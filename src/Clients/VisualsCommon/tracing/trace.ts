@@ -24,8 +24,6 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
-
 module jsCommon {
     export interface ITraceListener {
         logTrace(trace: TraceItem): void;
@@ -59,19 +57,23 @@ module jsCommon {
     }
 
     export module Trace {
-        var traceMaxCount = 1000;
-        var traces = new Array<TraceItem>(traceMaxCount);
-        var lastTraceIndex: number = -1;
-        var defaultListener = new ConsoleTracer();
-        var listeners = new Array<ITraceListener>(defaultListener);
+        const traceMaxCount = 1000;
+        let traces = new Array<TraceItem>(traceMaxCount);
+        let lastTraceIndex: number = -1;
+        let defaultListener = new ConsoleTracer();
+        let listeners = new Array<ITraceListener>(defaultListener);
 
-        /** Trace a warning. Please ensure that no PII is being logged.*/
+        /**
+         * Trace a warning. Please ensure that no PII is being logged.
+         */
         export function warning(text: string, requestId?: string): void {
             debug.assertValue(text, 'text');
             logTraceInternal(new TraceItem(text, TraceType.Warning, requestId));
         }
 
-        /** Trace an error. Please ensure that no PII is being logged.*/
+        /** 
+         * Trace an error. Please ensure that no PII is being logged.
+         */
         export function error(text: string, includeStackTrace?: boolean, requestId?: string): void {
             debug.assertValue(text, 'text');
             if (includeStackTrace)
@@ -79,7 +81,9 @@ module jsCommon {
             logTraceInternal(new TraceItem(text, TraceType.Error, requestId));
         }
 
-        /** Trace an information. Please ensure that no PII is being logged.*/
+        /** 
+         * Trace an information. Please ensure that no PII is being logged.
+         */
         export function verbose(text: string, requestId?: string): void {
             debug.assertValue(text, 'text');
             logTraceInternal(new TraceItem(text, TraceType.Verbose, requestId));
@@ -93,7 +97,7 @@ module jsCommon {
         export function removeListener(listener: ITraceListener): void {
             debug.assertValue(listener, 'listener');
 
-            var index = listeners.indexOf(listener);
+            let index = listeners.indexOf(listener);
             if (index >= 0)
                 listeners.splice(index, 1);
         }
@@ -110,14 +114,16 @@ module jsCommon {
             if (lastTraceIndex < 0)
                 return;
 
-            var result = new Array<TraceItem>(lastTraceIndex+1);
-            for (var i = 0; i <= lastTraceIndex; i++)
+            let result = new Array<TraceItem>(lastTraceIndex+1);
+            for (let i = 0; i <= lastTraceIndex; i++)
                 result[i] = traces[i];
 
             return result;
         }
 
-        /** used for unit-test only */
+        /** 
+         * Note: Used for unit-test only. 
+         */
         export function disableDefaultListener(): void {
             removeListener(defaultListener);
         }
@@ -132,7 +138,7 @@ module jsCommon {
 
             traces[++lastTraceIndex] = trace;
 
-            for (var i = 0, len = listeners.length; i < len; i++)
+            for (let i = 0, len = listeners.length; i < len; i++)
                 listeners[i].logTrace(trace);
         }
     }

@@ -24,8 +24,6 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
-
 module powerbi.data {
 
     export interface QueryDefinition {
@@ -34,12 +32,18 @@ module powerbi.data {
         Where?: QueryFilter[];
         OrderBy?: QuerySortClause[];
         Select: QueryExpressionContainer[];
+        GroupBy?: QueryExpressionContainer[];
     }
 
     export interface FilterDefinition {
         Version?: number;
         From: EntitySource[];
         Where: QueryFilter[];
+    }    
+
+    export enum EntitySourceType {
+        Table = 0,
+        Pod = 1,
     }
 
     export interface EntitySource {
@@ -47,6 +51,7 @@ module powerbi.data {
         EntitySet?: string; // TODO: Remove this when Q&A Silverlight is removed and make Entity required
         Entity?: string;
         Schema?: string;
+        Type?: EntitySourceType;
     }
 
     export interface QueryFilter {
@@ -56,7 +61,7 @@ module powerbi.data {
 
     export interface QuerySortClause {
         Expression: QueryExpressionContainer;
-        Direction: QuerySortDirection;
+        Direction: SortDirection;
     }
 
     export interface QueryExpressionContainer {
@@ -66,6 +71,9 @@ module powerbi.data {
         Column?: QueryColumnExpression;
         Measure?: QueryMeasureExpression;
         Aggregation?: QueryAggregationExpression;
+        Hierarchy?: QueryHierarchyExpression;
+        HierarchyLevel?: QueryHierarchyLevelExpression;
+        PropertyVariationSource?: QueryPropertyVariationSourceExpression;
 
         // Logical
         And?: QueryBinaryExpression;
@@ -93,7 +101,19 @@ module powerbi.data {
         DateSpan?: QueryDateSpanExpression;
         DateAdd?: QueryDateAddExpression;
         Now?: QueryNowExpression;
-        // TODO: Still need to add the rest of the QueryExpression types.
+
+        // Default Values
+        DefaultValue?: QueryDefaultValueExpression;
+        AnyValue?: QueryAnyValueExpression;
+
+        Arithmetic?: QueryArithmeticExpression;
+
+        // Client-only expressions
+        FillRule?: QueryFillRuleExpression;
+        ResourcePackageItem?: QueryResourcePackageItem;
+
+        // Evaluation Expressions
+        ScopedEval?: QueryScopedEvalExpression;
     }
 
     export interface QueryPropertyExpression {
@@ -104,7 +124,7 @@ module powerbi.data {
     export interface QueryColumnExpression extends QueryPropertyExpression {
     }
 
-    export interface QueryMeasureExpression extends QueryPropertyExpression  {
+    export interface QueryMeasureExpression extends QueryPropertyExpression {
     }
 
     export interface QuerySourceRefExpression {
@@ -114,6 +134,22 @@ module powerbi.data {
     export interface QueryAggregationExpression {
         Function: QueryAggregateFunction;
         Expression: QueryExpressionContainer;
+    }
+
+    export interface QueryHierarchyExpression {
+        Expression: QueryExpressionContainer;
+        Hierarchy: string;
+    }
+
+    export interface QueryHierarchyLevelExpression {
+        Expression: QueryExpressionContainer;
+        Level: string;
+    }
+
+    export interface QueryPropertyVariationSourceExpression {
+        Expression: QueryExpressionContainer;
+        Name: string;
+        Property: string;
     }
 
     export interface QueryBinaryExpression {
@@ -178,6 +214,53 @@ module powerbi.data {
 
     export interface QueryNowExpression { }
 
+    export interface QueryDefaultValueExpression { }
+
+    export interface QueryAnyValueExpression { }
+
+    export interface QueryArithmeticExpression {
+        Left: QueryExpressionContainer;
+        Right: QueryExpressionContainer;
+        Operator: ArithmeticOperatorKind;
+    }
+
+    export const enum ArithmeticOperatorKind {
+        Add = 0,
+        Subtract = 1,
+        Multiply = 2,
+        Divide = 3,
+    }
+
+    export function getArithmeticOperatorName(arithmeticOperatorKind: ArithmeticOperatorKind): string {
+        switch (arithmeticOperatorKind) {
+            case ArithmeticOperatorKind.Add:
+                return "Add";
+            case ArithmeticOperatorKind.Subtract:
+                return "Subtract";
+            case ArithmeticOperatorKind.Multiply:
+                return "Multiply";
+            case ArithmeticOperatorKind.Divide:
+                return "Divide";
+        }
+        throw new Error('Unexpected ArithmeticOperatorKind: ' + arithmeticOperatorKind);
+    }
+
+    export interface QueryFillRuleExpression {
+        Input: QueryExpressionContainer;
+        FillRule: FillRuleGeneric<QueryExpressionContainer, QueryExpressionContainer>;
+    }
+
+    export interface QueryResourcePackageItem {
+        PackageName: string;
+        PackageType: number;
+        ItemName: string;
+    }
+
+    export interface QueryScopedEvalExpression {
+        Expression: QueryExpressionContainer;
+        Scope: QueryExpressionContainer[];
+    }
+
     export enum TimeUnit {
         Day = 0,
         Week = 1,
@@ -196,11 +279,9 @@ module powerbi.data {
         Min = 3,
         Max = 4,
         CountNonNull = 5,
-    }
-
-    export enum QuerySortDirection {
-        Ascending = 1,
-        Descending = 2,
+        Median = 6,
+        StandardDeviation = 7,
+        Variance = 8,
     }
 
     export enum QueryComparisonKind {
@@ -209,11 +290,6 @@ module powerbi.data {
         GreaterThanOrEqual = 2,
         LessThan = 3,
         LessThanOrEqual = 4,
-    }
-
-    export interface SemanticQueryDataShapeCommand {
-        Query: QueryDefinition;
-        Binding: DataShapeBinding;
     }
 
     /** Defines semantic data types. */
@@ -236,16 +312,6 @@ module powerbi.data {
         Range = 0x4000,
     }
 
-    export enum SelectKind {
-        None,
-        Group,
-        Measure,
-    }
-
-    export interface AuxiliarySelectBinding {
-        Value?: string;
-    }
-
     export interface QueryMetadata {
         Select?: SelectMetadata[];
         Filters?: FilterMetadata[];
@@ -263,15 +329,23 @@ module powerbi.data {
 
         /** The select projection name. */
         Name?: string;
+
+        /* If defined, this indicates the KPI class*/
+        kpiStatusGraphic?: string; // old version of kpi data
+
+        /* If defined, this indicates the KPI metadata*/
+        kpi?: DataViewKpiColumnMetadata;
     }
 
     export interface FilterMetadata {
         Restatement: string;
         Kind?: FilterKind;
+        /** The expression being filtered.  This is reflected in the filter card UI. */
+        expression?: QueryExpressionContainer;
     }
 
     export enum FilterKind {
         Default,
         Period,
     }
-} 
+}

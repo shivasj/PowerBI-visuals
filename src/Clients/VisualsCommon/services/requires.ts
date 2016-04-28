@@ -24,11 +24,9 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
-
 module jsCommon {
 
-    var doc: HTMLDocument = document,
+    let doc: HTMLDocument = document,
         headElement: HTMLElement = doc.head,
         firstScriptInHeadElement: HTMLElement = headElement.getElementsByTagName('script')[0],
         linkElement: HTMLElement = doc.createElement('link'),
@@ -39,7 +37,9 @@ module jsCommon {
 
     linkElement.setAttribute('rel', 'stylesheet');
 
-    // Public API
+    /**
+     * Public API.
+     */
 	export interface IJavaScriptDependency {
 		javascriptFile: string;
 
@@ -53,20 +53,22 @@ module jsCommon {
 		javaScriptFilesWithCallback?: IJavaScriptDependency[];
     }
 
-    export function requires(dependency: IDependency, to: () => void = () => { }): void {
+    export function requires(dependency: IDependency, to: () => void = $.noop): void {
         loadStyleSheets(dependency.cssFiles || []);
 
-		var scriptsToRun = dependency.javaScriptFilesWithCallback || [];
+		let scriptsToRun = dependency.javaScriptFilesWithCallback || [];
 
 		if (dependency.javaScriptFiles) {
-			for(var i=0, len=dependency.javaScriptFiles.length; i<len; ++i) {
+			for(let i=0, len=dependency.javaScriptFiles.length; i<len; ++i) {
 				scriptsToRun.push({javascriptFile:dependency.javaScriptFiles[i]});
 			}
 		}
         loadJavaScriptFiles(scriptsToRun, to);
     }
 
-    // Private Helpers
+    /**
+     * Private Helpers.
+     */
     function loadStyleSheets(hrefList: string[]): void {
         hrefList.forEach(href => {
             if (styleSheetLoaded.indexOf(href) === -1) {
@@ -77,7 +79,7 @@ module jsCommon {
     }
 
     function loadJavaScriptFiles(scripts: IJavaScriptDependency[], callback: () => void): void {
-        var loadingCount = scripts.length,
+        let loadingCount = scripts.length,
             parsingCount = loadingCount,
             sourceCodeList: IJavaScriptDependency[] = [];
 
@@ -94,7 +96,7 @@ module jsCommon {
         }
 
         scripts.forEach((script: IJavaScriptDependency, index: number) => {
-            var file = script.javascriptFile;
+            let file = script.javascriptFile;
             if (javaScriptFilesLoaded.indexOf(file) === -1) { // not loaded
 
                 if (file in javaScriptFilesLoading) { // loading
@@ -128,7 +130,7 @@ module jsCommon {
     }
 
     function loadStyleSheet(href: string): void {
-        var link = <any>linkElement.cloneNode();
+        let link = <any>linkElement.cloneNode();
         link.href = href;
         if (firstScriptInHeadElement) {
             headElement.insertBefore(link, firstScriptInHeadElement);
@@ -143,17 +145,17 @@ module jsCommon {
         });
     }
 
-    function parseJavaScript(script: IJavaScriptDependency, onComplete: () => void = () => { }): void {
+    function parseJavaScript(script: IJavaScriptDependency, onComplete: () => void = $.noop): void {
         if (!script) {
             onComplete();
             return;
         }
 
-		var sourceCodeOrFileName = script.javascriptFile;
+		let sourceCodeOrFileName = script.javascriptFile;
 
-		var targetCallback = onComplete;
+		let targetCallback = onComplete;
 		if (script.onLoadCallback) {
-			var promiseAsCallback = () => {
+			let promiseAsCallback = () => {
 				script.onLoadCallback().then(onComplete);
 			};
 			targetCallback = promiseAsCallback;
@@ -164,8 +166,8 @@ module jsCommon {
         : parseInternalJavaScriptCode(sourceCodeOrFileName, targetCallback);
     }
 
-    function parseInternalJavaScriptCode(sourceCode: string, onComplete: () => void = () => { }): void {
-        var script: HTMLElement;
+    function parseInternalJavaScriptCode(sourceCode: string, onComplete: () => void = $.noop): void {
+        let script: HTMLElement;
         if (sourceCode) {
             script = <any>scriptElement.cloneNode();
             script.setAttribute('type', 'text/javascript');
@@ -176,7 +178,7 @@ module jsCommon {
     }
 
     function loadExternalJavaScriptFile(src, onload: () => void): void {
-        var script: HTMLElement;
+        let script: HTMLElement;
         if (src) {
             script = <any>scriptElement.cloneNode();
             script.setAttribute('src', src);
@@ -189,8 +191,8 @@ module jsCommon {
     function parseJavaScriptSourceCodes(scripts: IJavaScriptDependency[], sourceCodeList: IJavaScriptDependency[]): void {
         asyncLoop(sourceCodeList, parseJavaScript, /*on all files parsed*/() => {
             scripts.forEach((script: IJavaScriptDependency) => {
-                var file = script.javascriptFile;
-                var listeners = javaScriptFilesLoading[file];
+                let file = script.javascriptFile;
+                let listeners = javaScriptFilesLoading[file];
                 if (listeners) {
                     listeners.forEach((listener) => {
                         listener();
@@ -206,7 +208,7 @@ module jsCommon {
     }
 
     function webGet(src: string, onload: () => void, onerror?: (error: any) => void): void {
-        var xhr = new XMLHttpRequest();
+        let xhr = new XMLHttpRequest();
 
         try {
             xhr.open('GET', src, true);
@@ -220,7 +222,7 @@ module jsCommon {
     }
 
     function isExternalUrl(url: string): boolean {
-        var origin = location.protocol + '//' + location.host + '/';
+        let origin = location.protocol + '//' + location.host + '/';
         return /^http[s]?:\/\/.+/i.test(url) && url.indexOf(origin) !== 0;
     }
 
@@ -231,7 +233,7 @@ module jsCommon {
             return;
         }
 
-        var steps = [],
+        let steps = [],
             i = args.length;
 
         while (i--) {
@@ -245,7 +247,7 @@ module jsCommon {
     }
 
     function asyncLoop(enumerable: any[], func: (item, next) => void, callback: () => void): void {
-        var steps = [],
+        let steps = [],
             i = 0,
             len = enumerable.length;
 

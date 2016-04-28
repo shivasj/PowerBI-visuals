@@ -24,14 +24,11 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../../_references.ts"/>
-
 module powerbi.visuals.controls {
 
     export interface ITablixBinder {
         onStartRenderingSession(): void;
         onEndRenderingSession(): void;
-
         /**  Binds the row hierarchy member to the DOM element. */
         bindRowHeader(item: any, cell: ITablixCell): void;
         unbindRowHeader(item: any, cell: ITablixCell): void;

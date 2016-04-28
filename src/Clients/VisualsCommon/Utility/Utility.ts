@@ -24,14 +24,16 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
-
-// Defined in host
+/**
+ * Defined in host.
+ */
 declare var clusterUri: string;
 
 module jsCommon {
 
-    /** Http Status code we are interested */
+    /**
+     * Http Status code we are interested.
+     */
     export enum HttpStatusCode {
         OK = 200,
         BadRequest = 400,
@@ -40,50 +42,81 @@ module jsCommon {
         RequestEntityTooLarge = 413,
     }
 
-    /** Other HTTP Constants */
+    /**
+     * Other HTTP Constants.
+     */
     export module HttpConstants {
         export const ApplicationOctetStream = 'application/octet-stream';
         export const MultiPartFormData = 'multipart/form-data';
     }
 
-    /** Extensions to String class */
+    /**
+     * Extensions to String class.
+     */
     export module StringExtensions {
+        const HtmlTagRegex = new RegExp('[<>]', 'g');
+
         export function format(...args: string[]) {
-            var s = args[0];
+            let s = args[0];
 
             if (isNullOrUndefinedOrWhiteSpaceString(s))
                 return s;
 
-            for (var i = 0; i < args.length - 1; i++) {
-                var reg = new RegExp("\\{" + i + "\\}", "gm");
+            for (let i = 0; i < args.length - 1; i++) {
+                let reg = new RegExp("\\{" + i + "\\}", "gm");
                 s = s.replace(reg, args[i + 1]);
             }
             return s;
         }
 
-        /** Compares two strings for equality, ignoring case. */
+        /**
+         * Compares two strings for equality, ignoring case.
+         */
         export function equalIgnoreCase(a: string, b: string): boolean {
             return StringExtensions.normalizeCase(a) === StringExtensions.normalizeCase(b);
         }
 
         export function startsWithIgnoreCase(a: string, b: string): boolean {
-            var normalizedSearchString = StringExtensions.normalizeCase(b);
+            let normalizedSearchString = StringExtensions.normalizeCase(b);
             return StringExtensions.normalizeCase(a).indexOf(normalizedSearchString) === 0;
         }
 
-        /** Normalizes case for a string.  Used by equalIgnoreCase method. */
+        export function startsWith(a: string, b: string): boolean {
+            return a.indexOf(b) === 0;
+        }
+
+        /** Determines whether a string contains a specified substring (while ignoring case). */
+        export function containsIgnoreCase(source: string, substring: string): boolean {
+            if (source == null)
+                return false;
+
+            return source.toLowerCase().indexOf(substring.toLowerCase().toString()) !== -1;
+        }
+
+        /** 
+         * Normalizes case for a string.
+         * Used by equalIgnoreCase method. 
+         */
         export function normalizeCase(value: string): string {
             Utility.throwIfNullOrUndefined(value, StringExtensions, 'normalizeCase', 'value');
 
             return value.toUpperCase();
         }
 
-        /** Is string null or empty or undefined? */
+        /** 
+         * Is string null or empty or undefined?
+         * @return True if the value is null or undefined or empty string,
+         * otherwise false.
+         */
         export function isNullOrEmpty(value: string): boolean {
             return (value == null) || (value.length === 0);
         }
 
-        /** Returns true if the string is null, undefined, empty, or only includes white spaces */
+        /** 
+         * Returns true if the string is null, undefined, empty, or only includes white spaces.
+         * @return True if the str is null, undefined, empty, or only includes white spaces,
+         * otherwise false.
+         */
         export function isNullOrUndefinedOrWhiteSpaceString(str: string): boolean {
             return StringExtensions.isNullOrEmpty(str) || StringExtensions.isNullOrEmpty(str.trim());
         }
@@ -94,7 +127,7 @@ module jsCommon {
         export function containsWhitespace(str: string): boolean {
             Utility.throwIfNullOrUndefined(str, this, 'containsWhitespace', 'str');
 
-            var expr: RegExp = /\s/;
+            let expr: RegExp = /\s/;
             return expr.test(str);
         }
 
@@ -107,19 +140,25 @@ module jsCommon {
             return str.trim() === '';
         }
 
-        /** Returns the string with any trailing whitespace from str removed. */
+        /** 
+         * Returns the string with any trailing whitespace from str removed.
+         */
         export function trimTrailingWhitespace(str: string): string {
             Utility.throwIfNullOrUndefined(str, this, 'trimTrailingWhitespace', 'str');
             return str.replace(/\s+$/, '');
         }
 
-        /** Returns the string with any leading and trailing whitespace from str removed. */
+        /**
+         * Returns the string with any leading and trailing whitespace from str removed.
+         */
         export function trimWhitespace(str: string): string {
             Utility.throwIfNullOrUndefined(str, this, 'trimWhitespace', 'str');
             return str.replace(/^\s+/, '').replace(/\s+$/, '');
         }
 
-        /** Returns length difference between the two provided strings */
+        /** 
+         * Returns length difference between the two provided strings.
+         */
         export function getLengthDifference(left: string, right: string) {
             Utility.throwIfNullOrUndefined(left, this, 'getLengthDifference', 'left');
             Utility.throwIfNullOrUndefined(right, this, 'getLengthDifference', 'right');
@@ -127,32 +166,69 @@ module jsCommon {
             return Math.abs(left.length - right.length);
         }
 
-        /** Repeat char or string several times.
-          * @param char The string to repeat.
-          * @param count How many times to repeat the string.
-          */
+        /**
+         * Repeat char or string several times.
+         * @param char The string to repeat.
+         * @param count How many times to repeat the string.
+         */
         export function repeat(char: string, count: number): string {
-            var result = "";
-            for (var i = 0; i < count; i++) {
+            let result = "";
+            for (let i = 0; i < count; i++) {
                 result += char;
             }
             return result;
         }
 
-        /** Replace all the occurrences of the textToFind in the text with the textToReplace
-          * @param text The original string.
-          * @param textToFind Text to find in the original string
-          * @param textToReplace New text replacing the textToFind
-          */
+        /**
+         * Replace all the occurrences of the textToFind in the text with the textToReplace.
+         * @param text The original string.
+         * @param textToFind Text to find in the original string.
+         * @param textToReplace New text replacing the textToFind.
+         */
         export function replaceAll(text: string, textToFind: string, textToReplace: string): string {
             if (!textToFind)
                 return text;
 
-            var pattern = textToFind.replace(/([-()\[\]{}+?*.$\^|,:#<!\\])/g, '\\$1');
-            return text.replace(new RegExp(pattern, 'g'), textToReplace);
+            let pattern = escapeStringForRegex(textToFind);
+            return text.replace(new RegExp(pattern, 'gi'), textToReplace);
         }
 
-        /** Returns a name that is not specified in the values. */
+        export function ensureUniqueNames(names: string[]): string[] {
+            debug.assertValue(names, 'names');
+
+            let usedNames: { [name: string]: boolean } = {};
+
+            // Make sure we are giving fair chance for all columns to stay with their original name
+            // First we fill the used names map to contain all the original unique names from the list.
+            for (let name of names) {
+                usedNames[name] = false;
+            }
+
+            let uniqueNames: string[] = [];
+
+            // Now we go over all names and find a unique name for each
+            for (let name of names) {
+                let uniqueName = name;
+
+                // If the (original) column name is already taken lets try to find another name
+                if (usedNames[uniqueName]) {
+                    let counter = 0;
+                    // Find a name that is not already in the map
+                    while (usedNames[uniqueName] !== undefined) {
+                        uniqueName = name + "." + (++counter);
+                    }
+                }
+
+                uniqueNames.push(uniqueName);
+                usedNames[uniqueName] = true;
+            }
+
+            return uniqueNames;
+        }
+
+        /**
+         * Returns a name that is not specified in the values.
+         */
         export function findUniqueName(
             usedNames: { [name: string]: boolean },
             baseName: string): string {
@@ -160,7 +236,7 @@ module jsCommon {
             debug.assertValue(baseName, 'baseName');
 
             // Find a unique name
-            var i = 0,
+            let i = 0,
                 uniqueName: string = baseName;
             while (usedNames[uniqueName]) {
                 uniqueName = baseName + (++i);
@@ -176,14 +252,14 @@ module jsCommon {
             if (maxValue === null || maxValue === undefined)
                 maxValue = Number.MAX_VALUE;
 
-            var length = Math.min(maxValue, list.length);
+            let length = Math.min(maxValue, list.length);
 
-            var replacedList = [];
+            let replacedList = [];
             // Only need to replace user entries of {0} and {1} since we build the list in pairs.
-            for (var j = 0; j < 2; j++) {
-                var targetValue = '{' + j + '}';
-                var replaceValue = '_|_<' + j + '>_|_';
-                for (var i = 0; i < length; i++) {
+            for (let j = 0; j < 2; j++) {
+                let targetValue = '{' + j + '}';
+                let replaceValue = '_|_<' + j + '>_|_';
+                for (let i = 0; i < length; i++) {
                     if (list[i].indexOf(targetValue) > -1) {
                         list[i] = list[i].replace(targetValue, replaceValue);
                         replacedList.push({ targetValue: targetValue, replaceValue: replaceValue });
@@ -191,28 +267,76 @@ module jsCommon {
                 }
             }
 
-            var commaSeparatedList: string = '';
-            for (var i = 0; i < length; i++) {
+            let commaSeparatedList: string = '';
+            for (let i = 0; i < length; i++) {
                 if (i === 0)
                     commaSeparatedList = list[i];
                 else
                     commaSeparatedList = StringExtensions.format(resourceProvider.get('FilterRestatement_Comma'), commaSeparatedList, list[i]);
             }
 
-            for (var i = 0; i < replacedList.length; i++) {
+            for (let i = 0; i < replacedList.length; i++) {
                 commaSeparatedList = commaSeparatedList.replace(replacedList[i].replaceValue, replacedList[i].targetValue);
             }
 
             return commaSeparatedList;
         }
+
+        export function escapeStringForRegex(s: string): string {
+            return s.replace(/([-()\[\]{}+?*.$\^|,:#<!\\])/g, '\\$1');
+        }
+
+        /**
+         * Remove file name reserved characters <>:"/\|?* from input string.
+         */
+        export function normalizeFileName(fileName: string): string {   
+            debug.assertValue(fileName, 'fileName');         
+            return fileName.replace(/[\<\>\:"\/\\\|\?*]/g, '');
+        }
+
+        /**
+         * Similar to JSON.stringify, but strips away escape sequences so that the resulting
+         * string is human-readable (and parsable by JSON formatting/validating tools).
+         */
+        export function stringifyAsPrettyJSON(object: any): string {
+            //let specialCharacterRemover = (key: string, value: string) => value.replace(/[^\w\s]/gi, '');
+            return JSON.stringify(object /*, specialCharacterRemover*/);
+        }
+
+        /**
+         * Derive a CLS-compliant name from a specified string.  If no allowed characters are present, return a fallback string instead.
+         * TODO (6708134): this should have a fully Unicode-aware implementation
+         */
+        export function deriveClsCompliantName(input: string, fallback: string): string {
+            debug.assertValue(input, 'input');
+
+            let result = input.replace(/^[^A-Za-z]*/g, '').replace(/[ :\.\/\\\-\u00a0\u1680\u180e\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]/g, '_').replace(/[\W]/g, '');
+
+            return result.length > 0 ? result : fallback;
+        }
+
+        /** Performs cheap sanitization by stripping away HTML tag (<>) characters. */
+        export function stripTagDelimiters(s: string): string {
+            return s.replace(HtmlTagRegex, '');
+        }
     }
 
-    /** Interface used for interacting with WCF typed objects */
+    /**
+     * Interface used for interacting with WCF typed objects.
+     */
     export interface TypedObject {
         __type: string;
     }
 
-    /** Script#: The general utility class */
+    export interface TextMatch {
+        start: number;
+        end: number;
+        text: string;
+    }
+
+    /** 
+     * The general utility class.
+     */
     export class Utility {
         private static TypeNamespace = 'http://schemas.microsoft.com/sqlbi/2013/01/NLRuntimeService';
 
@@ -230,13 +354,13 @@ module jsCommon {
         public static Undefined = 'undefined';
 
         private static staticContentLocation: string = window.location.protocol + '//' + window.location.host;
-
+        
         /**
          * Ensures the specified value is not null or undefined. Throws a relevent exception if it is.
-         * @param value - The value to check
-         * @param context - The context from which the check originated
-         * @param methodName - The name of the method that initiated the check
-         * @param parameterName - The parameter name of the value to check
+         * @param value The value to check.
+         * @param context The context from which the check originated.
+         * @param methodName The name of the method that initiated the check.
+         * @param parameterName The parameter name of the value to check.
          */
         public static throwIfNullOrUndefined(value, context, methodName, parameterName) {
             if (value === null) {
@@ -249,10 +373,10 @@ module jsCommon {
 
         /**
          * Ensures the specified value is not null, undefined or empty. Throws a relevent exception if it is.
-         * @param value - The value to check
-         * @param context - The context from which the check originated
-         * @param methodName - The name of the method that initiated the check
-         * @param parameterName - The parameter name of the value to check
+         * @param value The value to check.
+         * @param context The context from which the check originated.
+         * @param methodName The name of the method that initiated the check.
+         * @param parameterName The parameter name of the value to check.
          */
         public static throwIfNullOrEmpty(value: any, context: any, methodName: string, parameterName: string) {
             Utility.throwIfNullOrUndefined(value, context, methodName, parameterName);
@@ -263,10 +387,10 @@ module jsCommon {
 
         /**
          * Ensures the specified string is not null, undefined or empty. Throws a relevent exception if it is.
-         * @param value - The value to check
-         * @param context - The context from which the check originated
-         * @param methodName - The name of the method that initiated the check
-         * @param parameterName - The parameter name of the value to check
+         * @param value The value to check.
+         * @param context The context from which the check originated.
+         * @param methodName The name of the method that initiated the check.
+         * @param parameterName The parameter name of the value to check.
          */
         public static throwIfNullOrEmptyString(value: string, context: any, methodName: string, parameterName: string) {
             Utility.throwIfNullOrUndefined(value, context, methodName, parameterName);
@@ -277,10 +401,10 @@ module jsCommon {
 
         /**
          * Ensures the specified value is not null, undefined, whitespace or empty. Throws a relevent exception if it is.
-         * @param value - The value to check
-         * @param context - The context from which the check originated
-         * @param methodName - The name of the method that initiated the check
-         * @param parameterName - The parameter name of the value to check
+         * @param value The value to check.
+         * @param context The context from which the check originated.
+         * @param methodName The name of the method that initiated the check.
+         * @param parameterName The parameter name of the value to check.
          */
         public static throwIfNullEmptyOrWhitespaceString(value: string, context: any, methodName: string, parameterName: string) {
             Utility.throwIfNullOrUndefined(value, context, methodName, parameterName);
@@ -291,10 +415,10 @@ module jsCommon {
 
         /**
          * Ensures the specified condition is true. Throws relevant exception if it isn't.
-         * @param condition - The condition to check
-         * @param context - The context from which the check originated
-         * @param methodName - The name of the method that initiated the check
-         * @param parameterName - The parameter name against which the condition is checked
+         * @param condition The condition to check.
+         * @param context The context from which the check originated.
+         * @param methodName The name of the method that initiated the check.
+         * @param parameterName The parameter name against which the condition is checked.
          */
         public static throwIfNotTrue(condition: boolean, context: any, methodName: string, parameterName: string) {
             if (!condition) {
@@ -304,7 +428,7 @@ module jsCommon {
 
         /**
          * Checks whether the provided value is a 'string'.
-         * @param value - The value to test
+         * @param value The value to test.
          */
         public static isString(value: any): boolean {
             return ((typeof value) === 'string');
@@ -312,7 +436,7 @@ module jsCommon {
 
         /**
          * Checks whether the provided value is a 'boolean'.
-         * @param value - The value to test
+         * @param value The value to test.
          */
         public static isBoolean(value: any): boolean {
             return ((typeof value) === 'boolean');
@@ -320,7 +444,7 @@ module jsCommon {
 
         /**
          * Checks whether the provided value is a 'number'.
-         * @param value - The value to test
+         * @param value The value to test.
          */
         public static isNumber(value: any): boolean {
             return ((typeof value) === 'number');
@@ -328,7 +452,7 @@ module jsCommon {
 
         /**
          * Checks whether the provided value is a Date instance.
-         * @param value - The value to test
+         * @param value The value to test.
          */
         public static isDate(value: any): boolean {
             return Utility.isObject(value) && (value instanceof Date);
@@ -336,7 +460,7 @@ module jsCommon {
 
         /**
          * Checks whether the provided value is an 'object'.
-         * @param value - The value to test
+         * @param value The value to test.
          */
         public static isObject(value: any): boolean {
             return (value != null) && ((typeof value) === 'object');
@@ -344,17 +468,17 @@ module jsCommon {
 
         /**
          * Checks whether the provided value is null or undefined.
-         * @param value - The value to test
-        */
+         * @param value The value to test.
+         */
         public static isNullOrUndefined(value: any): boolean {
             return (value === null) || (typeof (value) === Utility.Undefined);
         }
 
         /**
-         * Combine a base url and a path
-         * @param baseUrl - The base url
-         * @param path - The path to add on to the base url
-         * @returns The combined url
+         * Combine a base url and a path.
+         * @param baseUrl The base url.
+         * @param path The path to add on to the base url.
+         * @returns The combined url.
          */
         public static urlCombine(baseUrl: string, path: string) {
             Utility.throwIfNullOrUndefined(baseUrl, null, "urlCombine", "baseUrl");
@@ -369,7 +493,7 @@ module jsCommon {
                 return path;
             }
 
-            var finalUrl = baseUrl;
+            let finalUrl = baseUrl;
 
             if (finalUrl.charAt(finalUrl.length - 1) === '/') {
                 if (path.charAt(0) === '/')
@@ -385,7 +509,7 @@ module jsCommon {
         public static getAbsoluteUri(path: string): string {
             Utility.throwIfNullOrUndefined(path, null, "getAbsoluteUri", "path");
 
-            var url = path;
+            let url = path;
             // Make absolute
             if (url && url.indexOf('http') === - 1) {
                 url = Utility.urlCombine(clusterUri, url);
@@ -396,7 +520,7 @@ module jsCommon {
         public static getStaticResourceUri(path: string) {
             Utility.throwIfNullOrUndefined(path, null, "getStaticResourceUri", "path");
 
-            var url = path;
+            let url = path;
             // Make absolute
             if (url && url.indexOf('http') === - 1) {
                 url = jsCommon.Utility.urlCombine(Utility.staticContentLocation, url);
@@ -426,15 +550,15 @@ module jsCommon {
         }
 
         /**
-         * Creates a client-side Guid string
-         * @returns A string representation of a Guid
+         * Creates a client-side Guid string.
+         * @returns A string representation of a Guid.
          */
         public static generateGuid(): string {
-            var guid = "",
+            let guid = "",
                 idx = 0;
 
             for (idx = 0; idx < 32; idx += 1) {
-                var guidDigitsItem = Math.random() * 16 | 0;
+                let guidDigitsItem = Math.random() * 16 | 0;
                 switch (idx) {
                     case 8:
                     case 12:
@@ -450,29 +574,15 @@ module jsCommon {
         }
 
         /**
-         * Generates a random 7 character string that is used as a connection group name
-         * @returns A random connection group name
-         */
-        public static generateConnectionGroupName(): string {
-            var name = "";
-            var possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-
-            for (var i = 0; i < 7; i++)
-                name += possible.charAt(Math.floor(Math.random() * possible.length));
-
-            return name;
-        }
-
-        /**
-         * Try extract a cookie from <paramref name="cookie"/> identified by key <paramref name="key"/>
+         * Try extract a cookie from {@link document.cookie} identified by key.
          */
         public static getCookieValue(key: string): string {
             // the cookie is of the format <key1=value1>; <key2=value2>. Split by ';', then by '=' 
             // to search for the key
-            var keyValuePairs = document.cookie.split(';');
-            for (var i = 0; i < keyValuePairs.length; i++) {
-                var keyValue = keyValuePairs[i];
-                var split = keyValue.split('=');
+            let keyValuePairs = document.cookie.split(';');
+            for (let i = 0; i < keyValuePairs.length; i++) {
+                let keyValue = keyValuePairs[i];
+                let split = keyValue.split('=');
                 if (split.length > 0 && split[0].trim() === key) {
                     return keyValue.substr(keyValue.indexOf('=') + 1);
                 }
@@ -481,59 +591,59 @@ module jsCommon {
         }
 
         /**
-         * Extracts the protocol://hostname section of a url
-         * @param url - The URL from which to extract the section
-         * @returns The protocol://hostname portion of the given URL
+         * Extracts the protocol://hostname section of a url.
+         * @param url The URL from which to extract the section.
+         * @returns The protocol://hostname portion of the given URL.
          */
         public static getDomainForUrl(url: string): string {
-            var hrefObject = Utility.getHrefObjectFromUrl(url);
+            let hrefObject = Utility.getHrefObjectFromUrl(url);
             return hrefObject.prop('protocol') + '//' + hrefObject.prop('hostname');
         }
 
         /**
-         * Extracts the hostname and absolute path sections of a url
-         * @param url - The URL from which to extract the section
-         * @returns The hostname and absolute path portion of the given URL
+         * Extracts the hostname and absolute path sections of a url.
+         * @param url The URL from which to extract the section.
+         * @returns The hostname and absolute path portion of the given URL.
          */
         public static getHostNameForUrl(url: string): string {
-            var hrefObject = Utility.getHrefObjectFromUrl(url);
+            let hrefObject = Utility.getHrefObjectFromUrl(url);
             return Utility.urlCombine(hrefObject.prop('hostname'), hrefObject.prop('pathname'));
         }
 
         /**
-        * Return the original url with query string stripped.
-        * @param url - The URL from which to extract the section
-        * @returns the original url with query string stripped.
-        */
+         * Return the original url with query string stripped.
+         * @param url The URL from which to extract the section.
+         * @returns the original url with query string stripped.
+         */
         public static getUrlWithoutQueryString(url: string): string {
-            var hrefObject = Utility.getHrefObjectFromUrl(url);
+            let hrefObject = Utility.getHrefObjectFromUrl(url);
             return hrefObject.prop('protocol') + '//' + Utility.urlCombine(hrefObject.prop('host'), hrefObject.prop('pathname'));
         }
 
         /**
-         * Extracts the protocol section of a url
-         * @param url - The URL from which to extract the section
-         * @returns The protocol for the current URL
+         * Extracts the protocol section of a url.
+         * @param url The URL from which to extract the section.
+         * @returns The protocol for the current URL.
          */
         public static getProtocolFromUrl(url: string): string {
             return Utility.getHrefObjectFromUrl(url).prop('protocol').replace(':', '');
         }
 
         /**
-         * Returns a formatted href object from a URL
-         * @param url - The URL used to generate the object
-         * @returns A jQuery object with the url
+         * Returns a formatted href object from a URL.
+         * @param url The URL used to generate the object.
+         * @returns A jQuery object with the url.
          */
         public static getHrefObjectFromUrl(url: string): JQuery {
-            var aObject = $('<a>');
+            let aObject = $('<a>');
             aObject = aObject.prop('href', url);
             return aObject;
         }
 
         /**
-         * Converts a WCF representation of a dictionary to a JavaScript dictionary
-         * @param wcfDictionary - The WCF dictionary to convert
-         * @returns The native JavaScript representation of this dictionary
+         * Converts a WCF representation of a dictionary to a JavaScript dictionary.
+         * @param wcfDictionary The WCF dictionary to convert.
+         * @returns The native JavaScript representation of this dictionary.
          */
         public static convertWcfToJsDictionary(wcfDictionary: any[]): { [index: string]: any; } {
             // convert the WCF JSON representation of a dictionary
@@ -541,10 +651,10 @@ module jsCommon {
             // WCF representation: [{"Key": Key, "Value": Value}..]
             // JS representation: [Key: Value ..]
 
-            var result: { [index: string]: any; } = {};
+            let result: { [index: string]: any; } = {};
 
-            for (var i = 0; i < wcfDictionary.length; i++) {
-                var keyValuePair = wcfDictionary[i];
+            for (let i = 0; i < wcfDictionary.length; i++) {
+                let keyValuePair = wcfDictionary[i];
                 result[keyValuePair['Key']] = keyValuePair['Value'];
             }
 
@@ -555,16 +665,16 @@ module jsCommon {
             if (StringExtensions.isNullOrEmpty(jsonDate)) {
                 return null;
             }
-            var begIndex = jsonDate.indexOf('(');
-            var endIndex = jsonDate.indexOf(')');
+            let begIndex = jsonDate.indexOf('(');
+            let endIndex = jsonDate.indexOf(')');
             if (begIndex !== -1 && endIndex !== -1) {
-                var milliseconds = parseInt(jsonDate.substring(begIndex + 1, endIndex), 10);
+                let milliseconds = parseInt(jsonDate.substring(begIndex + 1, endIndex), 10);
 
                 if (fromUtcMilliseconds) {
                     return new Date(milliseconds);
                 }
                 else {
-                    var retValue = new Date(0);
+                    let retValue = new Date(0);
                     retValue.setUTCMilliseconds(milliseconds);
                     return retValue;
                 }
@@ -573,34 +683,34 @@ module jsCommon {
         }
 
         /**
-         * Get the outer html of the given jquery object
-         * @param content - The jquery object
-         * @returns The entire html representation of the object
+         * Get the outer html of the given jquery object.
+         * @param content The jquery object.
+         * @returns The entire html representation of the object.
          */
         public static getOuterHtml(content: JQuery): string {
             return $('<div>').append(content).html();
         }
 
         /**
-         * Comparison Method: Compares two integer numbers
-         * @param a - An integer value
-         * @param b - An integer value
-         * @returns The comparison result
+         * Comparison Method: Compares two integer numbers.
+         * @param a An integer value.
+         * @param b An integer value.
+         * @returns The comparison result.
          */
         public static compareInt(a: number, b: number): number {
             return a - b;
         }
-
-        /** 
-          Return the index of the smallest value in a numerical array
-          @param a - A numeric array
-          @returns - The index of the smallest value in the array
+        
+        /**
+         * Return the index of the smallest value in a numerical array.
+         * @param a A numeric array.
+         * @returns The index of the smallest value in the array.
          */
         public static getIndexOfMinValue(a: number[]) {
-            var retValue = 0;
-            var currentMinValue = a[0];
+            let retValue = 0;
+            let currentMinValue = a[0];
 
-            for (var i = 0; i < a.length; i++) {
+            for (let i = 0; i < a.length; i++) {
                 if (a[i] < currentMinValue) {
                     currentMinValue = a[i];
                     retValue = i;
@@ -609,44 +719,34 @@ module jsCommon {
 
             return retValue;
         }
-
-        /** 
-          Tests whether a URL is valid
-          @param url - The url to be tested
-          @returns - Whether the provided url is valid
-        */
-        public static isValidUrl(url: string): boolean {
-            return !StringExtensions.isNullOrEmpty(url) &&
-                (StringExtensions.startsWithIgnoreCase(url, 'http://') || StringExtensions.startsWithIgnoreCase(url, 'https://'));
-        }
-
-        /** 
-          Extracts a url from a background image attribute in the format of: url('www.foobar.com/image.png')
-          @param url - The value of the background-image attribute
-          @returns - The extracted url
-        */
+        
+        /**
+         * Extracts a url from a background image attribute in the format of: url('www.foobar.com/image.png').
+         * @param input The value of the background-image attribute.
+         * @returns The extracted url.
+         */
         public static extractUrlFromCssBackgroundImage(input: string) {
             return input.replace(/"/g, "").replace(/url\(|\)$/ig, "");
         }
-
-        /** 
-        *   Verifies image data url of images        
-        */
+        
+        /**
+         * Verifies image data url of images.
+         */
         public static isValidImageDataUrl(url: string): boolean {
-            var regex: RegExp = new RegExp('data:(image\/(png|jpg|jpeg|gif|svg))');
+            let regex: RegExp = new RegExp('data:(image\/(png|jpg|jpeg|gif|svg))');
             return regex.test(url);
         }
-
+        
         /**
-         Downloads a content string as a file
-         @param content - Content stream
-         @param fileName - File name to use
-        */
+         * Downloads a content string as a file.
+         * @param content Content stream.
+         * @param fileName File name to use.
+         */
         public static saveAsFile(content: any, fileName: string): void {
-            var contentBlob = new Blob([content], { type: HttpConstants.ApplicationOctetStream });
-            var url = window['webkitURL'] || URL;
-            var urlLink = url.createObjectURL(contentBlob);
-            var fileNameLink = fileName || urlLink;
+            let contentBlob = new Blob([content], { type: HttpConstants.ApplicationOctetStream });
+            let url = window['webkitURL'] || URL;
+            let urlLink = url.createObjectURL(contentBlob);
+            let fileNameLink = fileName || urlLink;
 
             // IE support, use msSaveOrOpenBlob API
             if (window.navigator.msSaveOrOpenBlob) {
@@ -657,7 +757,7 @@ module jsCommon {
             // WebKit-based browser support requires generating an anchor tag with
             // download attribute set to blob store and triggering a click event to invoke 
             // a download to file action
-            var hyperlink = document.createElement('a');
+            let hyperlink = document.createElement('a');
             hyperlink.href = urlLink;
             hyperlink.target = '_blank';
             hyperlink['download'] = fileNameLink;
@@ -668,14 +768,14 @@ module jsCommon {
         }
 
         /**
-         * Helper method to get the simple type name from a typed object
-         * @param obj - The typed object
-         * @returns The simple type name for the object
+         * Helper method to get the simple type name from a typed object.
+         * @param obj The typed object.
+         * @returns The simple type name for the object.
          */
         public static getType(obj: TypedObject) {
             Utility.throwIfNullEmptyOrWhitespaceString(obj.__type, this, 'getType', 'obj');
 
-            var parts = obj.__type.split(":");
+            let parts = obj.__type.split(":");
 
             if (parts.length !== 2) {
                 Errors.argument("obj.__type", "Type String not in expected format [Type]#[Namespace]: " + obj.__type);
@@ -689,14 +789,14 @@ module jsCommon {
         }
 
         /** 
-         * check if an element supports a specific event type
-         * @param eventName - The name of the event
-         * @param element - The element to test for event support
-         * @returns Whether the even is supported on the provided element
+         * Check if an element supports a specific event type.
+         * @param eventName The name of the event.
+         * @param element The element to test for event support.
+         * @returns Whether the even is supported on the provided element.
          */
         public static isEventSupported(eventName: string, element: Element): boolean {
             eventName = 'on' + eventName;
-            var isSupported = (eventName in element);
+            let isSupported = (eventName in element);
 
             if (!isSupported) {
                 // if we can't use setAttribute try a generic element
@@ -732,13 +832,13 @@ module jsCommon {
         }
 
         /** 
-         * check if an element supports a specific event type
-         * @param filePath - file path
-         * @returns file extension
+         * Check if an element supports a specific event type.
+         * @param filePath File path.
+         * @returns File extension.
          */
         public static getFileExtension(filePath: string): string {
             if (filePath) {
-                var index = filePath.lastIndexOf('.');
+                let index = filePath.lastIndexOf('.');
                 if (index >= 0)
                     return filePath.substr(index + 1);
             }
@@ -746,20 +846,20 @@ module jsCommon {
         }
 
         /** 
-         * Extract the filename out of a full path delimited by '\' or '/'
-         * @param filePath - file path
-         * @returns filename
+         * Extract the filename out of a full path delimited by '\' or '/'.
+         * @param filePath File path.
+         * @returns filename File name.
          */
         public static extractFileNameFromPath(filePath: string): string {
             return filePath.replace(/^.*[\\\/]/, '');
         }
 
         /**
-         *
          * This method indicates whether window.clipboardData is supported.
          * For example, clipboard support for Windows Store apps is currently disabled 
          * since window.clipboardData is unsupported (it raises access denied error)
-         * since clipboard in Windows Store is being achieved through Windows.ApplicationModel.DataTransfer.Clipboard class
+         * since clipboard in Windows Store is being 
+         * achieved through Windows.ApplicationModel.DataTransfer.Clipboard class.
          */
         public static canUseClipboard(): boolean {
             return (typeof MSApp === "undefined");
@@ -776,7 +876,7 @@ module jsCommon {
             if (value === undefined)
                 return defaultValue;
             
-            var result = Number(value);
+            let result = Number(value);
             if (isFinite(result))
                 return result;
             if (isNaN(result) && !(typeof value === "number" || value === "NaN"))
@@ -785,7 +885,7 @@ module jsCommon {
         }
 
         public static getURLParamValue(name:string) {
-            var results = new RegExp('[\?&]' + name + '=([^&#]*)').exec(window.location.href);
+            let results = new RegExp('[\?&]' + name + '=([^&#]*)').exec(window.location.href);
             if (results == null) {
                 return null;
             }
@@ -795,16 +895,18 @@ module jsCommon {
         }
 
         /**
-         * Return local timezone string or UTC if timezone cannot be found
-         * This function uses summer and winter offset to determine local time zone. The result localTimeZoneString must be a subset of the strings used by server, as
-         * documented here: https://msdn.microsoft.com/en-us/library/gg154758.aspx (Dynamic Daylight Savings Time (Compact 2013))
+         * Return local timezone.
+         * This function uses summer and winter offset to determine local time zone.
+         * The result localTimeZoneString must be a subset of the strings used by server, 
+         * as documented here: https://msdn.microsoft.com/en-us/library/gg154758.aspx (Dynamic Daylight Savings Time (Compact 2013)).
+         * @return Local timezone string or UTC if timezone cannot be found.
          */
         public static getLocalTimeZoneString(): string {
-            var timeSummer = new Date(Date.UTC(2005, 6, 30, 0, 0, 0, 0));
-            var summerOffset = -1 * timeSummer.getTimezoneOffset();
-            var timeWinter = new Date(Date.UTC(2005, 12, 30, 0, 0, 0, 0));
-            var winterOffset = -1 * timeWinter.getTimezoneOffset();
-            var localTimeZoneString;
+            let timeSummer = new Date(Date.UTC(2005, 6, 30, 0, 0, 0, 0));
+            let summerOffset = -1 * timeSummer.getTimezoneOffset();
+            let timeWinter = new Date(Date.UTC(2005, 12, 30, 0, 0, 0, 0));
+            let winterOffset = -1 * timeWinter.getTimezoneOffset();
+            let localTimeZoneString;
 
             if (-720 === summerOffset && -720 === winterOffset) { localTimeZoneString = 'Dateline Standard Time'; }
             else if (-660 === summerOffset && -660 === winterOffset) { localTimeZoneString = 'UTC-11'; }
@@ -867,20 +969,20 @@ module jsCommon {
 
     export class VersionUtility {
         /**
-         * Compares 2 version strings
-         * @param versionA - The first version string
-         * @param versionB - The second version string
-         * @returns A result for the comparison
+         * Compares 2 version strings.
+         * @param versionA The first version string.
+         * @param versionB The second version string.
+         * @returns A result for the comparison.
          */
         static compareVersions(versionA: string, versionB: string): number {
-            var a = versionA.split('.').map(parseFloat);
-            var b = versionB.split('.').map(parseFloat);
+            let a = versionA.split('.').map(parseFloat);
+            let b = versionB.split('.').map(parseFloat);
 
-            var versionParts = Math.max(a.length, b.length);
+            let versionParts = Math.max(a.length, b.length);
 
-            for (var i = 0; i < versionParts; i++) {
-                var partA = a[i] || 0;
-                var partB = b[i] || 0;
+            for (let i = 0; i < versionParts; i++) {
+                let partA = a[i] || 0;
+                let partB = b[i] || 0;
 
                 if (partA > partB)
                     return 1;
@@ -915,8 +1017,8 @@ module jsCommon {
 
             public end() {
                 if (window.performance === undefined || performance.mark === undefined || performance.measure === undefined) return;
-                var name = this._name;
-                var end = 'End ' + name;
+                let name = this._name;
+                let end = 'End ' + name;
                 performance.mark(end);
                 performance.measure(name, this._start, end);
                 if (console.timeEnd) {
@@ -932,13 +1034,13 @@ module jsCommon {
 
     export module DeferUtility {
         /**
-        * Wraps a callback and returns a new function
-        * The function can be called many times but the callback
-        * will only be executed once on the next frame.
-        * Use this to throttle big UI updates and access to DOM
-        */
+         * Wraps a callback and returns a new function.
+         * The function can be called many times but the callback
+         * will only be executed once on the next frame.
+         * Use this to throttle big UI updates and access to DOM.
+         */
         export function deferUntilNextFrame(callback: Function): Function {
-            var isWaiting, args, context;
+            let isWaiting, args, context;
 
             if (!window.requestAnimationFrame) {
                 window.requestAnimationFrame = (func) => setTimeout(func, 1000 / 50);

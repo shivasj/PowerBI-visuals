@@ -24,14 +24,11 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../../../_references.ts"/>
-
 module powerbi.visuals.controls.internal {
 
-    var UNSELECTABLE_CLASS_NAME = "unselectable";
+    const UNSELECTABLE_CLASS_NAME = "unselectable";
 
-    /** This class is responsible for tablix header resizing
-      */
+    /** This class is responsible for tablix header resizing */
     export class TablixResizer {
         private _element: HTMLElement;
         private _handler: ITablixResizeHandler;
@@ -123,7 +120,7 @@ module powerbi.visuals.controls.internal {
         }
 
         private onElementMouseDown(event: MouseEvent): void {
-            var position = TablixResizer.getMouseCoordinates(event);
+            let position = TablixResizer.getMouseCoordinates(event);
             if (!this._hotSpot(position))
                 return;
 
@@ -182,8 +179,10 @@ module powerbi.visuals.controls.internal {
             if (!this._startMousePosition)
                 return;
 
-            var delta = TablixResizer.getMouseCoordinateDelta(this._startMousePosition, TablixResizer.getMouseCoordinates(event));
+            let delta = TablixResizer.getMouseCoordinateDelta(this._startMousePosition, TablixResizer.getMouseCoordinates(event));
             this._handler.onResize(this.cell, delta.x, delta.y);
+            // Need to prevent default to prevent mouse move from triggering other effects (VSTS 6720639)
+            event.preventDefault();
         }
 
         private onDocumentMouseUp(event: MouseEvent): void {
@@ -212,8 +211,8 @@ module powerbi.visuals.controls.internal {
     export class TablixDomResizer extends TablixResizer {
         private _cell: TablixCell;
         constructor(cell: TablixCell, element: HTMLElement, handler: ITablixResizeHandler) {
-            this._cell = cell;
             super(element, handler);
+            this._cell = cell;
         }
 
         public get cell(): TablixCell {
@@ -227,20 +226,20 @@ module powerbi.visuals.controls.internal {
     }
 
     export class TablixCellPresenter {
-        static _noMarginsStyle: HTMLStyleElement;
-        static _noMarginsStyleName = "bi-tablix-cellNoMarginStyle";
         // Attribute used to disable dragging in order to have cell resizing work.
         static _dragResizeDisabledAttributeName = "drag-resize-disabled";
 
         private _owner: TablixCell;
 
         private _tableCell: HTMLTableCellElement;
+        /** Outer DIV */
         private _contentElement: HTMLDivElement;
+        /** Inner DIV */
         private _contentHost: HTMLDivElement;
 
-        private _contentHostStyle: string;
-        private _containerStyle: string;
         private _resizer: TablixResizer;
+
+        public layoutKind: TablixLayoutKind;
 
         constructor(fitProportionally: boolean, layoutKind: TablixLayoutKind) {
             // Table cell will be created once needed
@@ -248,31 +247,21 @@ module powerbi.visuals.controls.internal {
 
             // Content element
             this._contentElement = TablixUtils.createDiv();
-            this._contentElement.style.position = "relative";
-            if (!fitProportionally)
-                this._contentElement.style.setProperty("float", "left");
 
             // Content Host
             this._contentHost = TablixUtils.createDiv();
-            this._contentHost.style.position = "relative";
 
-            // TODO: this styling should not happen in the cell presenter; refactor to binder or layout manager
-            if (layoutKind === TablixLayoutKind.DashboardTile) {
-                this._contentHost.style.textOverflow = "ellipsis";
-                // With the current styling bold numbers are cut off at the right; adding a small padding
-                this._contentHost.style.paddingRight = "2px";
-            }
+            this.layoutKind = layoutKind;
 
             this._contentElement.appendChild(this._contentHost);
 
             this._resizer = null;
-            TablixCellPresenter.addNoMarginStyle();
         }
 
         public initialize(owner: TablixCell) {
             this._owner = owner;
         }
-        
+
         public get owner(): TablixCell {
             return this._owner;
         }
@@ -281,21 +270,22 @@ module powerbi.visuals.controls.internal {
             this._tableCell = tableCell;
 
             tableCell.appendChild(this._contentElement);
-            tableCell.className = TablixCellPresenter._noMarginsStyleName;
-
-            // TODO: Push to CSS
-            tableCell.style.verticalAlign = "top";
-            tableCell.style.lineHeight = "normal";
         }
-                
+
         public get tableCell(): HTMLTableCellElement {
             return this._tableCell;
         }
 
+        /**
+         * Outer DIV
+         */
         public get contentElement(): HTMLElement {
             return this._contentElement;
         }
 
+        /**
+        * Inner DIV
+        */
         public get contentHost(): HTMLElement {
             return this._contentHost;
         }
@@ -308,11 +298,11 @@ module powerbi.visuals.controls.internal {
             this._contentElement.onclick = null;
         }
 
-        public onContentWidthChanged(value: number): void {
+        public onContainerWidthChanged(value: number): void {
             HTMLElementUtils.setElementWidth(this._contentElement, value);
         }
 
-        public onContentHeightChanged(height: number): void {
+        public onContinerHeightChanged(height: number): void {
             HTMLElementUtils.setElementHeight(this._contentElement, height);
         }
 
@@ -330,9 +320,7 @@ module powerbi.visuals.controls.internal {
 
         public onClear(): void {
             this._contentHost.className = "";
-            this._contentHostStyle = "";
-            this._tableCell.className = TablixCellPresenter._noMarginsStyleName;
-            this._containerStyle = "";
+            this._tableCell.className = "";
         }
 
         public onHorizontalScroll(width: number, offset: number): void {
@@ -352,26 +340,6 @@ module powerbi.visuals.controls.internal {
             HTMLElementUtils.setElementHeight(this._contentHost, -1);
         }
 
-        public setContentHostStyle(style: string) {
-            if (this._contentHostStyle !== style) {
-                this._contentHostStyle = style;
-                this._contentHost.className = this._contentHostStyle;
-            }
-        }
-
-        public setContainerStyle(style: string) {
-            if (this._containerStyle !== style) {
-                this._containerStyle = style;
-                this._tableCell.className = this._containerStyle + " " + TablixCellPresenter._noMarginsStyleName;
-            }
-        }
-                
-        public clearContainerStyle() {
-            this._containerStyle = undefined;
-            if (this._tableCell.className !== TablixCellPresenter._noMarginsStyleName)
-                this._tableCell.className = TablixCellPresenter._noMarginsStyleName;
-        }
-
         public enableHorizontalResize(enable: boolean, handler: ITablixResizeHandler): void {
             if (enable === (this._resizer !== null))
                 return;
@@ -385,17 +353,10 @@ module powerbi.visuals.controls.internal {
             }
         }
 
-        static addNoMarginStyle() {
-            if (!TablixCellPresenter._noMarginsStyle) {
-                var style: HTMLStyleElement = <HTMLStyleElement>document.createElement('style');
-                style.appendChild(document.createTextNode("." + TablixCellPresenter._noMarginsStyleName + "{ padding: 0px; margin: 0px}"));
-                document.head.appendChild(style);
-                TablixCellPresenter._noMarginsStyle = style;
-            }
-        }
-
-        // In order to allow dragging of the tableCell we need to
-        // disable dragging of the container of the cell in IE.
+        /**
+         * In order to allow dragging of the tableCell we need to
+         * disable dragging of the container of the cell in IE.
+         */
         public disableDragResize() {
             this._tableCell.setAttribute(TablixCellPresenter._dragResizeDisabledAttributeName, "true");
         }
@@ -425,12 +386,12 @@ module powerbi.visuals.controls.internal {
         }
 
         public onAppendCell(cell: TablixCell): void {
-            var presenter = cell._presenter;
+            let presenter = cell._presenter;
 
             if (presenter.tableCell === null) {
                 // For performance reason we use InsertCell() to create new table cells instead of AppendChild()
                 // We use -1 to insert at the end (that's the cross-browser way of doing it)
-                var tableCell = this._tableRow.insertCell(-1);
+                let tableCell = this._tableRow.insertCell(-1);
                 presenter.registerTableCell(<HTMLTableCellElement>tableCell);
             }
             else {
@@ -441,11 +402,11 @@ module powerbi.visuals.controls.internal {
         public onInsertCellBefore(cell: TablixCell, refCell: TablixCell): void {
             debug.assertValue(refCell._presenter.tableCell, 'refTableCell');
 
-            var presenter = cell._presenter;
+            let presenter = cell._presenter;
 
             if (presenter.tableCell === null) {
                 // For performance reasons we use InsertCell() to create new table cells instead of AppendChild()
-                var tableCell = this._tableRow.insertCell(Math.max(0, refCell._presenter.tableCell.cellIndex - 1));
+                let tableCell = this._tableRow.insertCell(Math.max(0, refCell._presenter.tableCell.cellIndex - 1));
                 presenter.registerTableCell(<HTMLTableCellElement>tableCell);
             }
             else {
@@ -456,11 +417,11 @@ module powerbi.visuals.controls.internal {
         public onRemoveCell(cell: TablixCell): void {
             this._tableRow.removeChild(cell._presenter.tableCell);
         }
-        
+
         public getHeight(): number {
             return this.getCellHeight(this._row.getTablixCell());
         }
-    
+
         public getCellHeight(cell: ITablixCell): number {
             debug.assertFail("PureVirtualMethod: TablixRowPresenter.getCellHeight");
             return -1;
@@ -486,22 +447,22 @@ module powerbi.visuals.controls.internal {
         }
 
         public getCellHeight(cell: ITablixCell): number {
-            return this._gridPresenter.sizeComputationManager.cellHeight;
+            return cell.containerHeight;
         }
 
         public getCellContentHeight(cell: ITablixCell): number {
-            return this._gridPresenter.sizeComputationManager.contentHeight;
+            return cell.contentHeight;
         }
 
     }
 
     export class CanvasRowPresenter extends TablixRowPresenter {
         public getCellHeight(cell: ITablixCell): number {
-            return HTMLElementUtils.getElementHeight((<TablixCell>cell)._presenter.tableCell);
+            return cell.containerHeight;
         }
 
         public getCellContentHeight(cell: ITablixCell): number {
-            return HTMLElementUtils.getElementHeight((<TablixCell>cell)._presenter.contentElement);
+            return cell.contentHeight;
         }
 
     }
@@ -547,12 +508,42 @@ module powerbi.visuals.controls.internal {
     }
 
     export class CanvasColumnPresenter extends TablixColumnPresenter {
+        private _gridPresenter: CanvasTablixGridPresenter;
+        private _columnIndex: number;
+
+        constructor(gridPresenter: CanvasTablixGridPresenter, index: number) {
+            super();
+            this._gridPresenter = gridPresenter;
+            this._columnIndex = index;
+        }
         public getCellWidth(cell: ITablixCell): number {
+            let persistedWidth = this._gridPresenter.getPersistedCellWidth(this._columnIndex);
+
+            // Because persistedWidth could be 0 check specifically for null or undefined 
+            if (_.isNumber(persistedWidth))
+                return persistedWidth;
+
+            if (!(<TablixCell>cell)._presenter)
+                return 0;
+
             return HTMLElementUtils.getElementWidth((<TablixCell>cell)._presenter.tableCell);
         }
 
         public getCellContentWidth(cell: ITablixCell): number {
-            return HTMLElementUtils.getElementWidth((<TablixCell>cell)._presenter.contentElement);
+            let persistedWidth = this._gridPresenter.getPersistedCellWidth(this._columnIndex);
+
+            // Because persistedWidth could be 0 check specifically for null or undefined 
+            if (_.isNumber(persistedWidth))
+                return persistedWidth;
+
+            if (!(<TablixCell>cell)._presenter)
+                return 0;
+
+            let requiredWidth = HTMLElementUtils.getElementWidth((<TablixCell>cell)._presenter.contentElement);
+            if (requiredWidth > 0 && cell.colSpan === 1) // Doing this only for single-column-span cells
+                requiredWidth += 1; // Adding 1px because offsetWidth returns floored number, may risk getting ellipsis
+
+            return requiredWidth; 
         }
     }
 
@@ -561,8 +552,9 @@ module powerbi.visuals.controls.internal {
         protected _owner: TablixGrid;
 
         private _footerTable: HTMLTableElement;
+        private _columnWidthManager: TablixColumnWidthManager;
 
-        constructor() {
+        constructor(columnWidthManager?: TablixColumnWidthManager) {
             // Main Table
             this._table = TablixUtils.createTable();
             this._table.className = UNSELECTABLE_CLASS_NAME;
@@ -570,6 +562,9 @@ module powerbi.visuals.controls.internal {
             // Footer Table
             this._footerTable = TablixUtils.createTable();
             this._footerTable.className = UNSELECTABLE_CLASS_NAME;
+
+            // ColumnWidthManager
+            this._columnWidthManager = columnWidthManager;
         }
 
         public initialize(owner: TablixGrid, gridHost: HTMLElement, footerHost: HTMLElement, control: TablixControl) {
@@ -601,18 +596,18 @@ module powerbi.visuals.controls.internal {
             return null;
         }
 
-        public createColumnPresenter(): TablixColumnPresenter {
+        public createColumnPresenter(index: number): TablixColumnPresenter {
             debug.assertFail("PureVirtualMethod: TablixGridPresenter.createColumnPresenter");
             return null;
         }
 
         public onAppendRow(row: TablixRow): void {
-            var presenter = row.presenter;
+            let presenter = row.presenter;
 
             if (presenter.tableRow === null) {
                 // For performance reason we use InsertRow() to create new table cells instead of AppendChild()
                 // We use -1 to insert at the end (that's the cross-browser way of doing it)
-                var tableRow = this._table.insertRow(-1);
+                let tableRow = this._table.insertRow(-1);
                 presenter.registerRow(<HTMLTableRowElement>tableRow);
             }
             else {
@@ -623,11 +618,11 @@ module powerbi.visuals.controls.internal {
         public onInsertRowBefore(row: TablixRow, refRow: TablixRow): void {
             debug.assertValue(refRow.presenter.tableRow, 'refTableRow');
 
-            var presenter = row.presenter;
+            let presenter = row.presenter;
 
             if (presenter.tableRow === null) {
                 // For performance reason we use InsertRow() to create new table cells instead of AppendChild()
-                var tableRow = this._table.insertRow(Math.max(0, refRow.presenter.tableRow.rowIndex - 1));
+                let tableRow = this._table.insertRow(Math.max(0, refRow.presenter.tableRow.rowIndex - 1));
                 presenter.registerRow(<HTMLTableRowElement>tableRow);
             }
             else {
@@ -640,12 +635,12 @@ module powerbi.visuals.controls.internal {
         }
 
         public onAddFooterRow(row: TablixRow): void {
-            var presenter = row.presenter;
+            let presenter = row.presenter;
 
             if (presenter.tableRow === null) {
                 // For performance reason we use InsertRow() to create new table cells instead of AppendChild()
                 // We use -1 to insert at the end (that's the cross-browser way of doing it)
-                var tableRow = this._footerTable.insertRow(-1);
+                let tableRow = this._footerTable.insertRow(-1);
                 presenter.registerRow(<HTMLTableRowElement>tableRow);
             }
             else {
@@ -668,6 +663,16 @@ module powerbi.visuals.controls.internal {
                 this._footerTable.style.width = "auto";
             }
         }
+
+        public invokeColumnResizeEndCallback(columnIndex: number, width: number): void {
+            if (this._columnWidthManager)
+                this._columnWidthManager.onColumnWidthChanged(columnIndex, width);
+        }
+
+        public getPersistedCellWidth(columnIndex: number): number {
+            if (this._columnWidthManager)
+                return this._columnWidthManager.getPersistedColumnWidth(columnIndex);
+        }
     }
 
     export class DashboardTablixGridPresenter extends TablixGridPresenter {
@@ -683,7 +688,7 @@ module powerbi.visuals.controls.internal {
             return new DashboardRowPresenter(this, this._owner.fillColumnsProportionally);
         }
 
-        public createColumnPresenter(): TablixColumnPresenter {
+        public createColumnPresenter(index: number): TablixColumnPresenter {
             return new DashboardColumnPresenter(this);
         }
 
@@ -701,12 +706,17 @@ module powerbi.visuals.controls.internal {
     }
 
     export class CanvasTablixGridPresenter extends TablixGridPresenter {
+
+        constructor(columnWidthManager: TablixColumnWidthManager) {
+            super(columnWidthManager);
+        }
+
         public createRowPresenter(): TablixRowPresenter {
             return new CanvasRowPresenter(this._owner.fillColumnsProportionally);
         }
 
-        public createColumnPresenter(): TablixColumnPresenter {
-            return new CanvasColumnPresenter();
+        public createColumnPresenter(index: number): TablixColumnPresenter {
+            return new CanvasColumnPresenter(this, index);
         }
 
         public getWidth(): number {

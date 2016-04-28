@@ -24,24 +24,23 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
-
 module powerbitests {
-    import AnimatedNumber = powerbi.visuals.AnimatedNumber;
+    import AnimatedNumber = powerbi.visuals.AnimatedNumber; 
+    import animatedNumberCapabilities = powerbi.visuals.animatedNumberCapabilities;
 
     describe("AnimatedNumber", () => {
 
         it("AnimatedNumber registered capabilities", () => {
-            expect(powerbi.visuals.visualPluginFactory.create().getPlugin("animatedNumber").capabilities).toBe(AnimatedNumber.capabilities);
+            expect(powerbi.visuals.visualPluginFactory.create().getPlugin("animatedNumber").capabilities).toBe(animatedNumberCapabilities);
         });
 
         it("FormatString property should match calculated", () => {
-            expect(powerbi.data.DataViewObjectDescriptors.findFormatString(AnimatedNumber.capabilities.objects)).toEqual(AnimatedNumber.formatStringProp);
+            expect(powerbi.data.DataViewObjectDescriptors.findFormatString(animatedNumberCapabilities.objects)).toEqual(AnimatedNumber.formatStringProp);
         });
     });
 
     describe("AnimatedNumber DOM tests", () => {
-        var dataViewBuilder: DataViewBuilder;
+        let dataViewBuilder: DataViewBuilder;
 
         beforeEach(() => {
             dataViewBuilder = new DataViewBuilder();

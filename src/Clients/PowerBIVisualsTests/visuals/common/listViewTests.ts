@@ -24,16 +24,15 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../../_references.ts"/>
-
 module powerbitests {
     import ListViewFactory = powerbi.visuals.ListViewFactory;
     import ListViewOptions = powerbi.visuals.ListViewOptions;
     
     describe("List view tests", () => {
-        var listViewBuilder: ListViewBuilder;
+        let listViewBuilder: ListViewBuilder;
+        jasmine.clock().uninstall();
 
-        var data = [
+        let data = [
             { first: "Mickey", second: "Mouse" },
             { first: "Mini", second: "Mouse" },
             { first: "Daffy", second: "Duck" },
@@ -47,132 +46,107 @@ module powerbitests {
 
         beforeEach(() => {
             listViewBuilder = new ListViewBuilder();
-
             listViewBuilder.data = data;
+        });
+
+        afterEach(() => {
+            listViewBuilder.destroy();
+            listViewBuilder = null;
         });
 
         it("Create HTML List View Correctly", (done) => {
             listViewBuilder.buildHtmlListView();
 
             setTimeout(() => {
-                var itemCount = listViewBuilder.element.find(".item").length;
+                let itemCount = listViewBuilder.element.find(".item").length;
                 expect(itemCount).toBeGreaterThan(0);
-                expect(itemCount).toBeLessThan(9); // Some should be virtualized, so shouldn"t show all 9 items
+                expect(itemCount).toBeLessThan(9); // Some should be virtualized, so shouldn't show all 9 items
                 done();
             }, DefaultWaitForRender);
         });
-
-        it("Create SVG List View Correctly", (done) => {
-            listViewBuilder.buildSvgListView();
-
-            setTimeout(() => {
-                var itemCount = listViewBuilder.element.find(".item").length;
-                expect(itemCount).toBeGreaterThan(0);
-                expect(itemCount).toBeLessThan(9); // Some should be virtualized, so shouldn"t show all 9 items
-                done();
-            }, DefaultWaitForRender);
-        });
-
-        it("Scroll to last to check if items come in view HTML", (done) => {
-            listViewBuilder.isSpy = true;
+        
+         xit("Scroll partially down to check if the next item is added to the dom", (done) => {
             listViewBuilder.buildHtmlListView();
-
-            var lastElem = listViewBuilder.element.find(".item").last().text();
-
-            expect(lastElem).not.toEqual("-->Sachin-->Patney");
-            listViewBuilder.element.scrollTop(1000);
             setTimeout(() => {
-                var lastElem2 = listViewBuilder.element.find(".item").last().text();
-                expect(lastElem2).toEqual("-->Sachin-->Patney");
-                expect(listViewBuilder.spy).toHaveBeenCalled();
-                done();
+                let itemCount = listViewBuilder.element.find(".item").length;
+                expect(itemCount).toBeLessThan(9); // Some should be virtualized, so shouldn't show all 9 items
+
+                // Scroll just over half way down 1 element. This should force the next element to be added.
+                listViewBuilder.scrollElement.scrollTop(6);
+                setTimeout(() => {
+                    let items = listViewBuilder.element.find(".item");
+                    let newItemCount = items.length;
+                    let lastElem2 = items.last().text();
+                    expect(lastElem2).toEqual("-->Sachin-->Patney");
+                    expect(newItemCount).toEqual(itemCount + 1); // We should have an extra element since we're displaying an extra row.
+                    expect(listViewBuilder.spyOnLoadMoreData).toHaveBeenCalled();
+                    done();
+                }, DefaultWaitForRender);
             }, DefaultWaitForRender);
         });
 
-        it("Scroll to last to check if items come in view SVG", (done) => {
-            listViewBuilder.isSpy = true;
-            listViewBuilder.buildSvgListView();
-
-            var lastElem = listViewBuilder.element.find(".item").last().text();
-
-            expect(lastElem).not.toEqual("-->Sachin-->Patney");
-            listViewBuilder.element.scrollTop(1000);
-            setTimeout(() => {
-                var lastElem2 = listViewBuilder.element.find(".item").last().text();
-                expect(lastElem2).toEqual("-->Sachin-->Patney");
-                expect(listViewBuilder.spy).toHaveBeenCalled();
-                done();
-            }, DefaultWaitForRender);
-        });
-
-        it("Reset scrollbar position when ResetScrollbar flag is set", (done) => {
-            listViewBuilder.data = [
-                { first: "Mickey", second: "Mouse" },
-                { first: "Mini", second: "Mouse" },
-                { first: "Daffy", second: "Duck" },
-                { first: "Captain", second: "Planet" },
-                { first: "Russell", second: "Wilson" },
-                { first: "Jack", second: "Sparrow" },
-                { first: "James", second: "Bond" },
-                { first: "Sea", second: "Hawks" }
-            ];
-
+        xit("Scroll to last to check if items come in view HTML", (done) => {
             listViewBuilder.buildHtmlListView();
+            setTimeout(() => {
+                let lastElem = listViewBuilder.element.find(".item").last().text();
+                // the 8th item in the list when the viewport height is 80 and each item height is 10.
+                expect(lastElem).toEqual("-->Sea-->Hawks");
+                listViewBuilder.scrollElement.scrollTop(15);
+                setTimeout(() => {
+                    let lastElem2 = listViewBuilder.element.find(".item").last().text();
+                    expect(lastElem2).toEqual("-->Sachin-->Patney");
+                    expect(listViewBuilder.spyOnLoadMoreData).toHaveBeenCalled();
+                    done();
+                }, DefaultWaitForRender);
+            }, DefaultWaitForRender);
+        });
+        
 
-            listViewBuilder.element.scrollTop(1000);
+        xit("Reset scrollbar position when ResetScrollbar flag is set", (done) => {
+            listViewBuilder.buildHtmlListView();
+            setTimeout(() => {
+                listViewBuilder.scrollElement.scrollTop(14);
            
-            setTimeout(() => {
-                expect(listViewBuilder.element.find(".scrollRegion").first().parent().scrollTop()).toBe(40);
+                setTimeout(() => {
+                    expect(listViewBuilder.scrollElement.scrollTop()).toBe(14);
 
-                listViewBuilder.render(true, false);
-
-                expect(listViewBuilder.element.find(".scrollRegion").first().parent().scrollTop()).toBe(40);
+                    listViewBuilder.render(true, false);
+                    setTimeout(() => {
+                        expect(listViewBuilder.scrollElement.scrollTop()).toBe(14);
                 
-                listViewBuilder.render(true, true);
+                        listViewBuilder.render(true, true);
 
-                expect(listViewBuilder.element.find(".scrollRegion").first().parent().scrollTop()).toBe(0);
+                        expect(listViewBuilder.scrollElement.scrollTop()).toBe(0);
 
-                done();
-            }, DefaultWaitForRender);
+                        done();
+                    }, DefaultWaitForRender);
+                }, DefaultWaitForRender);
+            }, 30);
         });
+
     });
 
     class ListViewBuilder {
-        private nestedData: any[];
+        public element: JQuery;
+        public scrollElement: JQuery;
+        public data: any[];
+        public spyOnLoadMoreData: jasmine.Spy;
 
         private width: number;
-
         private height: number;
-
-        public isSpy: boolean = false;
-
-        public element: JQuery;
-
         private options: ListViewOptions;
-
-        private rowExit(rowSelection: D3.Selection) {
-            rowSelection.remove();
-        }
-
-        private _spy: jasmine.Spy;
-
-        public get spy(): jasmine.Spy {
-            return this._spy;
-        }
-
+        
         private _listView: powerbi.visuals.IListView;
 
         public get listView(): powerbi.visuals.IListView {
             return this._listView;
         }
 
-        public data: any[];
-
-        constructor(width: number = 200, height: number = 200) {
+        constructor(width: number = 200, height: number = 75) {
             this.setSize(width, height);
         }
 
-        public setSize(width: number, height: number) {
+        private setSize(width: number, height: number) {
             this.width = width;
             this.height = height;
 
@@ -184,20 +158,20 @@ module powerbitests {
         }
 
         private buildHtmlListViewOptions() {
-            var rowEnter = (rowSelection: D3.Selection) => {
+            let rowEnter = (rowSelection: D3.Selection) => {
                 rowSelection
                     .append("div")
-                    .style("height", "30px")
+                    .style("height", "10px")
                     .classed("item", true)
                     .selectAll("span")
                     .data(d => {
-                    return d.children;
-                })
+                        return d.children;
+                    })
                     .enter()
                     .append("span");
             };
 
-            var rowUpdate = (rowSelection: D3.Selection) => {
+            let rowUpdate = (rowSelection: D3.Selection) => {
                 rowSelection
                     .selectAll(".item")
                     .selectAll("span")
@@ -209,49 +183,25 @@ module powerbitests {
             this.createOptions(rowEnter, rowUpdate);
         }
         
-        private buildSvgListViewOptions() {
-            var rowEnterSVG = (rowSelection: D3.Selection) => {
-                rowSelection
-                    .append("g")
-                    .style("height", "30px")
-                    .classed("item", true)
-                    .selectAll("g")
-                    .data(d => {
-                    return d.children;
-                })
-                    .enter()
-                    .append("span")
-                    .classed("column", true);
-            };
-
-            var rowUpdateSVG = (rowSelection: D3.Selection) => {
-                rowSelection
-                    .selectAll(".item")
-                    .selectAll(".column")
-                    .text(d => {
-                    return "-->" + d.name;
-                });
-            };
-
-            this.createOptions(rowEnterSVG, rowUpdateSVG);
-        }
-
         private createOptions(rowEnter, rowUpdate) {
-            this.options = {
+            if (!this.options)
+                this.options = {
                 enter: rowEnter,
-                exit: this.rowExit,
+                exit: (rowSelection: D3.Selection) => { rowSelection.remove(); },
                 update: rowUpdate,
-                loadMoreData: () => { },
+                loadMoreData: () => _.noop,
                 baseContainer: d3.select(this.element.get(0)),
-                rowHeight: 30,
-                viewport: { height: this.height, width: this.width }
+                rowHeight: 10,
+                scrollEnabled: true,
+                viewport: { height: this.height, width: this.width },
+                isReadMode: null
             };
         }
 
         private generateNestedData(tuples: any[]) {
-            var testData = [];
+            let testData = [];
 
-            for (var i = 0; i < this.data.length; i++) {
+            for (let i = 0; i < this.data.length; i++) {
                 testData.push({
                     id: i,
                     children: [
@@ -263,40 +213,33 @@ module powerbitests {
 
             return testData;
         }
-
-        private buildCreateNestedData() {
-            this.nestedData = this.generateNestedData(this.data);
-        }
-
+        
         private createListView() {
-            this._listView = ListViewFactory.createHTMLListView(this.options);
+            this._listView = ListViewFactory.createListView(this.options);
         }
 
-        private setSpy() {
-            if (this.isSpy) {
-                this._spy = spyOn(this.options, "loadMoreData");
-            }
-        }
-
-        public build() {
-            this.buildCreateNestedData();
-            this.setSpy();
-            this.createListView();
-            this.render();
+        private setScrollElement(): void {
+            this.scrollElement = this.element.find('.scrollbar-inner.scroll-content');
         }
 
         public render(sizeChanged: boolean = true, resetScrollPosition?: boolean) {
-            this._listView.data(this.nestedData, d => d.id).render(sizeChanged, resetScrollPosition);
+            this._listView.data(this.generateNestedData(this.data), d => d.id, resetScrollPosition).render();
         }
 
         public buildHtmlListView() {
             this.buildHtmlListViewOptions();
-            this.build();
+            this.spyOnLoadMoreData = spyOn(this.options, 'loadMoreData');
+            this.createListView();
+            this.render();
+            this.setScrollElement();
         }
 
-        public buildSvgListView() {
-            this.buildSvgListViewOptions();
-            this.build();
+        public destroy() {
+            this._listView.empty();
+            this.options = null;
+            this.scrollElement = null;
+            this.element.remove();
+            this._listView = null;
         }
     }
 }

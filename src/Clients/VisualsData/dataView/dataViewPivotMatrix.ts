@@ -24,8 +24,6 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
-
 module powerbi.data {
     export module DataViewPivotMatrix {
         /** Pivots row hierarchy members in a matrix DataView into column hierarchy. */
@@ -34,47 +32,54 @@ module powerbi.data {
 
             if (!context.columnHierarchyRewritten)
                 dataViewMatrix.columns = Prototype.inherit(dataViewMatrix.columns);
-            var columns = dataViewMatrix.columns;
+            let columns = dataViewMatrix.columns;
 
             if (!context.rowHierarchyRewritten)
                 dataViewMatrix.rows = Prototype.inherit(dataViewMatrix.rows);
-            var rows = dataViewMatrix.rows;
+            let rows = dataViewMatrix.rows;
 
             if (columns.levels.length > 1)
                 return;
 
-            var pivotedRowNode: DataViewMatrixNode = {
+            let pivotedRowNode: DataViewMatrixNode = {
                 level: 0
             };
 
-            var columnLeafNodes: DataViewMatrixNode[] = columns.root.children;
-            var columnCount = columnLeafNodes.length;
+            let columnLeafNodes: DataViewMatrixNode[] = columns.root.children;
+            let measureCount = columnLeafNodes.length;
 
-            if (columnCount > 0) {
-                var index = 0;
-                var callback = function (node: DataViewMatrixNode) {
+            // Notes related to VSTS 6999369: The level value of Measure Header nodes is not necessarily its parent node's level + 1.
+            // In particular, the Measure Header column nodes directly under the Grand Total node at level 0 (i.e. _.last(pivotResultMatrix.columns.root.children))
+            // will have level === (pivotResultMatrix.columns.levels.length - 1), which will be greater than the Grand Total node's 'level + 1' 
+            // in a matrix with 2+ column fields and 2+ measure fields.
+            // In this code, all row levels will get pivoted over to the columns hierarchy, hence the level of any Measure Header nodes in the pivot result
+            // is just (1 + the level of the deepest row node's level), which === rows.levels.length.
+            let pivotResultMeasureHeaderLevel = rows.levels.length;
+
+            if (measureCount > 0) {
+                let index = 0;
+                let callback = function (node: DataViewMatrixNode) {
                     // Collect values and remove them from row leaves
                     if (node.values) {
                         if (!pivotedRowNode.values)
                             pivotedRowNode.values = {};
 
-                        for (var i = 0; i < columnCount; i++)
+                        for (let i = 0; i < measureCount; i++)
                             pivotedRowNode.values[index++] = node.values[i];
 
                         delete node.values;
                     }
 
                     // Create measure headers if there are more than one measures
-                    if (columnCount > 1) {
-                        var level = node.level + 1;
+                    if (measureCount > 1) {
                         if (!node.children)
                             node.children = [];
 
-                        for (var j = 0; j < columnCount; j++) {
-                            var measureHeaderLeaf: DataViewMatrixNode = { level: level };
+                        for (let j = 0; j < measureCount; j++) {
+                            let measureHeaderLeaf: DataViewMatrixNode = { level: pivotResultMeasureHeaderLevel };
 
                             // Copy levelSourceIndex from columnLeafNodes (as they might have been reordered)
-                            var columnLeafNode = columnLeafNodes[j];
+                            let columnLeafNode = columnLeafNodes[j];
                             measureHeaderLeaf.levelSourceIndex = columnLeafNode.levelSourceIndex;
 
                             if (node.isSubtotal)
@@ -98,9 +103,9 @@ module powerbi.data {
                 }
             }
 
-            if (columnCount > 1) {
+            if (measureCount > 1) {
                 // Keep measure headers, but move them to the innermost level
-                var level: DataViewHierarchyLevel = { sources: columns.levels[0].sources };
+                let level: DataViewHierarchyLevel = { sources: columns.levels[0].sources };
                 rows.levels.push(level);
 
                 columns.levels.length = 0;
@@ -113,7 +118,7 @@ module powerbi.data {
                 };
             }
             else {
-                var updatedRowRoot = Prototype.inherit(dataViewMatrix.rows.root);
+                let updatedRowRoot = Prototype.inherit(dataViewMatrix.rows.root);
                 updatedRowRoot.children = [pivotedRowNode];
                 dataViewMatrix.rows.root = updatedRowRoot;
             }
@@ -123,9 +128,9 @@ module powerbi.data {
         }
 
         function forEachLeaf(root: DataViewMatrixNode, callback: (node: DataViewMatrixNode) => void): void {
-            var children = root.children;
+            let children = root.children;
             if (children && children.length > 0) {
-                for (var i = 0, ilen = children.length; i < ilen; i++)
+                for (let i = 0, ilen = children.length; i < ilen; i++)
                     forEachLeaf(children[i], callback);
 
                 return;
@@ -139,14 +144,14 @@ module powerbi.data {
         }
 
         export function cloneTreeExecuteOnLeaf(node: DataViewMatrixNode, callback?: (node: DataViewMatrixNode) => void): DataViewMatrixNode {
-            var updatedNode = Prototype.inherit(node);
+            let updatedNode = Prototype.inherit(node);
 
-            var children = node.children;
+            let children = node.children;
             if (children && children.length > 0) {
-                var newChildren: DataViewTreeNode[] = [];
+                let newChildren: DataViewTreeNode[] = [];
 
-                for (var i = 0, ilen = children.length; i < ilen; i++) {
-                    var updatedChild = cloneTreeExecuteOnLeaf(children[i], callback);
+                for (let i = 0, ilen = children.length; i < ilen; i++) {
+                    let updatedChild = cloneTreeExecuteOnLeaf(children[i], callback);
                     newChildren.push(updatedChild);
                 }
                 updatedNode.children = newChildren;

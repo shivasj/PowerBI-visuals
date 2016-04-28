@@ -24,10 +24,7 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../../../_references.ts"/>
-
 module powerbi.visuals.controls {
-
     export module HTMLElementUtils {
         export function clearChildren(element: HTMLElement): void {
             if (!element) {
@@ -49,14 +46,14 @@ module powerbi.visuals.controls {
 
         export function setElementHeight(element: HTMLElement, height: number): void {
             if (HTMLElementUtils.isAutoSize(height))
-                element.style.height = "auto";
+                element.style.height = "";
             else
                 element.style.height = height + "px";
         }
 
         export function setElementWidth(element: HTMLElement, width: number): void {
             if (HTMLElementUtils.isAutoSize(width))
-                element.style.width = "auto";
+                element.style.width = "";
             else
                 element.style.width = width + "px";
         }
@@ -74,7 +71,7 @@ module powerbi.visuals.controls {
         }
 
         export function getAccumulatedScale(element: HTMLElement): number {
-            var scale: number = 1;
+            let scale: number = 1;
             while (element) {
                 scale *= HTMLElementUtils.getScale(element);
                 element = element.parentElement;
@@ -82,12 +79,14 @@ module powerbi.visuals.controls {
 
             return scale;
         }
-
-        // Get scale of element, return 1 when not scaled
+        
+        /**
+         * Get scale of element, return 1 when not scaled.
+         */
         export function getScale(element: any): number {
             element = $(element);
 
-            var str = element.css('-webkit-transform') ||
+            let str = element.css('-webkit-transform') ||
                 element.css('-moz-transform') ||
                 element.css('-ms-transform') ||
                 element.css('-o-transform') ||
@@ -96,45 +95,978 @@ module powerbi.visuals.controls {
             return (str && (
                 str.match(/\d*\.\d*/) && Number(str.match(/\d*\.\d*/)[0]) ||
                 str.match(/\d+/) && Number(str.match(/\d+/)[0]))
-                ) || 1;
+            ) || 1;
         }
     }
 }
 
 module powerbi.visuals.controls.internal {
+    import DomFactory = InJs.DomFactory;
+    import DataViewObjectDefinitions = powerbi.data.DataViewObjectDefinitions;
+
+    export module TablixObjects {
+        export const ObjectGeneral: string = "general";
+        export const ObjectGrid: string = "grid";
+        export const ObjectColumnHeaders: string = "columnHeaders";
+        export const ObjectRowHeaders: string = "rowHeaders";
+        export const ObjectValues: string = "values";
+        export const ObjectTotal: string = "total";
+        export const ObjectSubTotals: string = "subTotals";
+
+        export interface ObjectValueGetterFunction {
+            <T>(objects: DataViewObjects, propertyId: DataViewObjectPropertyIdentifier, defaultValue?: T): T;
+        }
+
+        /**
+         * Represents a DataViewObjects property related to the Tablix
+         */
+        export class TablixProperty {
+            public objectName: string;
+            public propertyName: string;
+            public defaultValue: any;
+            private getterFuntion: ObjectValueGetterFunction;
+
+            /**
+             * Creates a new TablixProperty
+             * @param {string} objectName Object Name
+             * @param {string} propertyName Property Name
+             * @param {any} defaultValue Default value of the Property
+             * @param {ObjectValueGetterFunction} getterFuntion Function used to get the Property value from the Objects
+             */
+            constructor(objectName: string, propertyName: string, defaultValue: any, getterFuntion: ObjectValueGetterFunction) {
+                this.objectName = objectName;
+                this.propertyName = propertyName;
+                this.defaultValue = defaultValue;
+                this.getterFuntion = getterFuntion;
+            }
+
+            /**
+             * Gets the PropertyIdentifier for the Property
+             * @returns PropertyIdentifier for the Property
+             */
+            public getPropertyID(): DataViewObjectPropertyIdentifier {
+                return { objectName: this.objectName, propertyName: this.propertyName };
+            }
+
+            /**
+             * Gets the value of the Property from the Objects
+             * @param {DataViewObjects} objects DataView Objects to get the value from
+             * @param {boolean} useDefault True to fall back to the Default value if the Property is missing from the objects. False to return undefined
+             * @returns Value of the property
+             */
+            public getValue<T>(objects: DataViewObjects): T {
+                // We use this when we intend to have undefined for missing properties. Useful in letting styles fallback to CSS if not defined
+                return this.getterFuntion<T>(objects, this.getPropertyID(), this.defaultValue);
+            }
+        }
+
+        // Per Column
+        export const PropColumnFormatString = new TablixProperty(ObjectGeneral, 'formatString', undefined, DataViewObjects.getValue);
+
+        // General
+        export const PropGeneralAutoSizeColumns = new TablixProperty(ObjectGeneral, 'autoSizeColumnWidth', true, DataViewObjects.getValue);
+        export const PropGeneralTextSize = new TablixProperty(ObjectGeneral, 'textSize', 8, DataViewObjects.getValue);
+        export const PropGeneralTableTotals = new TablixProperty(ObjectGeneral, 'totals', true, DataViewObjects.getValue);
+        export const PropGeneralMatrixRowSubtotals = new TablixProperty(ObjectGeneral, 'rowSubtotals', true, DataViewObjects.getValue);
+        export const PropGeneralMatrixColumnSubtotals = new TablixProperty(ObjectGeneral, 'columnSubtotals', true, DataViewObjects.getValue);
+
+        //Grid
+        export const PropGridVertical = new TablixProperty(ObjectGrid, 'gridVertical', false, DataViewObjects.getValue);
+        export const PropGridVerticalColor = new TablixProperty(ObjectGrid, 'gridVerticalColor', "#E8E8E8", DataViewObjects.getFillColor);
+        export const PropGridVerticalWeight = new TablixProperty(ObjectGrid, 'gridVerticalWeight', 1, DataViewObjects.getValue);
+        export const PropGridHorizontalTable = new TablixProperty(ObjectGrid, 'gridHorizontal', true, DataViewObjects.getValue);
+        export const PropGridHorizontalMatrix = new TablixProperty(ObjectGrid, 'gridHorizontal', false, DataViewObjects.getValue);
+        export const PropGridHorizontalColor = new TablixProperty(ObjectGrid, 'gridHorizontalColor', "#E8E8E8", DataViewObjects.getFillColor);
+        export const PropGridHorizontalWeight = new TablixProperty(ObjectGrid, 'gridHorizontalWeight', 1, DataViewObjects.getValue);
+        export const PropGridRowPadding = new TablixProperty(ObjectGrid, 'rowPadding', 0, DataViewObjects.getValue);
+        export const PropGridOutlineColor = new TablixProperty(ObjectGrid, 'outlineColor', "#CCC", DataViewObjects.getFillColor);
+        export const PropGridOutlineWeight = new TablixProperty(ObjectGrid, 'outlineWeight', 1, DataViewObjects.getValue);
+        export const PropGridImageHeight = new TablixProperty(ObjectGrid, 'imageHeight', 75, DataViewObjects.getValue);
+
+        // Column Headers
+        export const PropColumnsFontColor = new TablixProperty(ObjectColumnHeaders, 'fontColor', "#666", DataViewObjects.getFillColor);
+        export const PropColumnsBackColor = new TablixProperty(ObjectColumnHeaders, 'backColor', undefined, DataViewObjects.getFillColor);
+        export const PropColumnsOutline = new TablixProperty(ObjectColumnHeaders, 'outline', "BottomOnly", DataViewObjects.getValue);
+
+        // Row Headers
+        export const PropRowsFontColor = new TablixProperty(ObjectRowHeaders, 'fontColor', "#666", DataViewObjects.getFillColor);
+        export const PropRowsBackColor = new TablixProperty(ObjectRowHeaders, 'backColor', undefined, DataViewObjects.getFillColor);
+        export const PropRowsOutline = new TablixProperty(ObjectRowHeaders, 'outline', "RightOnly", DataViewObjects.getValue);
+
+        // Values
+        // VSTS 7167767: Remove temporary code for product demo.
+        export const PropValuesBackColorConditionalFormatting = new TablixProperty(ObjectValues, 'backgroundColorConditional', false, DataViewObjects.getValue);
+        export const PropValuesFontColorPrimary = new TablixProperty(ObjectValues, 'fontColorPrimary', "#333", DataViewObjects.getFillColor);
+        export const PropValuesBackColorPrimary = new TablixProperty(ObjectValues, 'backColorPrimary', undefined, DataViewObjects.getFillColor);
+        export const PropValuesFontColorSecondary = new TablixProperty(ObjectValues, 'fontColorSecondary', "#333", DataViewObjects.getFillColor);
+        export const PropValuesBackColorSecondary = new TablixProperty(ObjectValues, 'backColorSecondary', undefined, DataViewObjects.getFillColor);
+        export const PropValuesOutline = new TablixProperty(ObjectValues, 'outline', "None", DataViewObjects.getValue);
+        export const PropValuesUrlIconProp = new TablixProperty(ObjectValues, 'urlIcon', false, DataViewObjects.getValue);
+
+        // Total
+        export const PropTotalFontColor = new TablixProperty(ObjectTotal, 'fontColor', "#333", DataViewObjects.getFillColor);
+        export const PropTotalBackColor = new TablixProperty(ObjectTotal, 'backColor', undefined, DataViewObjects.getFillColor);
+        export const PropTotalOutline = new TablixProperty(ObjectTotal, 'outline', "TopOnly", DataViewObjects.getValue);
+
+        // SubTotals
+        export const PropSubTotalsFontColor = new TablixProperty(ObjectSubTotals, 'fontColor', "#333", DataViewObjects.getFillColor);
+        export const PropSubTotalsBackColor = new TablixProperty(ObjectSubTotals, 'backColor', undefined, DataViewObjects.getFillColor);
+        export const PropSubTotalsOutline = new TablixProperty(ObjectSubTotals, 'outline', "TopOnly", DataViewObjects.getValue);
+
+        /**
+         * Get the DataViewObject from the DataView
+         * @param {DataView} dataview The DataView
+         * @returns DataViewObjects (dataView.metadata.objects)
+         */
+        export function getMetadadataObjects(dataview: DataView): DataViewObjects {
+            if (dataview && dataview.metadata)
+                return dataview.metadata.objects;
+
+            return null;
+        }
+
+        export function enumerateObjectInstances(options: EnumerateVisualObjectInstancesOptions, enumeration: ObjectEnumerationBuilder, dataView: DataView, isConditionalFormattingEnabled: boolean, tablixType: TablixType): void {
+            debug.assertValue(dataView, "dataView can't be undefined");
+
+            let objects = getMetadadataObjects(dataView);
+
+            let totalsShown: boolean = true;
+
+            if (tablixType === TablixType.Table) {
+                totalsShown = shouldShowTableTotalsOption(dataView) && shouldShowTableTotals(objects);
+            }
+            else {
+                totalsShown =
+                    (shouldShowColumnSubtotalsOption(dataView) && shouldShowColumnSubtotals(objects)) ||
+                    (shouldShowRowSubtotalsOption(dataView) && shouldShowRowSubtotals(objects));
+            }
+
+            switch (options.objectName) {
+                case TablixObjects.ObjectGeneral:
+                    enumerateGeneralOptions(enumeration, objects, tablixType, dataView);
+                    break;
+                case TablixObjects.ObjectGrid:
+                    enumerateGridOptions(enumeration, objects, tablixType);
+                    break;
+                case TablixObjects.ObjectColumnHeaders:
+                    enumerateColumnHeadersOptions(enumeration, objects);
+                    break;
+                case TablixObjects.ObjectRowHeaders:
+                    enumerateRowHeadersOptions(enumeration, objects);
+                    break;
+                case TablixObjects.ObjectValues:
+                    enumerateValuesOptions(enumeration, objects, tablixType);
+
+                    if (tablixType === TablixType.Table && isConditionalFormattingEnabled)
+                        enumerateValuesOptionConditionalFormat(enumeration, objects);
+                    break;
+                case TablixObjects.ObjectTotal:
+                    if (totalsShown)
+                        enumerateTotalOptions(enumeration, objects);
+                    break;
+                case TablixObjects.ObjectSubTotals:
+                    if (totalsShown)
+                        enumerateSubTotalsOptions(enumeration, objects);
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        export function enumerateGeneralOptions(enumeration: ObjectEnumerationBuilder, objects: DataViewObjects, tablixType: TablixType, dataView: DataView): void {
+            let visualObjectinstance: VisualObjectInstance = {
+                selector: null,
+                objectName: TablixObjects.ObjectGeneral,
+                properties: {
+                    autoSizeColumnWidth: TablixObjects.PropGeneralAutoSizeColumns.getValue(objects),
+                    textSize: TablixObjects.PropGeneralTextSize.getValue<number>(objects),
+                }
+            };
+
+            let properties = visualObjectinstance.properties;
+
+            // Total and SubTotals
+            switch (tablixType) {
+                case TablixType.Table:
+                    if (shouldShowTableTotalsOption(dataView))
+                        properties[TablixObjects.PropGeneralTableTotals.propertyName] = shouldShowTableTotals(objects);
+                    break;
+
+                case TablixType.Matrix:
+                    if (shouldShowRowSubtotalsOption(dataView))
+                        properties[TablixObjects.PropGeneralMatrixRowSubtotals.propertyName] = shouldShowRowSubtotals(objects);
+                    if (shouldShowColumnSubtotalsOption(dataView))
+                        properties[TablixObjects.PropGeneralMatrixColumnSubtotals.propertyName] = shouldShowColumnSubtotals(objects);
+                    break;
+            }
+
+            enumeration.pushInstance(visualObjectinstance);
+        }
+
+        export function enumerateGridOptions(enumeration: ObjectEnumerationBuilder, objects: DataViewObjects, tablixType: TablixType): void {
+            let visualObjectinstance: VisualObjectInstance = {
+                selector: null,
+                objectName: TablixObjects.ObjectGeneral,
+                properties: {}
+            };
+            let properties = visualObjectinstance.properties;
+
+            // Vertical Grid
+            let verticalGridEnabled = TablixObjects.PropGridVertical.getValue<boolean>(objects);
+            properties[TablixObjects.PropGridVertical.propertyName] = verticalGridEnabled;
+            if (verticalGridEnabled) {
+                properties[TablixObjects.PropGridVerticalColor.propertyName] = TablixObjects.PropGridVerticalColor.getValue<string>(objects);
+                properties[TablixObjects.PropGridVerticalWeight.propertyName] = TablixObjects.PropGridVerticalWeight.getValue<number>(objects);
+            }
+
+            // Horizontal Grid
+            let horizontalGridEnabled = (tablixType === TablixType.Table ? TablixObjects.PropGridHorizontalTable : TablixObjects.PropGridHorizontalMatrix).getValue<boolean>(objects);
+            properties[(tablixType === TablixType.Table ? TablixObjects.PropGridHorizontalTable : TablixObjects.PropGridHorizontalMatrix).propertyName] = horizontalGridEnabled;
+            if (horizontalGridEnabled) {
+                properties[TablixObjects.PropGridHorizontalColor.propertyName] = TablixObjects.PropGridHorizontalColor.getValue<string>(objects);
+                properties[TablixObjects.PropGridHorizontalWeight.propertyName] = TablixObjects.PropGridHorizontalWeight.getValue<number>(objects);
+            }
+
+            // Row Padding
+            properties[TablixObjects.PropGridRowPadding.propertyName] = TablixObjects.PropGridRowPadding.getValue<number>(objects);
+
+            // Outline
+            properties[TablixObjects.PropGridOutlineColor.propertyName] = TablixObjects.PropGridOutlineColor.getValue<string>(objects);
+            properties[TablixObjects.PropGridOutlineWeight.propertyName] = TablixObjects.PropGridOutlineWeight.getValue<number>(objects);
+
+            // Image Height
+            properties[TablixObjects.PropGridImageHeight.propertyName] = TablixObjects.PropGridImageHeight.getValue<number>(objects);
+
+            enumeration.pushInstance(visualObjectinstance);
+        }
+
+        export function enumerateColumnHeadersOptions(enumeration: ObjectEnumerationBuilder, objects: DataViewObjects): void {
+            enumeration.pushInstance({
+                selector: null,
+                objectName: TablixObjects.ObjectColumnHeaders,
+                properties: {
+                    fontColor: TablixObjects.PropColumnsFontColor.getValue<string>(objects),
+                    backColor: TablixObjects.PropColumnsBackColor.getValue<string>(objects),
+                    outline: TablixObjects.PropColumnsOutline.getValue<string>(objects),
+                }
+            });
+        }
+
+        export function enumerateRowHeadersOptions(enumeration: ObjectEnumerationBuilder, objects: DataViewObjects): void {
+            enumeration.pushInstance({
+                selector: null,
+                objectName: TablixObjects.ObjectRowHeaders,
+                properties: {
+                    fontColor: TablixObjects.PropRowsFontColor.getValue<string>(objects),
+                    backColor: TablixObjects.PropRowsBackColor.getValue<string>(objects),
+                    outline: TablixObjects.PropRowsOutline.getValue<string>(objects),
+                }
+            });
+        }
+
+        export function enumerateValuesOptions(enumeration: ObjectEnumerationBuilder, objects: DataViewObjects, tablixType: TablixType): void {
+            let instance: VisualObjectInstance = {
+                selector: null,
+                objectName: TablixObjects.ObjectValues,
+                properties: {
+                    fontColorPrimary: TablixObjects.PropValuesFontColorPrimary.getValue<string>(objects),
+                    backColorPrimary: TablixObjects.PropValuesBackColorPrimary.getValue<string>(objects),
+                    fontColorSecondary: TablixObjects.PropValuesFontColorSecondary.getValue<string>(objects),
+                    backColorSecondary: TablixObjects.PropValuesBackColorSecondary.getValue<string>(objects),
+                    outline: TablixObjects.PropValuesOutline.getValue<string>(objects),
+                }
+            };
+
+            if (tablixType === TablixType.Table)
+                instance.properties[TablixObjects.PropValuesUrlIconProp.propertyName] = TablixObjects.PropValuesUrlIconProp.getValue<boolean>(objects);
+
+            enumeration.pushInstance(instance);
+        }
+
+        // TODO: VSTS 7167767: Remove temporary code for product demo.
+        export function enumerateValuesOptionConditionalFormat(enumeration: ObjectEnumerationBuilder, objects: DataViewObjects): void {
+            let instance: VisualObjectInstance = {
+                selector: null,
+                objectName: TablixObjects.ObjectValues,
+                properties: {
+                    backgroundColorConditional: TablixObjects.PropValuesBackColorConditionalFormatting.getValue<boolean>(objects),
+                }
+            };
+
+            enumeration.pushInstance(instance);
+        }
+
+        export function enumerateTotalOptions(enumeration: ObjectEnumerationBuilder, objects: DataViewObjects): void {
+            enumeration.pushInstance({
+                selector: null,
+                objectName: TablixObjects.ObjectTotal,
+                properties: {
+                    fontColor: TablixObjects.PropTotalFontColor.getValue<string>(objects),
+                    backColor: TablixObjects.PropTotalBackColor.getValue<string>(objects),
+                    outline: TablixObjects.PropTotalOutline.getValue<string>(objects),
+                }
+            });
+        }
+
+        export function enumerateSubTotalsOptions(enumeration: ObjectEnumerationBuilder, objects: DataViewObjects): void {
+            enumeration.pushInstance({
+                selector: null,
+                objectName: TablixObjects.ObjectSubTotals,
+                properties: {
+                    fontColor: TablixObjects.PropSubTotalsFontColor.getValue<string>(objects),
+                    backColor: TablixObjects.PropSubTotalsBackColor.getValue<string>(objects),
+                }
+            });
+        }
+
+        export function getTableObjects(dataView: DataView, isConditionalFormattingEnabled: boolean): TablixFormattingPropertiesTable {
+            let objects = getMetadadataObjects(dataView);
+
+            let formattingProperties: TablixFormattingPropertiesTable = {
+                // TODO: VSTS 7167767: Remove temporary code for product demo.
+                isConditionalFormattingEnabled: isConditionalFormattingEnabled,
+
+                general: {
+                    autoSizeColumnWidth: TablixObjects.PropGeneralAutoSizeColumns.getValue<boolean>(objects),
+                    textSize: TablixObjects.PropGeneralTextSize.getValue<number>(objects),
+                    totals: shouldShowTableTotals(objects),
+                },
+            };
+
+            formattingProperties.grid = {
+                gridVertical: TablixObjects.PropGridVertical.getValue<boolean>(objects),
+                gridVerticalColor: TablixObjects.PropGridVerticalColor.getValue<string>(objects),
+                gridVerticalWeight: TablixObjects.PropGridVerticalWeight.getValue<number>(objects),
+                gridHorizontal: TablixObjects.PropGridHorizontalTable.getValue<boolean>(objects),
+                gridHorizontalColor: TablixObjects.PropGridHorizontalColor.getValue<string>(objects),
+                gridHorizontalWeight: TablixObjects.PropGridHorizontalWeight.getValue<number>(objects),
+                outlineColor: TablixObjects.PropGridOutlineColor.getValue<string>(objects),
+                outlineWeight: TablixObjects.PropGridOutlineWeight.getValue<number>(objects),
+                rowPadding: TablixObjects.PropGridRowPadding.getValue<number>(objects),
+                imageHeight: TablixObjects.PropGridImageHeight.getValue<number>(objects),
+            };
+
+            formattingProperties.columnHeaders = {
+                fontColor: TablixObjects.PropColumnsFontColor.getValue<string>(objects),
+                backColor: TablixObjects.PropColumnsBackColor.getValue<string>(objects),
+                outline: TablixObjects.PropColumnsOutline.getValue<string>(objects),
+            };
+
+            formattingProperties.values = {
+                fontColorPrimary: TablixObjects.PropValuesFontColorPrimary.getValue<string>(objects),
+                backColorPrimary: TablixObjects.PropValuesBackColorPrimary.getValue<string>(objects),
+                fontColorSecondary: TablixObjects.PropValuesFontColorSecondary.getValue<string>(objects),
+                backColorSecondary: TablixObjects.PropValuesBackColorSecondary.getValue<string>(objects),
+                outline: TablixObjects.PropValuesOutline.getValue<string>(objects),
+                urlIcon: TablixObjects.PropValuesUrlIconProp.getValue<boolean>(objects),
+            };
+
+            if (isConditionalFormattingEnabled) {
+                formattingProperties.values.conditionalFormatting = TablixObjects.PropValuesBackColorConditionalFormatting.getValue<boolean>(objects);
+            }
+
+            formattingProperties.total = {
+                fontColor: TablixObjects.PropTotalFontColor.getValue<string>(objects),
+                backColor: TablixObjects.PropTotalBackColor.getValue<string>(objects),
+                outline: TablixObjects.PropTotalOutline.getValue<string>(objects),
+            };
+
+            return formattingProperties;
+        }
+
+        // TODO: VSTS 7167767: Remove temporary code for product demo.
+        export function getTableObjectConditionalFormatEnabled(dataView: DataView) {
+            return TablixObjects.PropValuesBackColorConditionalFormatting.getValue<boolean>(getMetadadataObjects(dataView));
+        }
+
+        export function getMatrixObjects(dataView: DataView): TablixFormattingPropertiesMatrix {
+            let objects = getMetadadataObjects(dataView);
+
+            let formattingProperties: TablixFormattingPropertiesMatrix = {
+                general: {
+                    autoSizeColumnWidth: TablixObjects.PropGeneralAutoSizeColumns.getValue<boolean>(objects),
+                    textSize: TablixObjects.PropGeneralTextSize.getValue<number>(objects),
+                    rowSubtotals: shouldShowRowSubtotals(objects),
+                    columnSubtotals: shouldShowColumnSubtotals(objects),
+                },
+            };
+
+            formattingProperties.grid = {
+                gridVertical: TablixObjects.PropGridVertical.getValue<boolean>(objects),
+                gridVerticalColor: TablixObjects.PropGridVerticalColor.getValue<string>(objects),
+                gridVerticalWeight: TablixObjects.PropGridVerticalWeight.getValue<number>(objects),
+                gridHorizontal: TablixObjects.PropGridHorizontalMatrix.getValue<boolean>(objects),
+                gridHorizontalColor: TablixObjects.PropGridHorizontalColor.getValue<string>(objects),
+                gridHorizontalWeight: TablixObjects.PropGridHorizontalWeight.getValue<number>(objects),
+                outlineColor: TablixObjects.PropGridOutlineColor.getValue<string>(objects),
+                outlineWeight: TablixObjects.PropGridOutlineWeight.getValue<number>(objects),
+                rowPadding: TablixObjects.PropGridRowPadding.getValue<number>(objects),
+                imageHeight: TablixObjects.PropGridImageHeight.getValue<number>(objects),
+            };
+
+            formattingProperties.columnHeaders = {
+                fontColor: TablixObjects.PropColumnsFontColor.getValue<string>(objects),
+                backColor: TablixObjects.PropColumnsBackColor.getValue<string>(objects),
+                outline: TablixObjects.PropColumnsOutline.getValue<string>(objects),
+            };
+
+            formattingProperties.rowHeaders = {
+                fontColor: TablixObjects.PropRowsFontColor.getValue<string>(objects),
+                backColor: TablixObjects.PropRowsBackColor.getValue<string>(objects),
+                outline: TablixObjects.PropRowsOutline.getValue<string>(objects),
+            };
+
+            formattingProperties.values = {
+                fontColorPrimary: TablixObjects.PropValuesFontColorPrimary.getValue<string>(objects),
+                backColorPrimary: TablixObjects.PropValuesBackColorPrimary.getValue<string>(objects),
+                fontColorSecondary: TablixObjects.PropValuesFontColorSecondary.getValue<string>(objects),
+                backColorSecondary: TablixObjects.PropValuesBackColorSecondary.getValue<string>(objects),
+                outline: TablixObjects.PropValuesOutline.getValue<string>(objects),
+            };
+
+            formattingProperties.subtotals = {
+                fontColor: TablixObjects.PropSubTotalsFontColor.getValue<string>(objects),
+                backColor: TablixObjects.PropSubTotalsBackColor.getValue<string>(objects),
+                outline: TablixObjects.PropSubTotalsOutline.getValue<string>(objects),
+            };
+
+            return formattingProperties;
+        }
+
+        /**
+         * Generate default objects for the Table/Matrix to set default styling
+         * @param {TablixType} tablixType Tablix Type: table | matrix
+         * @returns DataViewObjects that can be attached to the DataViewMetadata
+         */
+        export function generateTablixDefaultObjects(tablixType: TablixType): data.DataViewObjectDefinitions {
+            return {
+                general: [{
+                    selector: null,
+                    properties: {
+                        textSize: DataViewObjectDefinitions.encodePropertyValue(12, { numeric: true }),
+                        totals: DataViewObjectDefinitions.encodePropertyValue(false, { bool: true }),
+                    }
+                }],
+            };
+        }
+
+        export function getTextSizeInPx(textSize: number): string {
+            return jsCommon.PixelConverter.fromPoint(textSize);
+        }
+
+        export function shouldShowTableTotals(objects: DataViewObjects): boolean {
+            return TablixObjects.PropGeneralTableTotals.getValue<boolean>(objects);
+        }
+
+        function shouldShowTableTotalsOption(dataView: DataView): boolean {
+            if (dataView && dataView.table && !_.isEmpty(dataView.table.columns)) {
+                let columns = dataView.table.columns;
+                if (_.some(columns, (column) => column.discourageAggregationAcrossGroups))
+                    return false;
+            }
+
+            return true;
+        }
+
+        export function shouldShowRowSubtotals(objects: DataViewObjects): boolean {
+            return TablixObjects.PropGeneralMatrixRowSubtotals.getValue<boolean>(objects);
+        }
+
+        function shouldShowRowSubtotalsOption(dataView: DataView): boolean {
+            return !(dataView &&
+                dataView.matrix &&
+                dataView.matrix.rows &&
+                isDiscourageAggregationAcrossGroups(dataView.matrix.rows.levels));
+        }
+
+        export function shouldShowColumnSubtotals(objects: DataViewObjects): boolean {
+            return TablixObjects.PropGeneralMatrixColumnSubtotals.getValue<boolean>(objects);
+        }
+
+        export function shouldShowColumnSubtotalsOption(dataView: DataView): boolean {
+            return !(dataView &&
+                dataView.matrix &&
+                dataView.matrix.columns &&
+                isDiscourageAggregationAcrossGroups(dataView.matrix.columns.levels));
+        }
+
+        export function isDiscourageAggregationAcrossGroups(levels: DataViewHierarchyLevel[]): boolean {
+            let lastLevel = _.last(levels);
+            // If the last item is not Aggregatable, disable totals option since there will be no totals at all to display
+            // However, if the non-aggregatable filed is in the middle, there are totals showing up in matrix.
+            // Therefore, we still allow users to turn it off
+            return lastLevel && _.some(lastLevel.sources, source => source.discourageAggregationAcrossGroups);
+        }
+    }
 
     export module TablixUtils {
+        export const CssClassTablixDiv = "tablixDiv";                                                   // Any DIV inside the table (outer and inner)
+        export const CssClassContentElement = "tablixCellContentElement";                               // Outer DIV
+        export const CssClassContentHost = "tablixCellContentHost";                                     // Inner DIV
+
+        export const CssClassTablixHeader = "tablixHeader";                                             // Any Header in the Table/Matrix
+        export const CssClassTablixColumnHeaderLeaf = "tablixColumnHeaderLeaf";                         // Leaf Column Headers
+
+        export const CssClassTablixValueNumeric = "tablixValueNumeric";                                 // Numeric cells, will also be applied to all Matrix body cells
+        export const CssClassTablixValueTotal = "tablixValueTotal";                                     // Total cells,  will also be applied to subtotal Matrix body cells
+        export const CssClassValueURLIcon: string = "powervisuals-glyph url-icon tablixUrlIconGlyph";   // Any <a> Tag
+        export const CssClassValueURLIconContainer: string = "tablixValueUrlIcon";                      // Container for the <a> tag
+
+        export const CssClassMatrixRowHeaderLeaf = "matrixRowHeaderLeaf";                               // Matrix Leaf Row Headers
+        export const CssClassMatrixRowHeaderSubTotal = "matrixRowHeaderSubTotal";                       // Matrix SubTotal Row Headers
+
+        export const CssClassTableFooter = 'tableFooterCell';                                           // Any cell in the Footer area
+        export const CssClassTableBodyCell = 'tableBodyCell';                                           // Any cell in the Table Body
+        export const CssClassTableBodyCellBottom = 'tableBodyCellBottom';                               // Bottom-Most Body cell
+
+        export const StringNonBreakingSpace = '&nbsp;';
+
+        export const UnitOfMeasurement: string = 'px';
+        const SortIconContainerClassName: string = "tablixSortIconContainer";
+        export const CellPaddingLeft: number = 10;
+        export const CellPaddingRight: number = 5;
+        export const CellPaddingLeftMatrixTotal: number = 5;
+        export const FontFamilyCell: string = "'Segoe UI','wf_segoe-ui_normal', helvetica, arial, sans-serif";
+        export const FontFamilyHeader: string = "'Segoe UI','wf_segoe-ui_normal', helvetica, arial, sans-serif";
+        export const FontFamilyTotal: string = "'Segoe UI Bold','wf_segoe-ui_bold', helvetica, arial, sans-serif";
+        export const FontColorCells: string = "#333";
+        export const FontColorHeaders: string = "#666";
+
+        export interface Surround<T> {
+            top?: T;
+            right?: T;
+            bottom?: T;
+            left?: T;
+        }
+
+        export class EdgeSettings {
+            /**
+             * Weight in pixels. 0 to remove border. Undefined to fall back to CSS
+            */
+            public weight: number;
+            public color: string;
+
+            constructor(weight?: number, color?: string) {
+                this.applyParams(true, weight, color);
+            }
+
+            public applyParams(shown: boolean, weight: number, color?: string) {
+                if (shown) {
+                    this.weight = weight == null ? 0 : weight;
+                    this.color = color == null ? 'black' : color;
+                }
+                else {
+                    this.weight = 0;
+                    this.color = 'black';
+                }
+            }
+
+            public getCSS(): string {
+                let css: string[] = [];
+
+                if (_.isNumber(this.weight)) {
+                    css.push(this.weight + UnitOfMeasurement);
+                    if (this.color)
+                        css.push(this.color);
+
+                    css.push('solid');
+                }
+
+                return css.join(' ');
+            }
+        }
+
+        /**
+         * Style parameters for each Cell
+         */
+        export class CellStyle {
+            /**
+             * Font family of the cell. If undefined, it will be cleared to fall back to table font family
+            */
+            public fontFamily: string;
+            /**
+             * Font color of the cell. If undefined, it will be cleared to fall back to table font color
+            */
+            public fontColor: string;
+            /**
+             * Background color of the cell. If undefined, it will be cleared to fall back to default (transparent)
+            */
+            public backColor: string;
+            /**
+             * Indicates whether the Cell contains an Image or not. Affecting cell height.
+            */
+            public hasImage: boolean;
+            /**
+            * Settings for Borders
+            */
+            public borders: Surround<EdgeSettings>;
+
+            /**
+             * Settings for Padding
+            */
+            public paddings: Surround<number>;
+
+            constructor() {
+                this.borders = {};
+                this.paddings = { top: 0, left: TablixUtils.CellPaddingLeft, bottom: 0, right: TablixUtils.CellPaddingRight };
+
+                // Initializing values with empty string would cause CSS attributes to not be set if they are undefined
+                this.fontFamily = "";
+
+                this.fontColor = "";
+                this.backColor = "";
+
+                this.hasImage = false;
+            }
+
+            /**
+             * Sets the Inline style for the Cell
+             * @param {ITablixCell} cell Cell to set style to
+             */
+            public applyStyle(cell: ITablixCell): void {
+                let div = cell.extension.contentHost;
+                let style = div.style;
+
+                style.fontFamily = this.fontFamily;
+
+                style.color = this.fontColor;
+                style.backgroundColor = this.backColor;
+
+                /**
+                 * We are setting the borders as inset shadow
+                 * This way we can control how intersecting borders would look like when they have different colors
+                 */
+                let borderShadow: string[] = [];
+
+                style.border = "none";
+
+                if (this.borders.left) {
+                    borderShadow.push("inset " + this.borders.left.weight + UnitOfMeasurement + " 0 0 0 " + this.borders.left.color);
+                }
+
+                if (this.borders.right) {
+                    borderShadow.push("inset -" + this.borders.right.weight + UnitOfMeasurement + " 0 0 0 " + this.borders.right.color);
+                }
+
+                if (this.borders.top) {
+                    borderShadow.push("inset 0 " + this.borders.top.weight + UnitOfMeasurement + " 0 0 " + this.borders.top.color);
+                }
+
+                if (this.borders.bottom) {
+                    borderShadow.push("inset 0 -" + this.borders.bottom.weight + UnitOfMeasurement + " 0 0 " + this.borders.bottom.color);
+                }
+
+                style.boxShadow = borderShadow.join(', ');
+
+                style.paddingTop = ((this.paddings.top == null ? 0 : this.paddings.top) + (this.borders.top == null ? 0 : this.borders.top.weight)) + UnitOfMeasurement;
+                style.paddingRight = ((this.paddings.right == null ? CellPaddingRight : this.paddings.right) + (this.borders.right == null ? 0 : this.borders.right.weight)) + UnitOfMeasurement;
+                style.paddingBottom = ((this.paddings.bottom == null ? 0 : this.paddings.bottom) + (this.borders.bottom == null ? 0 : this.borders.bottom.weight)) + UnitOfMeasurement;
+                style.paddingLeft = ((this.paddings.left == null ? CellPaddingLeft : this.paddings.left) + (this.borders.left == null ? 0 : this.borders.left.weight)) + UnitOfMeasurement;
+            }
+
+            public getExtraTop(): number {
+                let extra = 0;
+
+                if (this.paddings.top)
+                    extra += this.paddings.top;
+                if (this.borders.top)
+                    extra += this.borders.top.weight;
+
+                return extra;
+            }
+
+            public getExtraBottom(): number {
+                let extra = 0;
+
+                if (this.paddings.bottom)
+                    extra += this.paddings.bottom;
+                if (this.borders.bottom)
+                    extra += this.borders.bottom.weight;
+
+                return extra;
+            }
+
+            public getExtraRight(): number {
+                let extra = 0;
+
+                if (this.paddings.right)
+                    extra += this.paddings.right;
+                if (this.borders.right)
+                    extra += this.borders.right.weight;
+
+                return extra;
+            }
+
+            public getExtraLeft(): number {
+                let extra = 0;
+
+                if (this.paddings.left)
+                    extra += this.paddings.left;
+                if (this.borders.left)
+                    extra += this.borders.left.weight;
+
+                return extra;
+            }
+        }
+
+        /**
+         * Index within a dimension (row/column)
+         */
+        export class DimensionPosition {
+            /**
+            * Global index within all leaf nodes
+            */
+            public index: number;
+            /**
+            * Index within siblings for same parent
+            */
+            public indexInSiblings: number;
+            /**
+            * Is last globally
+            */
+            public isLast: boolean;
+            /**
+            * Is first globally
+            */
+            public isFirst: boolean;
+        }
+        /**
+         * Poistion information about the cell
+         */
+        export class CellPosition {
+            public row: DimensionPosition;
+            public column: DimensionPosition;
+
+            constructor() {
+                this.row = new DimensionPosition();
+                this.column = new DimensionPosition();
+            }
+
+            public isMatch(position: CellPosition) {
+                return this.column.index === position.column.index &&
+                    this.row.index === position.row.index;
+            }
+        }
+
+        export class TablixVisualCell {
+            public dataPoint: any;
+            public position: TablixUtils.CellPosition;
+            public columnMetadata: DataViewMetadataColumn;
+            public isTotal: boolean;
+            private formatter: ICustomValueColumnFormatter;
+            // VSTS 7167767: Remove temporary code for product demo.
+            public backColorCustomFormatting: string;
+
+            constructor(dataPoint: any, isTotal: boolean, columnMetadata: DataViewMetadataColumn, formatter: ICustomValueColumnFormatter) {
+                this.dataPoint = dataPoint;
+                this.columnMetadata = columnMetadata;
+                this.formatter = formatter;
+                this.isTotal = isTotal;
+                this.backColorCustomFormatting = undefined;
+
+                this.position = new TablixUtils.CellPosition();
+            }
+
+            public get textContent(): string {
+                if (this.dataPoint == null)
+                    return '';
+
+                if (this.formatter)
+                    return this.formatter(this.dataPoint, this.columnMetadata, TablixObjects.PropColumnFormatString.getPropertyID());
+                else
+                    return this.dataPoint;
+            };
+
+            public get domContent(): JQuery {
+                if (this.columnMetadata && isValidStatusGraphic(this.columnMetadata.kpi, this.textContent))
+                    return createKpiDom(this.columnMetadata.kpi, this.textContent);
+            };
+
+            public get isNumeric(): boolean {
+                if (this.columnMetadata)
+                    return this.columnMetadata.type.numeric && !this.columnMetadata.kpi;
+            };
+
+            public get isUrl(): boolean {
+                if (this.columnMetadata)
+                    return converterHelper.isWebUrlColumn(this.columnMetadata);
+            };
+
+            public get isImage(): boolean {
+                if (this.columnMetadata)
+                    return converterHelper.isImageUrlColumn(this.columnMetadata);
+            }
+
+            public get isValidUrl(): boolean {
+                return jsCommon.UrlUtils.isValidImageUrl(this.textContent);
+            };
+
+            public isMatch(item: TablixVisualCell) {
+                return this.position.isMatch(item.position);
+            }
+        }
 
         export function createTable(): HTMLTableElement {
             return <HTMLTableElement>document.createElement("table");
         }
 
         export function createDiv(): HTMLDivElement {
-            var div: HTMLDivElement = <HTMLDivElement>document.createElement("div");
-
-            // TODO: Fold these into CSS as well combined with the styling done for the different scenarios where div are used.
-            var divStyle = div.style;
-            divStyle.whiteSpace = "nowrap";
-            divStyle.overflow = "hidden";
-            divStyle.lineHeight = "normal";
-
+            let div: HTMLDivElement = <HTMLDivElement>document.createElement("div");
+            div.className = "tablixDiv";
             return div;
         }
 
-        export function appendATagToBodyCell(value: string, cell: controls.ITablixCell): void {
-            var element = <HTMLElement>cell.extension.contentHost;
-            var atag: HTMLAnchorElement = null;
-            if(element.childElementCount === 0) {
+        export function resetCellCssClass(cell: controls.ITablixCell) {
+            cell.extension.contentElement.className = TablixUtils.CssClassTablixDiv + " " + TablixUtils.CssClassContentElement;
+            cell.extension.contentHost.className = TablixUtils.CssClassTablixDiv + " " + TablixUtils.CssClassContentHost;
+        }
+
+        export function addCellCssClass(cell: controls.ITablixCell, style: string): void {
+            cell.extension.contentHost.className += " " + style;
+        }
+
+        /**
+         * Clears all inline styles (border, fontColor, background) and resets CSS classes
+         * Performed with unbind-<Cell>
+         */
+        export function clearCellStyle(cell: controls.ITablixCell): void {
+            cell.extension.contentHost.className = "";
+            cell.extension.contentHost.style.cssText = "";
+        }
+
+        export function clearCellTextAndTooltip(cell: controls.ITablixCell): void {
+            cell.extension.contentHost.textContent = '';
+            cell.extension.contentHost.removeAttribute('title');
+            cell.contentHeight = cell.contentWidth = 0;
+            HTMLElementUtils.clearChildren(cell.extension.contentHost);
+        }
+
+        export function setCellTextAndTooltip(cell: controls.ITablixCell, text: string): void {
+            let val = TextUtil.replaceSpaceWithNBSP(text);
+            cell.extension.contentHost.textContent = val;
+            cell.extension.contentHost.title = val;
+        }
+
+        export function isValidSortClick(e: MouseEvent) {
+            let colHeader = <HTMLElement>e.target;
+            let x = e.offsetX;
+            return x >= 0 && x < colHeader.offsetWidth - TablixResizer.resizeHandleSize;
+        }
+
+        export function appendATagToBodyCell(value: string, cell: controls.ITablixCell, urlIcon?: boolean): void {
+            let element = <HTMLElement>cell.extension.contentHost;
+            let atag: HTMLAnchorElement = null;
+            if (element.childElementCount === 0) {
                 atag = document.createElement('a');
                 element.appendChild(atag);
-            } else {
+            }
+            else {
                 atag = <HTMLAnchorElement>element.children[0];
             }
 
             atag.href = value;
             atag.target = '_blank';
             atag.title = value;
-            atag.innerText = value;
+
+            if (urlIcon === true) {
+                atag.className = CssClassValueURLIcon;
+                element.className = CssClassValueURLIconContainer;
+            }
+            else {
+                atag.innerText = value;
+            }
+        }
+
+        export function appendImgTagToBodyCell(value: string, cell: controls.ITablixCell, imageHeight: number): void {
+            let element = <HTMLElement>cell.extension.contentHost;
+            let imgContainer: HTMLDivElement = TablixUtils.createDiv();
+            let imgTag: HTMLImageElement = document.createElement('img');
+
+            imgContainer.style.height = imageHeight + "px";
+            imgContainer.style.width = "100%";
+            imgContainer.style.textAlign = "center";
+            imgTag.src = value;
+            imgTag.style.maxHeight = "100%";
+            imgTag.style.maxWidth = "100%";
+            imgContainer.appendChild(imgTag);
+            element.appendChild(imgContainer);
+        }
+
+        export function createKpiDom(kpi: DataViewKpiColumnMetadata, kpiValue: string): JQuery {
+            debug.assertValue(kpi, 'kpi');
+            debug.assertValue(kpiValue, 'kpiValue');
+            let className: string = KpiUtil.getClassForKpi(kpi, kpiValue) || '';
+            return DomFactory.div()
+                .addClass(className)
+                .css({
+                    'display': 'inline-block',
+                    'vertical-align': 'bottom',
+                    'margin': '0',
+                });
+        }
+
+        export function isValidStatusGraphic(kpi: DataViewKpiColumnMetadata, kpiValue: string): boolean {
+            if (!kpi || kpiValue === undefined) {
+                return false;
+            }
+
+            return !!KpiUtil.getClassForKpi(kpi, kpiValue);
+        }
+
+        export function getCustomSortEventArgs(queryName: string, sortDirection: SortDirection): CustomSortEventArgs {
+            let sortDescriptors: SortableFieldDescriptor[] = [{
+                queryName: queryName,
+                sortDirection: sortDirection
+            }];
+            return { sortDescriptors: sortDescriptors };
+        }
+
+        export function reverseSort(sortDirection: SortDirection): SortDirection {
+            return sortDirection === SortDirection.Descending ? SortDirection.Ascending : SortDirection.Descending;
+        }
+
+        export function createColumnHeaderWithSortIcon(item: DataViewMetadataColumn, cell: controls.ITablixCell): void {
+            let colHeaderContainer: HTMLDivElement = TablixUtils.createDiv();
+
+            if (item.sort) {
+                let itemSort = item.sort;
+                colHeaderContainer.appendChild(createSortIcon(itemSort, true));
+                colHeaderContainer.appendChild(createSortIcon(reverseSort(itemSort), false));
+            }
+            else {
+                colHeaderContainer.appendChild(createSortIcon(SortDirection.Descending, false));
+            }
+
+            let colHeaderTitle: HTMLDivElement = TablixUtils.createDiv();
+            // Preserving trailing and leading spaces
+            let title = item ? TextUtil.replaceSpaceWithNBSP(item.displayName) : '';
+            colHeaderTitle.textContent = title;
+            colHeaderContainer.appendChild(colHeaderTitle);
+            cell.extension.contentHost.title = title;
+            cell.extension.contentHost.appendChild(colHeaderContainer);
+        }
+
+        function createSortIcon(sort: SortDirection, isSorted: boolean): HTMLElement {
+            let imgSort: HTMLPhraseElement = <HTMLPhraseElement>document.createElement('i');
+            imgSort.className = SortIconContainerClassName +
+                " " + (isSorted ? "sorted" : "future") +
+                " " + (sort === SortDirection.Ascending ? "powervisuals-glyph caret-up" : "powervisuals-glyph caret-down");
+            return imgSort;
+        }
+
+        function checkSortIconExists(cell: controls.ITablixCell): boolean {
+            for (let i = 0, len = cell.extension.contentElement.childElementCount; i < len; i++) {
+                let element = cell.extension.contentElement.children.item(i);
+                if (element.classList.contains(SortIconContainerClassName))
+                    return true;
+            }
+            return false;
+        }
+
+        export function removeSortIcons(cell: controls.ITablixCell): void {
+            if (!checkSortIconExists(cell))
+                return;
+            $((<HTMLElement>cell.extension.contentElement)).find('.' + SortIconContainerClassName).remove();
         }
     }
 }

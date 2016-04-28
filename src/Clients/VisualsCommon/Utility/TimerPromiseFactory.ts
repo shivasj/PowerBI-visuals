@@ -24,24 +24,30 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
-
 module jsCommon {
 
     export interface ITimerPromiseFactory {
-        /** Returns a promise that will be resolved after the specified delayInMs. */
+        /** 
+         * Creates a promise that will be resolved after the specified delayInMs.
+         * @return Promise.
+         */
         create(delayInMs: number): IRejectablePromise;
     }
 
-    /** Responsible for creating timer promises. */
+    /** 
+     * Responsible for creating timer promises.
+     */
     export class TimerPromiseFactory implements ITimerPromiseFactory {
         public static instance = new TimerPromiseFactory();
 
+        /**
+         * {@inheritDoc}
+         */
         public create(delayInMs: number): IRejectablePromise {
             debug.assertValue(delayInMs, 'delayInMs');
             debug.assert(delayInMs >= 0, 'delayInMs must be a positive value.');
 
-            var deferred = $.Deferred<void>();
+            let deferred = $.Deferred<void>();
 
             window.setTimeout(
                 () => deferred.resolve(),

@@ -24,8 +24,6 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
-
 module powerbi.visuals {
     import SQExprShortSerializer = data.SQExprShortSerializer;
 
@@ -35,7 +33,7 @@ module powerbi.visuals {
         private colors: IDataColorPalette;
         private defaultColorScale: IColorScale;
 
-        constructor(colors: IDataColorPalette, fillProp: DataViewObjectPropertyIdentifier, defaultDataPointColor?: string) {
+        constructor(colors: IDataColorPalette, fillProp?: DataViewObjectPropertyIdentifier, defaultDataPointColor?: string) {
             this.colors = colors;
             this.fillProp = fillProp;
             this.defaultDataPointColor = defaultDataPointColor;
@@ -43,19 +41,29 @@ module powerbi.visuals {
         }
 
         /**
-         * Gets the color for the given series value. If no explicit color or default color has been set then the color is
+         * Gets the color for the given series value.
+         * If no explicit color or default color has been set then the color is
          * allocated from the color scale for this series.
          */
-        public getColorForSeriesValue(objects: DataViewObjects, fieldIds: powerbi.data.SQExpr[], value: string): string {
+        public getColorForSeriesValue(objects: DataViewObjects, fieldIds: powerbi.data.ISQExpr[], value: string): string {
             return (this.fillProp && DataViewObjects.getFillColor(objects, this.fillProp))
                 || this.defaultDataPointColor
-                || this.colors.getColorScaleByKey(SQExprShortSerializer.serializeArray(fieldIds || [])).getColor(value).value;
+                || this.getColorScaleForSeries(fieldIds).getColor(value).value;
         }
 
-        /** Gets the color for the given measure. */
+        /**
+         * Gets the color scale for the given series.
+         */
+        public getColorScaleForSeries(fieldIds: powerbi.data.ISQExpr[]): IColorScale {
+            return this.colors.getColorScaleByKey(SQExprShortSerializer.serializeArray(<data.SQExpr[]>fieldIds || []));
+        }
+
+        /** 
+         * Gets the color for the given measure.
+         */
         public getColorForMeasure(objects: DataViewObjects, measureKey: any): string {
             // Note, this allocates the color from the scale regardless of if we use it or not which helps keep colors stable.
-            var scaleColor = this.defaultColorScale.getColor(measureKey).value;
+            let scaleColor = this.defaultColorScale.getColor(measureKey).value;
 
             return (this.fillProp && DataViewObjects.getFillColor(objects, this.fillProp))
                 || this.defaultDataPointColor

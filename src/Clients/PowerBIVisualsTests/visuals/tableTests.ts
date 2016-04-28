@@ -2,7 +2,7 @@
  *  Power BI Visualizations
  *
  *  Copyright (c) Microsoft Corporation
- *  All rights reserved. 
+ *  All rights reserved.
  *  MIT License
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -11,20 +11,18 @@
  *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
  *  copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
- *   
- *  The above copyright notice and this permission notice shall be included in 
+ *
+ *  The above copyright notice and this permission notice shall be included in
  *  all copies or substantial portions of the Software.
- *   
- *  THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
- *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
- *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
- *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+ *
+ *  THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
  *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  *  THE SOFTWARE.
  */
-
-/// <reference path="../_references.ts"/>
 
 module powerbitests {
     import CompiledDataViewMapping = powerbi.data.CompiledDataViewMapping;
@@ -34,44 +32,120 @@ module powerbitests {
     import DataViewTable = powerbi.DataViewTable;
     import DataViewMetadataColumn = powerbi.DataViewMetadataColumn;
     import Table = powerbi.visuals.Table;
-    import TableDataViewObjects = powerbi.visuals.TableDataViewObjects;
+    import tableCapabilities = powerbi.visuals.tableCapabilities;
     import TableHierarchyNavigator = powerbi.visuals.TableHierarchyNavigator;
     import valueFormatter = powerbi.visuals.valueFormatter;
     import ValueType = powerbi.ValueType;
     import PrimitiveType = powerbi.PrimitiveType;
-
-    var DefaultWaitForRender = 500;
+    import SortDirection = powerbi.SortDirection;
+    import Controls = powerbi.visuals.controls;
+    import TablixObjects = Controls.internal.TablixObjects;
+    import TablixControl = Controls.TablixControl;
+    import TablixUtils = Controls.internal.TablixUtils;
 
     powerbitests.mocks.setLocale();
 
-    var dataTypeNumber = ValueType.fromPrimitiveTypeAndCategory(PrimitiveType.Double);
-    var dataTypeString = ValueType.fromPrimitiveTypeAndCategory(PrimitiveType.Text);
-    var dataTypeWebUrl = ValueType.fromPrimitiveTypeAndCategory(PrimitiveType.Text, 'WebUrl');
+    const SelectorContainer = '.tablixCanvas';
+    const SelectorHeaderCell = '.tablixColumnHeaderLeaf';
+    const SelectorBodyCell = '.tableBodyCell';
+    const SelectorBodyCellLast = '.tableBodyCellBottom';
+    const SelectorFooterCell = '.tableFooterCell';
+    /** rasaro: ToDo Enable
+    const SelectorCellContent = '.tablixCellContentHost';*/
 
-    var groupSource1: DataViewMetadataColumn = { displayName: 'group1', queryName: 'group1', type: dataTypeString, index: 0 };
-    var groupSource2: DataViewMetadataColumn = { displayName: 'group2', queryName: 'group2', type: dataTypeString, index: 1 };
-    var groupSource3: DataViewMetadataColumn = { displayName: 'group3', queryName: 'group3', type: dataTypeString, index: 2 };
-    var groupSourceWebUrl: DataViewMetadataColumn = { displayName: 'groupWebUrl', queryName: 'groupWebUrl', type: dataTypeWebUrl, index: 0 };
+    const ColumnHeaderClassNameIconHidden = "tablixDiv tablixCellContentHost tablixHeader tablixColumnHeaderLeaf";
+    const RowClassName = "tablixDiv tablixCellContentHost tableBodyCell";
+    const LastRowClassName = "tablixDiv tablixCellContentHost tableBodyCellBottom";
+    const FooterClassName = "tablixDiv tablixCellContentHost tablixValueTotal tableFooterCell";
+    const CssClassTablixValueNumeric = " tablixValueNumeric";
+    const EmptyHeaderCell = "\xa0";
 
-    var measureSource1: DataViewMetadataColumn = { displayName: 'measure1', queryName: 'measure1', type: dataTypeNumber, isMeasure: true, index: 3, objects: { general: { formatString: '#.0' } } };
-    var measureSource2: DataViewMetadataColumn = { displayName: 'measure2', queryName: 'measure2', type: dataTypeNumber, isMeasure: true, index: 4, objects: { general: { formatString: '#.00' } } };
-    var measureSource3: DataViewMetadataColumn = { displayName: 'measure3', queryName: 'measure3', type: dataTypeNumber, isMeasure: true, index: 5, objects: { general: { formatString: '#' } } };
+    const dataTypeNumber = ValueType.fromPrimitiveTypeAndCategory(PrimitiveType.Double);
+    const dataTypeString = ValueType.fromPrimitiveTypeAndCategory(PrimitiveType.Text);
+    const dataTypeWebUrl = ValueType.fromPrimitiveTypeAndCategory(PrimitiveType.Text, "WebUrl");
+    const dataTypeKpiStatus = ValueType.fromPrimitiveTypeAndCategory(PrimitiveType.Integer);
 
-    var webPluginService = new powerbi.visuals.visualPluginFactory.MinervaVisualPluginService({});
+    const groupSource1: DataViewMetadataColumn = { displayName: "group1", queryName: "group1", type: dataTypeString, index: 0 };
+    const groupSource2: DataViewMetadataColumn = { displayName: "group2", queryName: "group2", type: dataTypeString, index: 1 };
+    const groupSource3: DataViewMetadataColumn = { displayName: "group3", queryName: "group3", type: dataTypeString, index: 2 };
+    const groupSourceLeadingSpeaces: DataViewMetadataColumn = { displayName: "    group1", queryName: "group1", type: dataTypeString, index: 0 };
+    const groupSourceWebUrl: DataViewMetadataColumn = { displayName: "groupWebUrl", queryName: "groupWebUrl", type: dataTypeWebUrl, index: 0 };
+    const groupSourceKpiStatus: DataViewMetadataColumn = {
+        displayName: "Average of Grade",
+        queryName: "Table1._Average of Grade Status",
+        type: dataTypeKpiStatus,
+        roles: { Values: true },
+        format: "g",
+        kpi: {
+            graphic: "Traffic Light - Single"
+        },
+        objects: {
+            general: {
+                formatString: "g",
+            },
+        },
+    };
 
-    var tableTotals: TableDataViewObjects = {
+    let measureSource1: DataViewMetadataColumn = { displayName: "measure1", queryName: "measure1", type: dataTypeNumber, isMeasure: true, index: 3, objects: { general: { formatString: "#.0" } } };
+    let measureSource2: DataViewMetadataColumn = { displayName: "measure2", queryName: "measure2", type: dataTypeNumber, isMeasure: true, index: 4, objects: { general: { formatString: "#.00" } } };
+    let measureSource3: DataViewMetadataColumn = { displayName: "measure3", queryName: "measure3", type: dataTypeNumber, isMeasure: true, index: 5, objects: { general: { formatString: "#" } } };
+
+    let measureSourceAscending: DataViewMetadataColumn = { displayName: "measure1", queryName: "measure1", type: dataTypeNumber, isMeasure: true, index: 3, objects: { general: { formatString: "#.0" } }, sort: SortDirection.Ascending };
+    let measureSourceDescending: DataViewMetadataColumn = { displayName: "measure1", queryName: "measure1", type: dataTypeNumber, isMeasure: true, index: 3, objects: { general: { formatString: "#.0" } }, sort: SortDirection.Descending };
+
+    let webPluginService = new powerbi.visuals.visualPluginFactory.MinervaVisualPluginService({});
+    let dashboardPluginService = new powerbi.visuals.visualPluginFactory.DashboardPluginService({}, { tooltipsEnabled: true });
+
+    let tableTotals: powerbi.DataViewObjects = {
         general: {
-            totals: true
+            totals: true,
+            autoSizeColumnWidth: true,
+            textSize: 8,
         }
     };
 
-    var tableNoTotals: TableDataViewObjects = {
+    let tableTotalsIncreasedFontSize: powerbi.DataViewObjects = {
         general: {
-            totals: false
+            totals: true,
+            autoSizeColumnWidth: true,
+            textSize: 14,
         }
     };
 
-    var tableOneMeasure: DataView = {
+    let tableNoTotals: powerbi.DataViewObjects = {
+        general: {
+            totals: false,
+            autoSizeColumnWidth: true,
+            textSize: 8,
+        }
+    };
+
+    let tableColumnWidthFalse: powerbi.DataViewObjects = {
+        general: {
+            totals: true,
+            autoSizeColumnWidth: false,
+            textSize: 8,
+        }
+    };
+
+    let tableColumnWidthTrue: powerbi.DataViewObjects = {
+        general: {
+            totals: true,
+            autoSizeColumnWidth: true,
+            textSize: 8,
+        }
+    };
+
+    let dataViewTableThreeMeasures: DataViewTable = {
+        columns: [measureSource1, measureSource2, measureSource3],
+        rows: [
+            [100, 10100, 102000],
+            [103, 104000, 1050000],
+            [106, 1070000, 10800000]
+        ]
+    };
+
+    let tableOneMeasure: DataView = {
         metadata: { columns: [measureSource1] },
         table: {
             columns: [measureSource1],
@@ -81,50 +155,92 @@ module powerbitests {
         }
     };
 
-    var dataViewTableOneGroup: DataViewTable = {
+    let tableOneMeasurSortAscending: DataView = {
+        metadata: { columns: [measureSourceAscending] },
+        table: {
+            columns: [measureSourceAscending],
+            rows: [
+                [100]
+            ]
+        }
+    };
+
+    let tableOneMeasurSortDescending: DataView = {
+        metadata: { columns: [measureSourceDescending] },
+        table: {
+            columns: [measureSourceDescending],
+            rows: [
+                [100]
+            ]
+        }
+    };
+
+    let dataViewTableOneGroup: DataViewTable = {
         columns: [groupSource1],
         rows: [
-            ['A'],
-            ['B'],
-            ['C']
+            ["A"],
+            ["B"],
+            ["C"]
         ]
     };
 
-    var tableOneGroup: DataView = {
+    let tableOneGroup: DataView = {
         metadata: { columns: [groupSource1] },
         table: dataViewTableOneGroup
     };
 
-    var tableOneGroupNulls: DataView = {
+    let tableOneGroupNulls: DataView = {
         metadata: { columns: [groupSource1] },
         table: {
             columns: [groupSource1],
             rows: [
-                [''],
+                [""],
                 [null]
             ]
         }
     };
 
-    var dataViewTableTwoGroups: DataViewTable = {
-        columns: [groupSource1, groupSource2],
+    let dataViewTableOneGroupLeadingSpaces: DataViewTable = {
+        columns: [groupSourceLeadingSpeaces],
         rows: [
-            ['A', 'a1'],
-            ['A', 'a2'],
-            ['A', 'a3'],
-            ['B', 'a1'],
-            ['B', 'a2'],
-            ['C', 'c1'],
-            ['C', 'c2']
+            ["    A"],
+            ["B"],
+            ["C"]
         ]
     };
 
-    var tableTwoGroups: DataView = {
+    let tableOneGroupLeadingSpaces: DataView = {
+        metadata: { columns: [groupSourceLeadingSpeaces] },
+        table: dataViewTableOneGroupLeadingSpaces
+    };
+
+    let dataViewTableTwoGroups: DataViewTable = {
+        columns: [groupSource1, groupSource2],
+        rows: [
+            ["A", "a1"],
+            ["A", "a2"],
+            ["A", "a3"],
+            ["B", "a1"],
+            ["B", "a2"],
+            ["C", "c1"],
+            ["C", "c2"]
+        ]
+    };
+
+    let tableTwoGroups: DataView = {
         metadata: { columns: [groupSource1, groupSource2] },
         table: dataViewTableTwoGroups
     };
 
-    var tableTwoGroupsThreeMeasures: DataView = {
+    let tableTwoGroupsIncreasedFontSize: DataView = {
+        metadata: {
+            columns: [groupSource1, groupSource2],
+            objects: tableTotalsIncreasedFontSize,
+        },
+        table: dataViewTableTwoGroups
+    };
+
+    let tableWithLongText: DataView = {
         metadata: {
             columns: [groupSource1, groupSource2, measureSource1, measureSource2, measureSource3],
             objects: tableTotals
@@ -132,51 +248,87 @@ module powerbitests {
         table: {
             columns: [groupSource1, groupSource2, measureSource1, measureSource2, measureSource3],
             rows: [
-                ['A', 'a1', 100, 101, 102],
-                ['A', 'a2', 103, 104, 105],
-                ['A', 'a3', 106, 107, 108],
-                ['B', 'a1', 109, 110, 111],
-                ['B', 'a2', 112, 113, 114],
-                ['C', 'c1', 115, 116, 117],
-                ['C', 'c2', 118, 119, 120]
+                ["432432432", "a5", 344344, 1043241, 104342],
+                ["g4", "432432432", 114324325, 116, 432432432],
+                ["114324325", "114324325", 43242, 114324325, 3243242334]
+            ],
+            totals: [null, null, null, 114711911, 115367542, 3672424338]
+        }
+    };
+
+    let tableTwoGroupsThreeMeasures: DataView = {
+        metadata: {
+            columns: [groupSource1, groupSource2, measureSource1, measureSource2, measureSource3],
+            objects: tableTotals
+        },
+        table: {
+            columns: [groupSource1, groupSource2, measureSource1, measureSource2, measureSource3],
+            rows: [
+                ["A", "a1", 100, 101, 102],
+                ["A", "a2", 103, 104, 105],
+                ["A", "a3", 106, 107, 108],
+                ["B", "a1", 109, 110, 111],
+                ["B", "a2", 112, 113, 114],
+                ["C", "c1", 115, 116, 117],
+                ["C", "c2", 118, 119, 120]
             ],
             totals: [null, null, 763, 770, 777]
         }
     };
 
-    var tableTwoGroups1MeasureNulls: DataView = {
+    let tableTwoGroupsThreeMeasuresIncreasedFontSize: DataView = {
         metadata: {
-            columns: [groupSource1, groupSource2, measureSource1],
+            columns: [groupSource1, groupSource2, measureSource1, measureSource2, measureSource3],
+            objects: tableTotalsIncreasedFontSize
+        },
+        table: {
+            columns: [groupSource1, groupSource2, measureSource1, measureSource2, measureSource3],
+            rows: [
+                ["A", "a1", 100, 101, 102],
+                ["A", "a2", 103, 104, 105],
+                ["A", "a3", 106, 107, 108],
+                ["B", "a1", 109, 110, 111],
+                ["B", "a2", 112, 113, 114],
+                ["C", "c1", 115, 116, 117],
+                ["C", "c2", 118, 119, 120]
+            ],
+            totals: [null, null, 763, 770, 777]
+        }
+    };
+
+    let tableTwoGroups1MeasureNulls: DataView = {
+        metadata: {
+            columns: [groupSource1, groupSource2, measureSource1]
         },
         table: {
             columns: [groupSource1, groupSource2, measureSource1],
             rows: [
-                ['A', 'a1', 100],
-                ['', null, 103],
-                ['', 'a3', 106],
-                ['B', '', 112],
-                [null, '', null]
+                ["A", "a1", 100],
+                ["", null, 103],
+                ["", "a3", 106],
+                ["B", "", 112],
+                [null, "", null]
             ]
         }
     };
 
-    var tableThreeGroupsThreeMeasuresInterleaved: DataView = {
+    let tableThreeGroupsThreeMeasuresInterleaved: DataView = {
         metadata: { columns: [groupSource1, measureSource1, groupSource2, measureSource2, groupSource3, measureSource3] },
         table: {
             columns: [groupSource1, measureSource1, groupSource2, measureSource2, groupSource3, measureSource3],
             rows: [
-                ['A', 100, 'aa', 101, 'aa1', 102],
-                ['A', 103, 'aa', 104, 'aa2', 105],
-                ['A', 106, 'ab', 107, 'ab1', 108],
-                ['B', 109, 'ba', 110, 'ba1', 111],
-                ['B', 112, 'bb', 113, 'bb1', 114],
-                ['B', 115, 'bb', 116, 'bb2', 117],
-                ['C', 118, 'cc', 119, 'cc1', 120],
+                ["A", 100, "aa", 101, "aa1", 102],
+                ["A", 103, "aa", 104, "aa2", 105],
+                ["A", 106, "ab", 107, "ab1", 108],
+                ["B", 109, "ba", 110, "ba1", 111],
+                ["B", 112, "bb", 113, "bb1", 114],
+                ["B", 115, "bb", 116, "bb2", 117],
+                ["C", 118, "cc", 119, "cc1", 120]
             ]
         }
     };
 
-    var tableOneMeasureOneGroupSubtotals: DataView = {
+    let tableOneMeasureOneGroupSubtotals: DataView = {
         metadata: {
             columns: [measureSource1, groupSource1],
             objects: tableTotals
@@ -184,15 +336,47 @@ module powerbitests {
         table: {
             columns: [measureSource1, groupSource1],
             rows: [
-                [1, 'A'],
-                [2, 'B'],
-                [3, 'C']
+                [1, "A"],
+                [2, "B"],
+                [3, "C"]
             ],
             totals: [6, null]
         }
     };
 
-    var tableOneMeasureOneGroup: DataView = {
+    let tableOneMeasureOneGroupColumnWidthDefault: DataView = {
+        metadata: {
+            columns: [measureSource1, groupSource1],
+            objects: tableColumnWidthFalse
+        },
+        table: {
+            columns: [measureSource1, groupSource1],
+            rows: [
+                [1, "A"],
+                [2, "B"],
+                [3, "C"]
+            ],
+            totals: [6, null]
+        }
+    };
+
+    let tableOneMeasureOneGroupColumnWidthTrue: DataView = {
+        metadata: {
+            columns: [measureSource1, groupSource1],
+            objects: tableColumnWidthTrue
+        },
+        table: {
+            columns: [measureSource1, groupSource1],
+            rows: [
+                [1, "A"],
+                [2, "B"],
+                [3, "C"]
+            ],
+            totals: [6, null]
+        }
+    };
+
+    let tableOneMeasureOneGroup: DataView = {
         metadata: {
             columns: [measureSource1, groupSource1],
             objects: tableNoTotals
@@ -200,111 +384,117 @@ module powerbitests {
         table: {
             columns: [measureSource1, groupSource1],
             rows: [
-                [1, 'A'],
-                [2, 'B'],
-                [3, 'C']
+                [1, "A"],
+                [2, "B"],
+                [3, "C"]
             ]
         }
     };
 
-    var tableWebUrl: DataView = {
+    let tableWebUrl: DataView = {
         metadata: {
             columns: [groupSourceWebUrl],
-            objects: tableNoTotals,
+            objects: tableNoTotals
         },
         table: {
             columns: [groupSourceWebUrl],
             rows: [
-                ['http://www.microsoft.com'],
-                ['data:url'],
-                ['https://www.microsoft.com/2'],
+                ["http://www.microsoft.com"],
+                ["data:url"],
+                ["https://www.microsoft.com/2"]
             ]
         }
     };
 
-    describe('Table',() => {
-        it('Table registered capabilities',() => {
-            expect(webPluginService.getPlugin('table').capabilities).toEqual(Table.capabilities);
+    let tableKpi: DataView = {
+        metadata: {
+            columns: [groupSourceKpiStatus],
+        },
+        table: {
+            columns: [groupSourceKpiStatus],
+            rows: [
+                ["-1"],
+                ["0"],
+                ["+1"],
+            ]
+        }
+    };
+
+    describe("Table", () => {
+        it("Table registered capabilities", () => {
+            expect(webPluginService.getPlugin("table").capabilities).toEqual(tableCapabilities);
         });
 
-        it('Capabilities should include dataViewMappings',() => {
-            expect(Table.capabilities.dataViewMappings).toBeDefined();
+        it("Capabilities should include dataViewMappings", () => {
+            expect(tableCapabilities.dataViewMappings).toBeDefined();
         });
 
-        it('Capabilities should include dataRoles',() => {
-            expect(Table.capabilities.dataRoles).toBeDefined();
+        it("Capabilities should include dataRoles", () => {
+            expect(tableCapabilities.dataRoles).toBeDefined();
         });
 
-        it('Capabilities should suppressDefaultTitle',() => {
-            expect(Table.capabilities.suppressDefaultTitle).toBe(true);
+        it("Capabilities should suppressDefaultTitle", () => {
+            expect(tableCapabilities.suppressDefaultTitle).toBe(true);
         });
 
-        it('FormatString property should match calculated',() => {
-            expect(powerbi.data.DataViewObjectDescriptors.findFormatString(Table.capabilities.objects)).toEqual(Table.formatStringProp);
+        it("FormatString property should match calculated", () => {
+            expect(powerbi.data.DataViewObjectDescriptors.findFormatString(tableCapabilities.objects)).toEqual(TablixObjects.PropColumnFormatString.getPropertyID());
         });
 
-        it('CustomizeQuery picks up enabled total',() => {
-            var objects: TableDataViewObjects = {
-                general: {
-                    totals: true
-                }
-            };
-            var dataViewMapping = createCompiledDataViewMapping(objects);
+        it("CustomizeQuery picks up enabled total", () => {
+            let dataViewMapping = createCompiledDataViewMapping(tableTotals);
 
             Table.customizeQuery({
                 dataViewMappings: [dataViewMapping]
             });
 
-            var rows = <CompiledDataViewRoleForMapping>dataViewMapping.table.rows;
+            let rows = <CompiledDataViewRoleForMapping>dataViewMapping.table.rows;
             expect(rows.for.in.subtotalType).toEqual(CompiledSubtotalType.Before);
         });
 
-        it('CustomizeQuery picks up disabled total',() => {
-            var objects: TableDataViewObjects = {
-                general: {
-                    totals: false
-                }
-            };
-            var dataViewMapping = createCompiledDataViewMapping(objects);
+        it("CustomizeQuery picks up disabled total", () => {
+            let dataViewMapping = createCompiledDataViewMapping(tableNoTotals);
 
             powerbi.visuals.Table.customizeQuery({
                 dataViewMappings: [dataViewMapping]
             });
 
-            var rows = <CompiledDataViewRoleForMapping>dataViewMapping.table.rows;
+            let rows = <CompiledDataViewRoleForMapping>dataViewMapping.table.rows;
             expect(rows.for.in.subtotalType).toEqual(CompiledSubtotalType.None);
         });
 
-        it('CustomizeQuery handles missing settings',() => {
-            var dataViewMapping = createCompiledDataViewMapping();
+        it("CustomizeQuery handles missing settings", () => {
+            let dataViewMapping = createCompiledDataViewMapping();
 
             Table.customizeQuery({
                 dataViewMappings: [dataViewMapping]
             });
 
             // Total should be enabled by default
-            var rows = <CompiledDataViewRoleForMapping>dataViewMapping.table.rows;
+            let rows = <CompiledDataViewRoleForMapping>dataViewMapping.table.rows;
             expect(rows.for.in.subtotalType).toEqual(CompiledSubtotalType.Before);
         });
 
-        it('CustomizeQuery handles missing subtotal settings',() => {
-            var objects: TableDataViewObjects = {
+        it("CustomizeQuery handles missing subtotal settings", () => {
+            let objects: powerbi.DataViewObjects = {
                 general: {
-                    totals: undefined
+                    totals: undefined,
+                    autoSizeColumnWidth: true,
+                    textSize: 8,
                 }
             };
-            var dataViewMapping = createCompiledDataViewMapping(objects);
+            let dataViewMapping = createCompiledDataViewMapping(objects);
 
             Table.customizeQuery({
                 dataViewMappings: [dataViewMapping]
             });
 
             // Total should be enabled by default
-            var rows = <CompiledDataViewRoleForMapping>dataViewMapping.table.rows;
+            let rows = <CompiledDataViewRoleForMapping>dataViewMapping.table.rows;
             expect(rows.for.in.subtotalType).toEqual(CompiledSubtotalType.Before);
         });
 
-        function createCompiledDataViewMapping(objects?: TableDataViewObjects): CompiledDataViewMapping {
+        function createCompiledDataViewMapping(objects?: powerbi.DataViewObjects): CompiledDataViewMapping {
             return {
                 metadata: {
                     objects: objects
@@ -312,7 +502,7 @@ module powerbitests {
                 table: {
                     rows: {
                         for: {
-                            in: { role: 'Values', items: [] }
+                            in: { role: "Values", items: [] }
                         }
                     }
                 }
@@ -320,311 +510,325 @@ module powerbitests {
         }
     });
 
-    describe('Table hierarchy navigator tests',() => {
-        function createNavigator(dataView: DataView): TableHierarchyNavigator {
-            return new TableHierarchyNavigator(dataView.table, valueFormatter.formatRaw);
+    describe("Table hierarchy navigator tests", () => {
+        function createNavigator(dataViewTable: DataViewTable): TableHierarchyNavigator {
+            return new TableHierarchyNavigator(dataViewTable, valueFormatter.formatValueColumn);
         }
 
-        describe('getDepth',() => {
-            var dataView = tableTwoGroupsThreeMeasures;
-            var navigator = createNavigator(dataView);
+        describe("getDepth", () => {
+            let dataView = tableTwoGroupsThreeMeasures;
+            let navigator = createNavigator(dataView.table);
 
-            it('returns 1 for row dimension',() => {
-                expect(navigator.getDepth(dataView.table.rows)).toBe(1);
+            it("returns 1 for row dimension", () => {
+                expect(navigator.getRowHierarchyDepth()).toBe(1);
             });
-            it('returns 1 for column dimension',() => {
-                expect(navigator.getDepth(dataView.table.columns)).toBe(1);
-            });
-            it('always returns 1',() => {
-                expect(navigator.getDepth(null)).toBe(1);
+
+            it("returns 1 for column dimension", () => {
+                expect(navigator.getColumnHierarchyDepth()).toBe(1);
             });
         });
-        describe('getLeafCount',() => {
-            var dataView = tableThreeGroupsThreeMeasuresInterleaved;
-            var navigator = createNavigator(dataView);
 
-            it('returns the row count for row dimension',() => {
+        describe("getLeafCount", () => {
+            let dataView = tableThreeGroupsThreeMeasuresInterleaved;
+            let navigator = createNavigator(dataView.table);
+
+            it("returns the row count for row dimension", () => {
                 expect(navigator.getLeafCount(dataView.table.rows)).toBe(7);
             });
-            it('returns the column count for column dimension',() => {
+
+            it("returns the column count for column dimension", () => {
                 expect(navigator.getLeafCount(dataView.table.columns)).toBe(6);
             });
         });
-        describe('getLeafAt',() => {
-            it('returns the correct leaf from the row dimension',() => {
-                var dataView = tableTwoGroupsThreeMeasures;
-                var navigator = createNavigator(dataView);
-                var rows = dataView.table.rows;
+
+        describe("getLeafAt", () => {
+
+            it("returns the correct leaf from the row dimension", () => {
+                let dataView = tableTwoGroupsThreeMeasures;
+                let navigator = createNavigator(dataView.table);
+                let rows = dataView.table.rows;
 
                 expect(navigator.getLeafAt(rows, 0)).toBe(rows[0]);
                 expect(navigator.getLeafAt(rows, 1)).toBe(rows[1]);
                 expect(navigator.getLeafAt(rows, 6)).toBe(rows[6]);
             });
-            it('returns the correct leaf from the column dimension',() => {
-                var dataView = tableThreeGroupsThreeMeasuresInterleaved;
-                var navigator = createNavigator(dataView);
-                var columns = dataView.table.columns;
+
+            it("returns the correct leaf from the column dimension", () => {
+                let dataView = tableThreeGroupsThreeMeasuresInterleaved;
+                let navigator = createNavigator(dataView.table);
+                let columns = dataView.table.columns;
 
                 expect(navigator.getLeafAt(columns, 0)).toBe(columns[0]);
                 expect(navigator.getLeafAt(columns, 1)).toBe(columns[1]);
                 expect(navigator.getLeafAt(columns, 5)).toBe(columns[5]);
             });
-            it('returns undefined if index is out of bounds in the row dimension',() => {
-                var dataView = tableOneMeasure;
-                var navigator = createNavigator(dataView);
-                var rows = dataView.table.rows;
+
+            it("returns undefined if index is out of bounds in the row dimension", () => {
+                let dataView = tableOneMeasure;
+                let navigator = createNavigator(dataView.table);
+                let rows = dataView.table.rows;
 
                 expect(navigator.getLeafAt(rows, 1)).not.toBeDefined();
             });
-            it('returns undefined if index is out of bounds in the column dimension',() => {
-                var dataView = tableOneMeasure;
-                var navigator = createNavigator(dataView);
-                var columns = dataView.table.columns;
+
+            it("returns undefined if index is out of bounds in the column dimension", () => {
+                let dataView = tableOneMeasure;
+                let navigator = createNavigator(dataView.table);
+                let columns = dataView.table.columns;
 
                 expect(navigator.getLeafAt(columns, 1)).not.toBeDefined();
             });
         });
-        describe('getParent',() => {
-            var dataView = tableTwoGroupsThreeMeasures;
-            var navigator = createNavigator(dataView);
 
-            it('returns null for column header',() => {
-                var columns = dataView.table.columns;
+        describe("getParent", () => {
+            let dataView = tableTwoGroupsThreeMeasures;
+            let navigator = createNavigator(dataView.table);
 
-                expect(navigator.getParent(columns[0])).toBeNull();
+            it("returns null for column header", () => {
+                expect(navigator.getParent(dataView.table.columns[0])).toBeNull();
             });
-            it('returns null for row',() => {
-                var rows = dataView.table.rows;
 
-                expect(navigator.getParent(rows[0])).toBeNull();
+            it("returns null for row", () => {
+                expect(navigator.getParent(dataView.table.rows[0])).toBeNull();
             });
-            it('returns null in any other cases',() => {
+
+            it("returns null in any other cases", () => {
                 expect(navigator.getParent(null)).toBeNull();
             });
         });
-        describe('getIndex',() => {
-            it('returns the correct index for columns',() => {
-                var dataView = tableThreeGroupsThreeMeasuresInterleaved;
-                var navigator = createNavigator(dataView);
-                var columns = dataView.table.columns;
-                var column1 = columns[0];
-                var column2 = columns[1];
-                var column3 = columns[2];
-                var column4 = columns[3];
-                var column5 = columns[4];
-                var column6 = columns[5];
 
-                expect(navigator.getIndex(column1)).toBe(0);
-                expect(navigator.getIndex(column2)).toBe(1);
-                expect(navigator.getIndex(column3)).toBe(2);
-                expect(navigator.getIndex(column4)).toBe(3);
-                expect(navigator.getIndex(column5)).toBe(4);
-                expect(navigator.getIndex(column6)).toBe(5);
+        describe("getIndex", () => {
+
+            it("returns the correct index for columns", () => {
+                let dataView = tableThreeGroupsThreeMeasuresInterleaved;
+                let navigator = createNavigator(dataView.table);
+                let columns = dataView.table.columns;
+
+                expect(navigator.getIndex(columns[0])).toBe(0);
+                expect(navigator.getIndex(columns[1])).toBe(1);
+                expect(navigator.getIndex(columns[2])).toBe(2);
+                expect(navigator.getIndex(columns[3])).toBe(3);
+                expect(navigator.getIndex(columns[4])).toBe(4);
+                expect(navigator.getIndex(columns[5])).toBe(5);
             });
-            it('returns the correct index for rows',() => {
-                var dataView = tableTwoGroupsThreeMeasures;
-                var navigator = createNavigator(dataView);
-                var rows = dataView.table.rows;
-                var row1 = { index: 0, values: rows[0] };
-                var row2 = { index: 1, values: rows[1] };
+
+            it("returns the correct index for rows", () => {
+                let dataView = tableTwoGroupsThreeMeasures;
+                let navigator = createNavigator(dataView.table);
+                let rows = dataView.table.rows;
+                let row1 = { index: 0, values: rows[0] };
+                let row2 = { index: 1, values: rows[1] };
 
                 expect(navigator.getIndex(row1)).toBe(0);
                 expect(navigator.getIndex(row2)).toBe(1);
             });
-            it('returns -1 if cannot find column in the collection',() => {
-                var dataView = tableTwoGroups;
-                var navigator = createNavigator(dataView);
 
-                var columnInAnotherTable = tableThreeGroupsThreeMeasuresInterleaved.table.columns[4];
+            it("returns -1 if cannot find column in the collection", () => {
+                let dataView = tableTwoGroups;
+                let navigator = createNavigator(dataView.table);
+                let columnInAnotherTable = tableThreeGroupsThreeMeasuresInterleaved.table.columns[4];
 
                 expect(navigator.getIndex(columnInAnotherTable)).toBe(-1);
             });
-            it('returns -1 if it is null',() => {
-                var dataView = tableTwoGroups;
-                var navigator = createNavigator(dataView);
+
+            it("returns -1 if it is null", () => {
+                let dataView = tableTwoGroups;
+                let navigator = createNavigator(dataView.table);
 
                 expect(navigator.getIndex(null)).toBe(-1);
             });
         });
-        describe('isLeaf',() => {
-            it('returns true for columns',() => {
-                var dataView = tableThreeGroupsThreeMeasuresInterleaved;
-                var navigator = createNavigator(dataView);
-                var columns = dataView.table.columns;
-                var column1 = columns[0];
-                var column2 = columns[1];
-                var column3 = columns[2];
-                var column4 = columns[3];
-                var column5 = columns[4];
-                var column6 = columns[5];
+        describe("isLeaf", () => {
 
-                expect(navigator.isLeaf(column1)).toBeTruthy();
-                expect(navigator.isLeaf(column2)).toBeTruthy();
-                expect(navigator.isLeaf(column3)).toBeTruthy();
-                expect(navigator.isLeaf(column4)).toBeTruthy();
-                expect(navigator.isLeaf(column5)).toBeTruthy();
-                expect(navigator.isLeaf(column6)).toBeTruthy();
+            it("returns true for columns", () => {
+                let dataView = tableThreeGroupsThreeMeasuresInterleaved;
+                let navigator = createNavigator(dataView.table);
+                let columns = dataView.table.columns;
+
+                expect(navigator.isLeaf(columns[0])).toBeTruthy();
+                expect(navigator.isLeaf(columns[1])).toBeTruthy();
+                expect(navigator.isLeaf(columns[2])).toBeTruthy();
+                expect(navigator.isLeaf(columns[3])).toBeTruthy();
+                expect(navigator.isLeaf(columns[4])).toBeTruthy();
+                expect(navigator.isLeaf(columns[5])).toBeTruthy();
             });
-            it('returns true for rows',() => {
-                var dataView = tableTwoGroupsThreeMeasures;
-                var navigator = createNavigator(dataView);
-                var rows = dataView.table.rows;
-                var row1 = rows[0];
-                var row2 = rows[1];
-                var row3 = rows[2];
-                var row4 = rows[3];
-                var row5 = rows[4];
-                var row6 = rows[5];
-                var row7 = rows[6];
 
-                expect(navigator.isLeaf(row1)).toBeTruthy();
-                expect(navigator.isLeaf(row2)).toBeTruthy();
-                expect(navigator.isLeaf(row3)).toBeTruthy();
-                expect(navigator.isLeaf(row4)).toBeTruthy();
-                expect(navigator.isLeaf(row5)).toBeTruthy();
-                expect(navigator.isLeaf(row6)).toBeTruthy();
-                expect(navigator.isLeaf(row7)).toBeTruthy();
+            it("returns true for rows", () => {
+                let dataView = tableTwoGroupsThreeMeasures;
+                let navigator = createNavigator(dataView.table);
+                let rows = dataView.table.rows;
+
+                expect(navigator.isLeaf(rows[0])).toBeTruthy();
+                expect(navigator.isLeaf(rows[1])).toBeTruthy();
+                expect(navigator.isLeaf(rows[2])).toBeTruthy();
+                expect(navigator.isLeaf(rows[3])).toBeTruthy();
+                expect(navigator.isLeaf(rows[4])).toBeTruthy();
+                expect(navigator.isLeaf(rows[5])).toBeTruthy();
+                expect(navigator.isLeaf(rows[6])).toBeTruthy();
             });
         });
-        describe('getChildren',() => {
-            it('returns null for column',() => {
-                var dataView = tableTwoGroupsThreeMeasures;
-                var navigator = createNavigator(dataView);
-                var column = dataView.table.columns[3];
+
+        describe("getChildren", () => {
+
+            it("returns null for column", () => {
+                let dataView = tableTwoGroupsThreeMeasures;
+                let navigator = createNavigator(dataView.table);
+                let column = dataView.table.columns[3];
 
                 expect(navigator.getChildren(column)).toBeNull();
             });
-            it('returns null for row',() => {
-                var dataView = tableThreeGroupsThreeMeasuresInterleaved;
-                var navigator = createNavigator(dataView);
-                var row = dataView.table.rows[4];
+
+            it("returns null for row", () => {
+                let dataView = tableThreeGroupsThreeMeasuresInterleaved;
+                let navigator = createNavigator(dataView.table);
+                let row = dataView.table.rows[4];
 
                 expect(navigator.getChildren(row)).toBeNull();
             });
         });
-        describe('getCount',() => {
-            var dataView = tableThreeGroupsThreeMeasuresInterleaved;
-            var navigator = createNavigator(dataView);
 
-            it('returns the number of the columns for column dimension',() => {
+        describe("getCount", () => {
+            let dataView = tableThreeGroupsThreeMeasuresInterleaved;
+            let navigator = createNavigator(dataView.table);
+
+            it("returns the number of the columns for column dimension", () => {
                 expect(navigator.getCount(dataView.table.columns)).toBe(dataView.table.columns.length);
             });
-            it('returns the number of the rows for row dimension',() => {
+
+            it("returns the number of the rows for row dimension", () => {
                 expect(navigator.getCount(dataView.table.rows)).toBe(dataView.table.rows.length);
             });
         });
-        describe('getAt',() => {
-            it('returns the correct item from the row dimension',() => {
-                var dataView = tableTwoGroupsThreeMeasures;
-                var navigator = createNavigator(dataView);
-                var rows = dataView.table.rows;
+
+        describe("getAt", () => {
+
+            it("returns the correct item from the row dimension", () => {
+                let dataView = tableTwoGroupsThreeMeasures;
+                let navigator = createNavigator(dataView.table);
+                let rows = dataView.table.rows;
 
                 expect(navigator.getAt(rows, 0)).toBe(rows[0]);
                 expect(navigator.getAt(rows, 1)).toBe(rows[1]);
                 expect(navigator.getAt(rows, 6)).toBe(rows[6]);
             });
-            it('returns the correct item from the column dimension',() => {
-                var dataView = tableThreeGroupsThreeMeasuresInterleaved;
-                var navigator = createNavigator(dataView);
-                var columns = dataView.table.columns;
+
+            it("returns the correct item from the column dimension", () => {
+                let dataView = tableThreeGroupsThreeMeasuresInterleaved;
+                let navigator = createNavigator(dataView.table);
+                let columns = dataView.table.columns;
 
                 expect(navigator.getAt(columns, 0)).toBe(columns[0]);
                 expect(navigator.getAt(columns, 1)).toBe(columns[1]);
                 expect(navigator.getAt(columns, 5)).toBe(columns[5]);
             });
-            it('returns undefined if index is out of bounds in the row dimension',() => {
-                var dataView = tableOneMeasure;
-                var navigator = createNavigator(dataView);
-                var rows = dataView.table.rows;
 
-                expect(navigator.getAt(rows, 1)).not.toBeDefined();
+            it("returns undefined if index is out of bounds in the row dimension", () => {
+                let dataView = tableOneMeasure;
+                let navigator = createNavigator(dataView.table);
+
+                expect(navigator.getAt(dataView.table.rows, 1)).not.toBeDefined();
             });
-            it('returns undefined if index is out of bounds in the column dimension',() => {
-                var dataView = tableOneMeasure;
-                var navigator = createNavigator(dataView);
-                var columns = dataView.table.columns;
 
-                expect(navigator.getAt(columns, 1)).not.toBeDefined();
-            });
-        });
-        describe('getLevel',() => {
-            var dataView = tableThreeGroupsThreeMeasuresInterleaved;
-            var navigator = createNavigator(dataView);
+            it("returns undefined if index is out of bounds in the column dimension", () => {
+                let dataView = tableOneMeasure;
+                let navigator = createNavigator(dataView.table);
 
-            it('returns 0 for column',() => {
-                var columns = dataView.table.columns;
-
-                expect(navigator.getLevel(columns[1])).toBe(0);
-            });
-            it('returns 0 for row',() => {
-                var rows = dataView.table.rows;
-
-                expect(navigator.getLevel(rows[5])).toBe(0);
+                expect(navigator.getAt(dataView.table.columns, 1)).not.toBeDefined();
             });
         });
-        describe('getIntersection',() => {
-            it('returns values in the intersection',() => {
-                var dataView = tableThreeGroupsThreeMeasuresInterleaved;
-                var visualTable = powerbi.visuals.Table.converter(dataView.table);
-                var rows = visualTable.visualRows;
-                var columns = dataView.table.columns;
 
-                var expectedValues: string[][] = [
-                    ['A', '100.0', 'aa', '101.00', 'aa1', '102'],
-                    ['A', '103.0', 'aa', '104.00', 'aa2', '105'],
-                    ['A', '106.0', 'ab', '107.00', 'ab1', '108'],
-                    ['B', '109.0', 'ba', '110.00', 'ba1', '111'],
-                    ['B', '112.0', 'bb', '113.00', 'bb1', '114'],
-                    ['B', '115.0', 'bb', '116.00', 'bb2', '117'],
-                    ['C', '118.0', 'cc', '119.00', 'cc1', '120']
+        describe("getLevel", () => {
+            let dataView = tableThreeGroupsThreeMeasuresInterleaved;
+            let navigator = createNavigator(dataView.table);
+
+            it("returns 0 for column", () => {
+                expect(navigator.getLevel(dataView.table.columns[1])).toBe(0);
+            });
+
+            it("returns 0 for row", () => {
+                expect(navigator.getLevel(dataView.table.rows[5])).toBe(0);
+            });
+        });
+
+        describe("getIntersection", () => {
+            it("returns values in the intersection", () => {
+                let dataView = tableThreeGroupsThreeMeasuresInterleaved;
+                let visualTable = powerbi.visuals.Table.converter(dataView, false);
+                let rows = visualTable.visualRows;
+                let columns = dataView.table.columns;
+                let navigator = new TableHierarchyNavigator(visualTable, valueFormatter.formatValueColumn);
+
+                let expectedValues: string[][] = [
+                    ["A", "100.0", "aa", "101.00", "aa1", "102"],
+                    ["A", "103.0", "aa", "104.00", "aa2", "105"],
+                    ["A", "106.0", "ab", "107.00", "ab1", "108"],
+                    ["B", "109.0", "ba", "110.00", "ba1", "111"],
+                    ["B", "112.0", "bb", "113.00", "bb1", "114"],
+                    ["B", "115.0", "bb", "116.00", "bb2", "117"],
+                    ["C", "118.0", "cc", "119.00", "cc1", "120"]
                 ];
 
-                var navigator = new TableHierarchyNavigator(visualTable, valueFormatter.formatRaw);
-                validateIntersections(navigator, rows, columns, expectedValues);
+                expect(fillResult<string>(navigator, rows, columns, "textContent")).toEqual(expectedValues);
             });
 
-            it('returns weburl values',() => {
-                var dataView = tableWebUrl;
-                var visualTable = powerbi.visuals.Table.converter(dataView.table);
-                var rows = visualTable.visualRows;
-                var columns = dataView.table.columns;
+            it("returns weburl values", () => {
+                let dataView = tableWebUrl;
+                let visualTable = powerbi.visuals.Table.converter(dataView, false);
+                let rows = visualTable.visualRows;
+                let columns = dataView.table.columns;
+                let navigator = new TableHierarchyNavigator(visualTable, valueFormatter.formatValueColumn);
 
-                var navigator = new TableHierarchyNavigator(visualTable, valueFormatter.formatRaw);
-                var result: boolean[][] = [];
-                for (var i = 0, ilen = rows.length; i < ilen; i++) {
-                    result[i] = [];
-                    for (var j = 0, jlen = columns.length; j < jlen; j++)
-                        result[i][j] = navigator.getIntersection(rows[i], columns[j]).showUrl;
-                }
-
-                var expectedValues: boolean[][] = [
+                let expectedValues: boolean[][] = [
                     [true],
                     [false],
-                    [true],
+                    [true]
                 ];
-                expect(result).toEqual(expectedValues);
+
+                expect(fillResult<boolean>(navigator, rows, columns, "isValidUrl")).toEqual(expectedValues);
             });
 
-            function validateIntersections(
+            it("returns Kpi Markup", () => {
+                let dataView = tableKpi;
+                let visualTable = powerbi.visuals.Table.converter(dataView, false);
+                let rows = visualTable.visualRows;
+                let columns = dataView.table.columns;
+                let navigator = new TableHierarchyNavigator(visualTable, valueFormatter.formatValueColumn);
+
+                let expectedValues: string[][] = [
+                    ['<div class="powervisuals-glyph circle kpi-red" style="display: inline-block; vertical-align: bottom; margin: 0px;"></div>'],
+                    ['<div class="powervisuals-glyph circle kpi-yellow" style="display: inline-block; vertical-align: bottom; margin: 0px;"></div>'],
+                    ['<div class="powervisuals-glyph circle kpi-green" style="display: inline-block; vertical-align: bottom; margin: 0px;"></div>'],
+                ];
+
+                expect(fillResult<string>(navigator, rows, columns, "domContent")).toEqual(expectedValues);
+            });
+
+            function fillResult<T>(
                 navigator: TableHierarchyNavigator,
                 rows: powerbi.visuals.DataViewVisualTableRow[],
                 columns: DataViewMetadataColumn[],
-                expectedValues: string[][]): void {
-                var result: string[][] = [];
+                property: string): T[][] {
 
-                for (var i = 0, ilen = rows.length; i < ilen; i++) {
+                let result: T[][] = [];
+
+                for (let i = 0, ilen = rows.length; i < ilen; i++) {
                     result[i] = [];
-                    for (var j = 0, jlen = columns.length; j < jlen; j++)
-                        result[i][j] = navigator.getIntersection(rows[i], columns[j]).value;
+                    for (let j = 0, jlen = columns.length; j < jlen; j++) {
+                        let propertyValue = result[i][j] = navigator.getIntersection(rows[i], columns[j])[property];
+                        if (propertyValue instanceof jQuery)
+                            result[i][j] = propertyValue[0].outerHTML;
+                    }
                 }
 
-                expect(result).toEqual(expectedValues);
+                return result;
             }
         });
-        describe('getCorner',() => {
-            it('always returns null',() => {
-                var dataView = tableThreeGroupsThreeMeasuresInterleaved;
-                var navigator = createNavigator(dataView);
+
+        describe("getCorner", () => {
+
+            it("always returns null", () => {
+                let dataView = tableThreeGroupsThreeMeasuresInterleaved;
+                let navigator = createNavigator(dataView.table);
 
                 expect(navigator.getCorner(0, 0)).toBeNull();
                 expect(navigator.getCorner(10, 0)).toBeNull();
@@ -632,72 +836,81 @@ module powerbitests {
                 expect(navigator.getCorner(10, 10)).toBeNull();
             });
         });
-        describe('headerItemEquals',() => {
-            it('returns true if the two items are the same',() => {
-                var dataView = tableThreeGroupsThreeMeasuresInterleaved;
-                var row = dataView.table.rows[0];
-                var column = dataView.table.columns[0];
-                var navigator = createNavigator(dataView);
+
+        describe("headerItemEquals", () => {
+
+            it("returns true if the two items are the same", () => {
+                let dataView = tableThreeGroupsThreeMeasuresInterleaved;
+                let row = dataView.table.rows[0];
+                let column = dataView.table.columns[0];
+                let navigator = createNavigator(dataView.table);
 
                 expect(navigator.headerItemEquals(row, row)).toBeTruthy();
                 expect(navigator.headerItemEquals(column, column)).toBeTruthy();
             });
-            it('returns true for equivalent columns',() => {
-                var dataView = tableThreeGroupsThreeMeasuresInterleaved;
-                var navigator = createNavigator(dataView);
 
-                expect(navigator.headerItemEquals({ displayName: 'a' }, { displayName: 'a' })).toBeTruthy();
+            it("returns false if the two items are not same", () => {
+                let dataView = tableThreeGroupsThreeMeasuresInterleaved;
+                let navigator = createNavigator(dataView.table);
+
+                expect(navigator.headerItemEquals({ displayName: "a" }, { displayName: "a" })).toBeTruthy();
             });
-            it('returns true for rows with index',() => {
-                var dataView = tableThreeGroupsThreeMeasuresInterleaved;
-                var navigator = createNavigator(dataView);
+            it("returns true for rows with index", () => {
+                let dataView = tableThreeGroupsThreeMeasuresInterleaved;
+                let navigator = createNavigator(dataView.table);
 
                 expect(navigator.headerItemEquals({ index: 1, values: [] }, { index: 1, values: [] })).toBeTruthy();
             });
-            it('returns false if the two items are not same',() => {
-                var dataView = tableThreeGroupsThreeMeasuresInterleaved;
-                var row = dataView.table.rows[0];
-                var column = dataView.table.columns[0];
-                var navigator = createNavigator(dataView);
+            it("returns false if the two items are not same", () => {
+                let dataView = tableThreeGroupsThreeMeasuresInterleaved;
+                let row = dataView.table.rows[0];
+                let column = dataView.table.columns[0];
+                let navigator = createNavigator(dataView.table);
 
                 expect(navigator.headerItemEquals(row, column)).toBeFalsy();
                 expect(navigator.headerItemEquals(column, row)).toBeFalsy();
             });
-            it('returns false detects rows with index',() => {
-                var dataView = tableThreeGroupsThreeMeasuresInterleaved;
-                var navigator = createNavigator(dataView);
+            it("returns false detects rows with index", () => {
+                let dataView = tableThreeGroupsThreeMeasuresInterleaved;
+                let navigator = createNavigator(dataView.table);
 
                 expect(navigator.headerItemEquals({ index: 1 }, { index: 2 })).toBeFalsy();
             });
 
         });
-        describe('bodyCellItemEquals',() => {
-            it('returns true if the two items are the same',() => {
-                var dataView = tableThreeGroupsThreeMeasuresInterleaved;
-                var cell1 = dataView.table.rows[0][3];
-                var navigator = createNavigator(dataView);
 
-                expect(navigator.bodyCellItemEquals(cell1, cell1)).toBeTruthy();
+        describe("bodyCellItemEquals", () => {
+
+            it("returns true if the two items are the same", () => {
+                let dataView = tableThreeGroupsThreeMeasuresInterleaved;
+                let dataViewVisualTable = Table.converter(dataView, false);
+                let navigator = createNavigator(dataViewVisualTable);
+                let cell1 = navigator.getIntersection(dataViewVisualTable.visualRows[0], dataView.table.columns[3]);
+                let cell2 = navigator.getIntersection(dataViewVisualTable.visualRows[0], dataView.table.columns[3]);
+
+                expect(navigator.bodyCellItemEquals(cell1, cell2)).toBeTruthy();
             });
-            it('returns false if the two items are not same',() => {
-                var dataView = tableThreeGroupsThreeMeasuresInterleaved;
-                var cell1 = dataView.table.rows[1][3];
-                var cell2 = dataView.table.rows[2][3];
-                var navigator = createNavigator(dataView);
+
+            it("returns false if the two items are not same", () => {
+                let dataView = tableThreeGroupsThreeMeasuresInterleaved;
+                let dataViewVisualTable = Table.converter(dataView, false);
+                let navigator = createNavigator(dataViewVisualTable);
+                let cell1 = navigator.getIntersection(dataViewVisualTable.visualRows[0], dataView.table.columns[1]);
+                let cell2 = navigator.getIntersection(dataViewVisualTable.visualRows[0], dataView.table.columns[2]);
 
                 expect(navigator.bodyCellItemEquals(cell1, cell2)).toBeFalsy();
             });
         });
     });
 
-    describe('Table logic',() => {
-        var v: powerbi.IVisual,
+    describe("Table logic", () => {
+        let v: powerbi.IVisual,
             element: JQuery;
 
         beforeEach(() => {
-            element = powerbitests.helpers.testDom('500', '500');
-            element['visible'] = () => { return true; };
-            v = webPluginService.getPlugin('table').create();
+            element = powerbitests.helpers.testDom("500", "500");
+            element["visible"] = () => { return true; };
+            v = webPluginService.getPlugin("table").create();
             v.init({
                 element: element,
                 host: powerbitests.mocks.createVisualHostServices(),
@@ -713,13 +926,13 @@ module powerbitests {
             });
         });
 
-        it('loadMoreData calls control refresh',() => {
-            var nav = { update() { } };
-            var control = { refresh() { }, rowDimension: {}, updateModels(resetScrollOffsets: boolean, rowModel?: any, columnModel?: any) { } };
-            var navSpy = spyOn(nav, "update");
-            var controlSpy = spyOn(control, "refresh");
-            v['hierarchyNavigator'] = nav;
-            v['tablixControl'] = control;
+        it("loadMoreData calls control refresh", () => {
+            let nav = { update() { } };
+            let control = { refresh() { }, rowDimension: {}, updateModels(resetScrollOffsets: boolean, rowModel: any, columnModel: any) { } };
+            let navSpy = spyOn(nav, "update");
+            let controlSpy = spyOn(control, "refresh");
+            v["hierarchyNavigator"] = nav;
+            v["tablixControl"] = control;
 
             v.onDataChanged({
                 dataViews: [tableOneGroup],
@@ -730,7 +943,7 @@ module powerbitests {
             expect(controlSpy).toHaveBeenCalled();
         });
 
-        it('needsMoreData waitingForData',() => {
+        it("needsMoreData waitingForData", () => {
             v.onDataChanged({
                 dataViews: [{
                     metadata: { columns: [groupSource1], segment: {} },
@@ -738,15 +951,15 @@ module powerbitests {
                 }]
             });
 
-            v['waitingForData'] = true;
-            var tableVisual: Table = <Table>v;
-            var lastRow = dataViewTableOneGroup.rows[2];
-            var result = tableVisual.needsMoreData(lastRow);
+            v["waitingForData"] = true;
+            let tableVisual: Table = <Table>v;
+            let lastRow = dataViewTableOneGroup.rows[2];
+            let result = tableVisual.needsMoreData(lastRow);
 
             expect(result).toBe(false);
         });
 
-        it('needsMoreData segmentComplete',() => {
+        it("needsMoreData segmentComplete", () => {
 
             v.onDataChanged({
                 dataViews: [{
@@ -755,16 +968,16 @@ module powerbitests {
                 }]
             });
 
-            var tableVisual: Table = <Table>v;
-            var lastRow = dataViewTableOneGroup.rows[2];
-            var result = tableVisual.needsMoreData(lastRow);
+            let tableVisual: Table = <Table>v;
+            let lastRow = dataViewTableOneGroup.rows[2];
+            let result = tableVisual.needsMoreData(lastRow);
 
             expect(result).toBe(false);
         });
 
-        it('needsMoreData belowThreshold',() => {
+        it("needsMoreData belowThreshold", () => {
 
-            var table = dataViewTableTwoGroups;
+            let table = dataViewTableTwoGroups;
 
             v.onDataChanged({
                 dataViews: [{
@@ -773,16 +986,16 @@ module powerbitests {
                 }]
             });
 
-            var tableVisual: Table = <Table>v;
-            var lastRow = table.rows[3];
-            var result = tableVisual.needsMoreData(lastRow);
+            let tableVisual: Table = <Table>v;
+            let lastRow = table.rows[3];
+            let result = tableVisual.needsMoreData(lastRow);
 
             expect(result).toBe(false);
         });
 
-        it('needsMoreData aboveThreshold',() => {
+        it("needsMoreData aboveThreshold", () => {
 
-            var table = dataViewTableTwoGroups;
+            let table = dataViewTableTwoGroups;
 
             v.onDataChanged({
                 dataViews: [{
@@ -791,128 +1004,218 @@ module powerbitests {
                 }]
             });
 
-            var tableVisual: Table = <Table>v;
-            var lastRow = { index: 6, values: table.rows[6] };
-            var result = tableVisual.needsMoreData(lastRow);
+            let tableVisual: Table = <Table>v;
+            let lastRow = { index: 6, values: table.rows[6] };
+            let result = tableVisual.needsMoreData(lastRow);
 
             expect(result).toBe(true);
         });
 
-        it('bindRowHeader callback',() => {
+        it("bindRowHeader callback", () => {
 
-            var callBackCalled = false;
-            var binderOptions = {
-                onBindRowHeader: (item: any) => { callBackCalled = true; },
-                layoutKind: powerbi.visuals.controls.TablixLayoutKind.Canvas,
+            let callBackCalled = false;
+            let binderOptions: powerbi.visuals.TableBinderOptions = {
+                onBindRowHeader: () => { callBackCalled = true; },
+                layoutKind: powerbi.visuals.controls.TablixLayoutKind.Canvas
             };
 
-            var binder = new powerbi.visuals.TableBinder(binderOptions);
-            binder.bindRowHeader({ name: null }, {
-                type: null, item: null, colSpan: 0, rowSpan: 0, textAlign: '',
-                extension: { setContainerStyle: () => { } }
-            });
+            let binder = new powerbi.visuals.TableBinder(binderOptions);
+            let position = new TablixUtils.CellPosition;
+            let cell: powerbi.visuals.controls.ITablixCell = {
+                type: null,
+                item: null,
+                colSpan: 0,
+                rowSpan: 0,
+                textAlign: "",
+                position: position,
+                extension: new powerbi.visuals.controls.internal.TablixCellPresenter(false, Controls.TablixLayoutKind.Canvas),
+                style: new TablixUtils.CellStyle(),
+                contentHeight: 0,
+                contentWidth: 0,
+                applyStyle: function () { },
+                unfixRowHeight: function () { },
+                containerHeight: 0, containerWidth: 0
+            };
+            binder.bindRowHeader({ name: null }, cell);
 
             expect(callBackCalled).toBe(true);
         });
 
-        it('enumerateObjectInstances empty data view',() => {
+        it("enumerateObjectInstances empty data view", () => {
             v.onDataChanged({ dataViews: [] });
 
             // Note: this must not throw an exception
-            var objects = v.enumerateObjectInstances({ objectName: 'general' });
-            expect(objects).toEqual([]);
+            expect(v.enumerateObjectInstances({ objectName: "general" })).toEqual(undefined);
         });
 
-        it('enumerateObjectInstances general totals on',() => {
+        it("enumerateObjectInstances general totals on", () => {
             v.onDataChanged({ dataViews: [tableOneMeasureOneGroupSubtotals] });
 
-            var objects = v.enumerateObjectInstances({ objectName: 'general' });
-            expect(objects).toEqual([{
-                selector: null,
-                objectName: 'general',
-                properties: {
-                    totals: true
-                }
-            }]);
+            expect(v.enumerateObjectInstances({ objectName: "general" })).toEqual({
+                instances: [{
+                    selector: null,
+                    objectName: "general",
+                    properties: {
+                        totals: true,
+                        autoSizeColumnWidth: true,
+                        textSize: 8,
+                        //TODO: add after featureswitch
+                        //outlineColor: "#E8E8E8",
+                        // outlineWeight: 2
+                    }
+                }]
+            });
         });
 
-        it('enumerateObjectInstances general totals off',() => {
+        it("enumerateObjectInstances general totals off", () => {
             v.onDataChanged({ dataViews: [tableOneMeasureOneGroup] });
 
-            var objects = v.enumerateObjectInstances({ objectName: 'general' });
-            expect(objects).toEqual([{
-                selector: null,
-                objectName: 'general',
-                properties: {
-                    totals: false
-                }
-            }]);
+            expect(v.enumerateObjectInstances({ objectName: "general" })).toEqual({
+                instances: [{
+                    selector: null,
+                    objectName: "general",
+                    properties: {
+                        totals: false,
+                        autoSizeColumnWidth: true,
+                        textSize: 8,
+                        //TODO: add after featureswitch
+                        //outlineColor: "#E8E8E8",
+                        // outlineWeight: 2
+                    }
+                }]
+            });
         });
 
-        it('enumerateObjectInstances general no objects',() => {
-            var dataView: DataView = {
+        it("enumerateObjectInstances general totals on but suppressed by no aggregation", () => {
+            let dataViews = _.cloneDeep(tableOneMeasureOneGroupSubtotals);
+            dataViews.table.columns[0].discourageAggregationAcrossGroups = true;
+
+            v.onDataChanged({ dataViews: [dataViews] });
+
+            expect(v.enumerateObjectInstances({ objectName: "general" })).toEqual({
+                instances: [{
+                    selector: null,
+                    objectName: "general",
+                    properties: {
+                        autoSizeColumnWidth: true,
+                        textSize: 8,
+                        //TODO: add after featureswitch
+                        //outlineColor: "#E8E8E8",
+                        // outlineWeight: 2
+                    }
+                }]
+            });
+        });
+
+        it("enumerateObjectInstances general no objects", () => {
+            let dataView: DataView = {
                 metadata: {
                     columns: [measureSource1, groupSource1]
                 },
                 table: {
                     columns: [measureSource1, groupSource1],
                     rows: [
-                        [1, 'A'],
-                        [2, 'B'],
-                        [3, 'C']
+                        [1, "A"],
+                        [2, "B"],
+                        [3, "C"]
                     ],
                     totals: [6, null]
                 }
             };
             v.onDataChanged({ dataViews: [dataView] });
 
-            var objects = v.enumerateObjectInstances({ objectName: 'general' });
-            expect(objects).toEqual([{
-                selector: null,
-                objectName: 'general',
-                properties: {
-                    totals: true
-                }
-            }]);
+            expect(v.enumerateObjectInstances({ objectName: "general" })).toEqual({
+                instances: [{
+                    selector: null,
+                    objectName: "general",
+                    properties: {
+                        totals: true,
+                        autoSizeColumnWidth: true,
+                        textSize: 8,
+                        //TODO: add after featureswitch
+                        //outlineColor: "#E8E8E8",
+                        // outlineWeight: 2
+                    }
+                }]
+            });
         });
 
-        it('enumerateObjectInstances some other object',() => {
+        it("enumerateObjectInstances some other object", () => {
             v.onDataChanged({ dataViews: [tableOneMeasureOneGroup] });
 
-            var objects = v.enumerateObjectInstances({ objectName: 'some other object' });
-            expect(objects).toEqual([]);
+            let objects = v.enumerateObjectInstances({ objectName: "some other object" });
+            expect(objects).toEqual(undefined);
         });
 
-        it('RefreshControl invisible parent',() => {
-            var control = { refresh() { } };
-            var controlSpy = spyOn(control, "refresh");
-            v['shouldAllowHeaderResize'] = () => { return true; };
-            v['hierarchyNavigator'] = { update() { } };
-            v['tablixControl'] = control;
-            v['element']['visible'] = () => { return false; };
+        it("enumerateObjectInstances general autoSizeColumnWidth off", () => {
+            v.onDataChanged({ dataViews: [tableOneMeasureOneGroupColumnWidthDefault] });
+
+            expect(v.enumerateObjectInstances({ objectName: "general" })).toEqual({
+                instances: [{
+                    selector: null,
+                    objectName: "general",
+                    properties: {
+                        totals: true,
+                        autoSizeColumnWidth: false,
+                        textSize: 8,
+                        //TODO: add after featureswitch
+                        //outlineColor: "#E8E8E8",
+                        // outlineWeight: 2
+                    }
+                }]
+            });
+        });
+
+        it("enumerateObjectInstances general autoSizeColumnWidth on", () => {
+            v.onDataChanged({ dataViews: [tableOneMeasureOneGroupColumnWidthTrue] });
+
+            expect(v.enumerateObjectInstances({ objectName: "general" })).toEqual({
+                instances: [{
+                    selector: null,
+                    objectName: "general",
+                    properties: {
+                        totals: true,
+                        autoSizeColumnWidth: true,
+                        textSize: 8,
+                        //TODO: add after featureswitch
+                        //outlineColor: "#E8E8E8",
+                        // outlineWeight: 2
+                    }
+                }]
+            });
+        });
+
+        it("RefreshControl invisible parent", () => {
+            let control = { refresh() { } };
+            let controlSpy = spyOn(control, "refresh");
+            v["shouldAllowHeaderResize"] = () => { return true; };
+            v["hierarchyNavigator"] = { update() { } };
+            v["tablixControl"] = control;
+            v["element"]["visible"] = () => { return false; };
 
             v.onResizing({ width: 100, height: 100 });
 
-            expect(controlSpy).not.toHaveBeenCalled();
+            // Even though element visibility is false, because height and width are greater than zero, refresh will be called
+            expect(controlSpy).toHaveBeenCalled();
         });
 
-        it('RefreshControl invisible parent but dashboard layout',() => {
-            var control = { refresh() { } };
-            var controlSpy = spyOn(control, "refresh");
-            v['shouldAllowHeaderResize'] = () => { return true; };
-            v['hierarchyNavigator'] = { update() { } };
-            v['tablixControl'] = control;
-            v['element']['visible'] = () => { return false; };
-            v['isInteractive'] = false;
+        it("RefreshControl invisible parent but dashboard layout", () => {
+            let control = { refresh() { } };
+            let controlSpy = spyOn(control, "refresh");
+            v["shouldAllowHeaderResize"] = () => { return true; };
+            v["hierarchyNavigator"] = { update() { } };
+            v["tablixControl"] = control;
+            v["element"]["visible"] = () => { return false; };
+            v["isInteractive"] = false;
 
             v.onResizing({ width: 100, height: 100 });
 
             expect(controlSpy).toHaveBeenCalled();
         });
 
-        it('ShouldClearControl noSort',(done) => {
+        it("ShouldClearControl noSort", (done) => {
             v.onDataChanged({ dataViews: [tableOneGroup] });
-            var refreshSpy = spyOn(v, "refreshControl").and.callFake(() => { });
+            let refreshSpy = spyOn(v, "refreshControl").and.callFake(() => { });
 
             v.onDataChanged({ dataViews: [tableOneGroup] });
             setTimeout(() => {
@@ -921,10 +1224,10 @@ module powerbitests {
             }, DefaultWaitForRender);
         });
 
-        it('ShouldClearControl sort',(done) => {
+        it("ShouldClearControl sort", (done) => {
             v.onDataChanged({ dataViews: [tableOneGroup] });
-            var refreshSpy = spyOn(v, "refreshControl").and.callFake(() => { });
-            v['waitingForSort'] = true;
+            let refreshSpy = spyOn(v, "refreshControl").and.callFake(() => { });
+            v["waitingForSort"] = true;
             v.onDataChanged({ dataViews: [tableOneGroup] });
 
             setTimeout(() => {
@@ -932,18 +1235,251 @@ module powerbitests {
                 done();
             }, DefaultWaitForRender);
         });
+
+        it("suppressNotification not set after loading table with ColumnAutoSizeProperty off", (done) => {
+            let dataViewObjects: powerbi.DataViewObjects = {
+                general: {
+                    totals: true,
+                    autoSizeColumnWidth: false,
+                    textSize: 8,
+                }
+            };
+
+            let measureSource1WithWidth = createColumnWithWidth(measureSource1, 100);
+            let measureSource2WithWidth = createColumnWithWidth(measureSource2, 200);
+            let measureSource3WithWidth = createColumnWithWidth(measureSource3, 300);
+
+            let dataView: DataView = {
+                metadata: {
+                    columns: [measureSource1WithWidth, measureSource2WithWidth, measureSource3WithWidth],
+                    objects: dataViewObjects
+                },
+                table: dataViewTableThreeMeasures
+            };
+            v.onDataChanged({ dataViews: [dataView] });
+            setTimeout(() => {
+                let tableVisual = <Table>v;
+                let colWidthManager = tableVisual.getColumnWidthManager();
+                let persistedColWidths = colWidthManager.getColumnWidthObjects();
+
+                expect(tableVisual.persistingObjects).toBe(false);
+                expect(persistedColWidths.length).toBe(3);
+                expect(persistedColWidths[0].queryName).toBe('measure1');
+                expect(persistedColWidths[0].width).toBe(100);
+                expect(persistedColWidths[1].queryName).toBe('measure2');
+                expect(persistedColWidths[1].width).toBe(200);
+                expect(persistedColWidths[2].queryName).toBe('measure3');
+                expect(persistedColWidths[2].width).toBe(300);
+                done();
+            }, DefaultWaitForRender);
+        });
+
+        it("ColumnWidthChangedCallback ColumnAutoSizeProperty on", (done) => {
+            let dataViewObjects: powerbi.DataViewObjects = {
+                general: {
+                    totals: true,
+                    autoSizeColumnWidth: true,
+                    textSize: 8,
+                }
+            };
+            let dataView: DataView = {
+                metadata: {
+                    columns: [measureSource1, measureSource2, measureSource3],
+                    objects: dataViewObjects
+                },
+                table: dataViewTableThreeMeasures
+            };
+            v.onDataChanged({ dataViews: [dataView] });
+            setTimeout(() => {
+                let tableVisual = <Table>v;
+                let colWidthManager = tableVisual.getColumnWidthManager();
+                colWidthManager.onColumnWidthChanged(2, 45);
+                let persistedColWidths = colWidthManager.getFixedColumnWidthObjects();
+                expect(persistedColWidths.length).toBe(1);
+                expect(persistedColWidths[0].queryName).toBe('measure2');
+                expect(persistedColWidths[0].width).toBe(45);
+                done();
+            }, DefaultWaitForRender);
+        });
+
+        it("ColumnWidthChangedCallback ColumnAutoSizeProperty off", (done) => {
+            let dataViewObjects: powerbi.DataViewObjects = {
+                general: {
+                    totals: true,
+                    autoSizeColumnWidth: false,
+                    textSize: 8,
+                }
+            };
+
+            let measureSource1WithWidth = createColumnWithWidth(measureSource1, 100);
+            let measureSource2WithWidth = createColumnWithWidth(measureSource2, 200);
+            let measureSource3WithWidth = createColumnWithWidth(measureSource3, 300);
+
+            let dataView: DataView = {
+                metadata: {
+                    columns: [measureSource1WithWidth, measureSource2WithWidth, measureSource3WithWidth],
+                    objects: dataViewObjects
+                },
+                table: dataViewTableThreeMeasures
+            };
+            v.onDataChanged({ dataViews: [dataView] });
+            setTimeout(() => {
+                let tableVisual = <Table>v;
+                let colWidthManager = tableVisual.getColumnWidthManager();
+                let persistedColWidths = colWidthManager.getColumnWidthObjects();
+
+                expect(persistedColWidths.length).toBe(3);
+                expect(persistedColWidths[0].queryName).toBe(measureSource1.queryName);
+                expect(persistedColWidths[0].width).toBe(100);
+                expect(persistedColWidths[1].queryName).toBe(measureSource2.queryName);
+                expect(persistedColWidths[1].width).toBe(200);
+                expect(persistedColWidths[2].queryName).toBe(measureSource3.queryName);
+                expect(persistedColWidths[2].width).toBe(300);
+                done();
+            }, DefaultWaitForRender);
+        });
+
+        it("ColumnWidthChangedCallback ColumnAutoSizeProperty off then resize", (done) => {
+            let dataViewObjects: powerbi.DataViewObjects = {
+                general: {
+                    totals: true,
+                    autoSizeColumnWidth: false,
+                    textSize: 8,
+                }
+            };
+
+            let measureSource1WithWidth = createColumnWithWidth(measureSource1, 100);
+            let measureSource2WithWidth = createColumnWithWidth(measureSource2, 200);
+            let measureSource3WithWidth = createColumnWithWidth(measureSource3, 300);
+
+            let dataView: DataView = {
+                metadata: {
+                    columns: [measureSource1WithWidth, measureSource2WithWidth, measureSource3WithWidth],
+                    objects: dataViewObjects
+                },
+                table: dataViewTableThreeMeasures
+            };
+            v.onDataChanged({ dataViews: [dataView] });
+            setTimeout(() => {
+                let tableVisual = <Table>v;
+                let colWidthManager = tableVisual.getColumnWidthManager();
+                    
+                //Initially, autoSizeColumnWidth is OFF, not persisting
+                expect(tableVisual.persistingObjects).toBe(false);
+
+                // Resize
+                colWidthManager.onColumnWidthChanged(2, 45);
+                expect(tableVisual.persistingObjects).toBe(true);
+                let persistedColWidths = colWidthManager.getColumnWidthObjects();
+                expect(persistedColWidths.length).toBe(3);
+                expect(persistedColWidths[0].queryName).toBe(measureSource1.queryName);
+                expect(persistedColWidths[0].width).toBe(100);
+                expect(persistedColWidths[1].queryName).toBe(measureSource2.queryName);
+                expect(persistedColWidths[1].width).toBe(45);
+                expect(persistedColWidths[2].queryName).toBe(measureSource3.queryName);
+                expect(persistedColWidths[2].width).toBe(300);
+                done();
+            }, DefaultWaitForRender);
+        });
+
+        it("ColumnWidthManager ColumnAutoSizeProperty off malformed selector", (done) => {
+            let dataViewObjects: powerbi.DataViewObjects = {
+                general: {
+                    totals: true,
+                    autoSizeColumnWidth: false,
+                    textSize: 8,
+                }
+            };
+
+            let measureSource1WithWidth = createColumnWithWidth(measureSource1, 100);
+            let measureSource2WithWidth = createColumnWithWidth(measureSource2, 200);
+            measureSource2WithWidth.queryName = undefined;
+            let measureSource3WithWidth = createColumnWithWidth(measureSource3, 300);
+
+            let dataView0: DataView = {
+                metadata: {
+                    columns: [measureSource1WithWidth, measureSource2WithWidth, measureSource3WithWidth],
+                    objects: dataViewObjects
+                },
+                table: {
+                    columns: [measureSource1WithWidth, measureSource2WithWidth, measureSource3WithWidth],
+                    rows: [
+                        [100, 10100, 102000],
+                        [103, 104000, 1050000],
+                        [106, 1070000, 10800000]
+                    ]
+                }
+            };
+            v.onDataChanged({ dataViews: [dataView0] });
+            setTimeout(() => {
+                v.onDataChanged({ dataViews: [dataView0] });
+                setTimeout(() => {
+                    let tableVisual = <Table>v;
+                    let colWidthManager = tableVisual.getColumnWidthManager();
+                    colWidthManager['generateVisualObjectInstancesToPersist']();
+                    let changes: powerbi.VisualObjectInstancesToPersist = colWidthManager['visualObjectInstancesToPersist'];
+                    expect(changes.merge).toBeDefined();
+                    expect(changes.merge.length).toBe(3);
+
+                    let objectInstances = changes.merge;
+                    expect(objectInstances).toHaveLength(3);
+                    expect(objectInstances[0].properties["autoSizeColumnWidth"]).toBe(false);
+                    expect(objectInstances[1].selector.metadata).toBe(measureSource1.queryName);
+                    expect(objectInstances[1].properties["columnWidth"]).toBe(100);
+                    expect(objectInstances[2].selector.metadata).toBe(measureSource3.queryName);
+                    expect(objectInstances[2].properties["columnWidth"]).toBe(300);
+                    done();
+                }, DefaultWaitForRender);
+            }, DefaultWaitForRender);
+        });
+
+        it("Change ViewMode allow Header Resize", (done) => {
+            let dataViewObjects: powerbi.DataViewObjects = {
+                general: {
+                    totals: true,
+                    autoSizeColumnWidth: false,
+                    textSize: 8,
+                }
+            };
+            let newMeasureSource2: DataViewMetadataColumn = { displayName: "", queryName: undefined, type: dataTypeNumber, isMeasure: true, index: 4, objects: { general: { formatString: "#.00", columnWidth: 45 } } };
+            let dataView0: DataView = {
+                metadata: {
+                    columns: [measureSource1, newMeasureSource2, measureSource3],
+                    objects: dataViewObjects
+                },
+                table: {
+                    columns: [measureSource1, newMeasureSource2, measureSource3],
+                    rows: [
+                        [100, 10100, 102000],
+                        [103, 104000, 1050000],
+                        [106, 1070000, 10800000]
+                    ]
+                }
+            };
+            v.onDataChanged({ dataViews: [dataView0] });
+            setTimeout(() => {
+                let tableVisual = <Table>v;
+                let control = <TablixControl>tableVisual["tablixControl"];
+                let layoutManager = control.layoutManager;
+
+                expect(layoutManager["_allowHeaderResize"]).toBe(false);
+                let viewMode = powerbi.ViewMode.Edit;
+                tableVisual["hostServices"] = {
+                    getViewMode: () => { return viewMode; }
+                };
+                tableVisual.onViewModeChanged(viewMode);
+
+                setTimeout(() => {
+                    expect(layoutManager["_allowHeaderResize"]).toBe(true);
+                    done();
+                }, DefaultWaitForRender);
+            }, DefaultWaitForRender);
+        });
     });
 
-    describe('Table DOM validation',() => {
-        var v: powerbi.IVisual,
-            element: JQuery,
-            NoMarginClass = 'bi-tablix-cellNoMarginStyle',
-            ColumnHeaderClassName = 'bi-table-column-header',
-            RowClassName = 'bi-table-row',
-            LastRowClassName = 'bi-table-last-row',
-            FooterClassName = 'bi-table-footer',
-            NumericCellClassName = ' bi-table-cell-numeric',
-            EmptyHeaderCell = '\xa0';
+    describe("Table DOM validation", () => {
+        let v: powerbi.IVisual,
+            element: JQuery;
 
         beforeEach(() => {
 
@@ -956,9 +1492,9 @@ module powerbitests {
         });
 
         beforeEach(() => {
-            element = powerbitests.helpers.testDom('500', '500');
-            element['visible'] = () => { return true; };
-            v = webPluginService.getPlugin('table').create();
+            element = powerbitests.helpers.testDom("500", "500");
+            element["visible"] = () => { return true; };
+            v = webPluginService.getPlugin("table").create();
             v.init({
                 element: element,
                 host: powerbitests.mocks.createVisualHostServices(),
@@ -974,57 +1510,361 @@ module powerbitests {
             });
         });
 
-        function validateTable(expectedValues: string[][]): void {
-            tablixHelper.validateTable(expectedValues, '.bi-tablix tr');
+        function validateSortIcons(expectedValues: string[]): void {
+            tablixHelper.validateSortIconClassNames(expectedValues, ".tablixCanvas tr");
         }
 
-        function validateChildTag(expectedChildTag: string[][]): void {
-            var rows = $('.bi-tablix tr');
-
-            var result: string[][] = [];
-
-            for (var i = 0, ilen = rows.length; i < ilen; i++) {
-                result[i] = [];
-                var cells = rows.eq(i).find('td');
-                for (var j = 0, jlen = cells.length; j < jlen; j++) {
-                    var childTag = expectedChildTag[i][j];
-                    if (childTag) {
-                        var child = cells.eq(j).find(childTag);
-                        if (child.length > 0)
-                            result[i][j] = childTag;
-                        else
-                            result[i][j] = undefined;
-                    }
-                    else
-                        result[i][j] = undefined;
-                }
-            }
-
-            expect(result).toEqual(expectedChildTag);
+        function validateTable(expectedValues: string[][]): void {
+            tablixHelper.validateTable(expectedValues, ".tablixCanvas tr");
         }
 
         function validateClassNames(expectedValues: string[][]): void {
-            tablixHelper.validateClassNames(expectedValues, '.bi-tablix tr', NoMarginClass);
+            tablixHelper.validateClassNames(expectedValues, ".tablixCanvas tr");
         }
 
-        it('1x2 table (one measure)',(done) => {
+        it("resize with autoSizeColumnwidth on", (done) => {
+            let selector = ".tablixCanvas tr";
+            let dataViewObjects: powerbi.DataViewObjects = {
+                general: {
+                    totals: true,
+                    autoSizeColumnWidth: true,
+                    textSize: 8,
+                }
+            };
+            let dataView: DataView = {
+                metadata: {
+                    columns: [measureSource1, measureSource2, measureSource3],
+                    objects: dataViewObjects
+                },
+                table: dataViewTableThreeMeasures
+            };
+            v.onDataChanged({ dataViews: [dataView] });
+            setTimeout(() => {
+                let rows = $(selector);
+                let rowCells = rows.eq(0).find('td');
+                expect(rowCells.eq(1).width()).toEqual(65);
+                expect(rowCells.eq(2).width()).toEqual(73);
+                expect(rowCells.eq(3).width()).toEqual(65);
+                
+                // Mock Resize
+                let newMeasureSource2: DataViewMetadataColumn = { displayName: "measure2", queryName: "measure2", type: dataTypeNumber, isMeasure: true, index: 4, objects: { general: { formatString: "#.00", columnWidth: 45 } } };
+                let dataView2: DataView = {
+                    metadata: {
+                        columns: [measureSource1, newMeasureSource2, measureSource3],
+                        objects: dataViewObjects
+                    },
+                    table: dataViewTableThreeMeasures
+                };
+                v.onDataChanged({ dataViews: [dataView2] });
+                setTimeout(() => {
+                    let newRows = $(selector);
+                    let newRowCells = newRows.eq(0).find('td');
+                    expect(newRowCells.eq(1).width()).toEqual(65);
+                    expect(newRowCells.eq(2).width()).toEqual(45);
+                    expect(newRowCells.eq(3).width()).toEqual(65);
+                    done();
+                }, DefaultWaitForRender);
+            }, DefaultWaitForRender);
+        });
 
-            var dataView = tableOneMeasure;
+        it("autoSizeColumnwidth on to off then resize", (done) => {
+            let selector = ".tablixCanvas tr";
+            let dataView: DataView = {
+                metadata: {
+                    columns: [measureSource1, measureSource2, measureSource3],
+                    objects: tableColumnWidthFalse
+                },
+                table: dataViewTableThreeMeasures
+            };
+            v.onDataChanged({ dataViews: [dataView] });
+            setTimeout(() => {
+                let rows = $(selector);
+                let rowCells = rows.eq(0).find('td');
+                expect(rowCells.eq(1).width()).toEqual(65);
+                expect(rowCells.eq(2).width()).toEqual(73);
+                expect(rowCells.eq(3).width()).toEqual(65);
+
+                // Mock Resize
+                let newMeasureSource2: DataViewMetadataColumn = { displayName: "measure2", queryName: "measure2", type: dataTypeNumber, isMeasure: true, index: 4, objects: { general: { formatString: "#.00", columnWidth: 45 } } };
+                let dataView2: DataView = {
+                    metadata: {
+                        columns: [measureSource1, newMeasureSource2, measureSource3],
+                        objects: tableColumnWidthFalse
+                    },
+                    table: dataViewTableThreeMeasures
+                };
+                let tableVisual = <Table>v;
+                
+                // Overriding suppress notification. For test purposes the call needs to go through
+                // Normally, calling onDataChanged first time with autoSizeColumns OFF triggers a persistAllColumnWidths which triggers another onDataViewChanged
+                tableVisual.persistingObjects = false;
+                v.onDataChanged({ dataViews: [dataView2] });
+                setTimeout(() => {
+                    let newRows = $(selector);
+                    let newRowCells = newRows.eq(0).find('td');
+                    expect(newRowCells.eq(1).width()).toEqual(65);
+                    expect(newRowCells.eq(2).width()).toEqual(45);
+                    expect(newRowCells.eq(3).width()).toEqual(65);
+                    done();
+                }, DefaultWaitForRender);
+            }, DefaultWaitForRender);
+        });
+
+        it("autoSizeColumnwidth off to on", (done) => {
+            let selector = ".tablixCanvas tr";
+            let dataViewObjects: powerbi.DataViewObjects = {
+                general: {
+                    totals: true,
+                    autoSizeColumnWidth: false,
+                    textSize: 8,
+                }
+            };
+            let newMeasureSource2: DataViewMetadataColumn = { displayName: "measure2", queryName: "measure2", type: dataTypeNumber, isMeasure: true, index: 4, objects: { general: { formatString: "#.00", columnWidth: 45 } } };
+            let dataView0: DataView = {
+                metadata: {
+                    columns: [measureSource1, newMeasureSource2, measureSource3],
+                    objects: dataViewObjects
+                },
+                table: dataViewTableThreeMeasures
+            };
+            
+            // AutoSize property off
+            v.onDataChanged({ dataViews: [dataView0] });
+            setTimeout(() => {
+                let tableVisual = <Table>v;
+                let rows = $(selector);
+                let rowCells = rows.eq(0).find('td');
+                expect(rowCells.eq(1).width()).toEqual(65);
+                expect(rowCells.eq(2).width()).toEqual(45);
+                expect(rowCells.eq(3).width()).toEqual(65);
+
+                expect(tableVisual.persistingObjects).toBe(false);
+
+                // AutoSize property on
+                let dataViewObjects1: powerbi.DataViewObjects = {
+                    general: {
+                        totals: true,
+                        autoSizeColumnWidth: true,
+                        textSize: 8,
+                    }
+                };
+                let dataView1: DataView = {
+                    metadata: {
+                        columns: [measureSource1, measureSource2, measureSource3],
+                        objects: dataViewObjects1
+                    },
+                    table: dataViewTableThreeMeasures
+                };
+
+                v.onDataChanged({ dataViews: [dataView1] });
+                setTimeout(() => {
+                    let rows = $(selector);
+                    let rowCells = rows.eq(0).find('td');
+                    expect(rowCells.eq(1).width()).toEqual(65);
+                    expect(rowCells.eq(2).width()).toEqual(73);
+                    expect(rowCells.eq(3).width()).toEqual(65);
+                    done();
+                }, DefaultWaitForRender);
+            }, DefaultWaitForRender);
+        });
+
+        describe('text size', () => {
+            describe('default', () => {
+                it('font size set on container', (done) => {
+                    let newMeasureSource2: DataViewMetadataColumn = {
+                        displayName: "measure2",
+                        queryName: "measure2",
+                        type: dataTypeNumber,
+                        isMeasure: true,
+                        index: 4,
+                        objects: {
+                            general: {
+                                formatString: "#.00",
+                                columnWidth: 45,
+                            },
+                        },
+                    };
+
+                    // AutoSize property off
+                    v.onDataChanged({
+                        dataViews: [{
+                            metadata: {
+                                columns: [measureSource1, newMeasureSource2, measureSource3],
+                                objects: {
+                                    general: {
+                                        totals: true,
+                                        autoSizeColumnWidth: false,
+                                    }
+                                }
+                            },
+                            table: dataViewTableThreeMeasures
+                        }]
+                    });
+                    setTimeout(() => {
+                        let actualFontSize = element.find(`${SelectorContainer}`).css('font-size');
+                        tablixHelper.validateFontSize(actualFontSize, 8);
+                        done();
+                    }, DefaultWaitForRender);
+                });
+
+                it("2x8 table with default text size row height", (done) => {
+                    let dataView = tableTwoGroups;
+                    v.onDataChanged({ dataViews: [dataView] });
+
+                    setTimeout(() => {
+                        let cells = element.find(`${SelectorHeaderCell}, ${SelectorBodyCell}, ${SelectorBodyCellLast}`);
+
+                        expect(cells.length).toBe(16);
+                        tablixHelper.validateCellHeights(cells.slice(0, 1), 16);
+                        tablixHelper.validateCellHeights(cells.slice(2), 13);
+
+                        done();
+                    }, DefaultWaitForRender);
+                });
+            });
+
+            describe('specified', () => {
+                it('font size set on container', (done) => {
+                    let newMeasureSource2: DataViewMetadataColumn = {
+                        displayName: "measure2",
+                        queryName: "measure2",
+                        type: dataTypeNumber,
+                        isMeasure: true,
+                        index: 4,
+                        objects: {
+                            general: {
+                                formatString: "#.00",
+                                columnWidth: 45,
+                            },
+                        },
+                    };
+
+                    // AutoSize property off
+                    v.onDataChanged({
+                        dataViews: [{
+                            metadata: {
+                                columns: [measureSource1, newMeasureSource2, measureSource3],
+                                objects: {
+                                    general: {
+                                        totals: true,
+                                        autoSizeColumnWidth: false,
+                                        textSize: 18,
+                                    }
+                                }
+                            },
+                            table: dataViewTableThreeMeasures,
+                        }]
+                    });
+                    setTimeout(() => {
+                        let actualFontSize = element.find(`${SelectorContainer}`).css('font-size');
+                        tablixHelper.validateFontSize(actualFontSize, 18);
+                        done();
+                    }, DefaultWaitForRender);
+                });
+
+                it("2x8 table with specified text size adjusted row height", (done) => {
+                    let dataView = tableTwoGroupsIncreasedFontSize;
+                    v.onDataChanged({ dataViews: [dataView] });
+
+                    setTimeout(() => {
+                        let cells = element
+                            .find(`${SelectorHeaderCell}, ${SelectorBodyCell}, ${SelectorBodyCellLast}`);
+
+                        expect(cells.length).toBe(16);
+                        tablixHelper.validateCellHeights(cells, 25);
+
+                        done();
+                    }, DefaultWaitForRender);
+                });
+
+                it("5x9 table with text size does not crop columns by minimum column width", (done) => {
+                    let dataView = tableTwoGroupsThreeMeasuresIncreasedFontSize;
+                    measureSource1.index = 2;
+                    measureSource2.index = 3;
+                    measureSource3.index = 4;
+
+                    v.onDataChanged({ dataViews: [dataView] });
+
+                    setTimeout(() => {
+                        // All columns will be visible since this is not dashboard
+                        let cellValue1: string = formatter(dataView.table.rows[0][2], measureSource1);
+                        let cellValue2: string = formatter(dataView.table.rows[1][2], measureSource1);
+                        let cellValue3: string = formatter(dataView.table.rows[2][2], measureSource1);
+                        let cellValue4: string = formatter(dataView.table.rows[3][2], measureSource1);
+                        let cellValue5: string = formatter(dataView.table.rows[4][2], measureSource1);
+                        let cellValue6: string = formatter(dataView.table.rows[5][2], measureSource1);
+                        let cellValue7: string = formatter(dataView.table.rows[6][2], measureSource1);
+                        let cellValue8: string = formatter(dataView.table.rows[0][3], measureSource2);
+                        let cellValue9: string = formatter(dataView.table.rows[1][3], measureSource2);
+                        let cellValue10: string = formatter(dataView.table.rows[2][3], measureSource2);
+                        let cellValue11: string = formatter(dataView.table.rows[3][3], measureSource2);
+                        let cellValue12: string = formatter(dataView.table.rows[4][3], measureSource2);
+                        let cellValue13: string = formatter(dataView.table.rows[5][3], measureSource2);
+                        let cellValue14: string = formatter(dataView.table.rows[6][3], measureSource2);
+                        let cellValue15: string = formatter(dataView.table.rows[0][4], measureSource3);
+                        let cellValue16: string = formatter(dataView.table.rows[1][4], measureSource3);
+                        let cellValue17: string = formatter(dataView.table.rows[2][4], measureSource3);
+                        let cellValue18: string = formatter(dataView.table.rows[3][4], measureSource3);
+                        let cellValue19: string = formatter(dataView.table.rows[4][4], measureSource3);
+                        let cellValue20: string = formatter(dataView.table.rows[5][4], measureSource3);
+                        let cellValue21: string = formatter(dataView.table.rows[6][4], measureSource3);
+
+                        let total1: string = formatter(dataView.table.totals[2], measureSource1);
+                        let total2: string = formatter(dataView.table.totals[3], measureSource2);
+                        let total3: string = formatter(dataView.table.totals[4], measureSource3);
+
+                        let expectedCells: string[][] = [
+                            [groupSource1.displayName, groupSource2.displayName, measureSource1.displayName, measureSource2.displayName, measureSource3.displayName],
+                            [dataView.table.rows[0][0], dataView.table.rows[0][1], cellValue1, cellValue8, cellValue15],
+                            [dataView.table.rows[1][0], dataView.table.rows[1][1], cellValue2, cellValue9, cellValue16],
+                            [dataView.table.rows[2][0], dataView.table.rows[2][1], cellValue3, cellValue10, cellValue17],
+                            [dataView.table.rows[3][0], dataView.table.rows[3][1], cellValue4, cellValue11, cellValue18],
+                            [dataView.table.rows[4][0], dataView.table.rows[4][1], cellValue5, cellValue12, cellValue19],
+                            [dataView.table.rows[5][0], dataView.table.rows[5][1], cellValue6, cellValue13, cellValue20],
+                            [dataView.table.rows[6][0], dataView.table.rows[6][1], cellValue7, cellValue14, cellValue21],
+                            ["Total", EmptyHeaderCell, total1, total2, total3]
+                        ];
+
+                        validateTable(expectedCells);
+
+                        let expectedClassNames: string[][] = [
+                            [ColumnHeaderClassNameIconHidden, ColumnHeaderClassNameIconHidden, ColumnHeaderClassNameIconHidden, ColumnHeaderClassNameIconHidden, ColumnHeaderClassNameIconHidden],
+                            [RowClassName, RowClassName, RowClassName + CssClassTablixValueNumeric, RowClassName + CssClassTablixValueNumeric, RowClassName + CssClassTablixValueNumeric],
+                            [RowClassName, RowClassName, RowClassName + CssClassTablixValueNumeric, RowClassName + CssClassTablixValueNumeric, RowClassName + CssClassTablixValueNumeric],
+                            [RowClassName, RowClassName, RowClassName + CssClassTablixValueNumeric, RowClassName + CssClassTablixValueNumeric, RowClassName + CssClassTablixValueNumeric],
+                            [RowClassName, RowClassName, RowClassName + CssClassTablixValueNumeric, RowClassName + CssClassTablixValueNumeric, RowClassName + CssClassTablixValueNumeric],
+                            [RowClassName, RowClassName, RowClassName + CssClassTablixValueNumeric, RowClassName + CssClassTablixValueNumeric, RowClassName + CssClassTablixValueNumeric],
+                            [RowClassName, RowClassName, RowClassName + CssClassTablixValueNumeric, RowClassName + CssClassTablixValueNumeric, RowClassName + CssClassTablixValueNumeric],
+                            [LastRowClassName, LastRowClassName, LastRowClassName + CssClassTablixValueNumeric, LastRowClassName + CssClassTablixValueNumeric, LastRowClassName + CssClassTablixValueNumeric],
+                            [FooterClassName, FooterClassName, FooterClassName + CssClassTablixValueNumeric, FooterClassName + CssClassTablixValueNumeric, FooterClassName + CssClassTablixValueNumeric]
+                        ];
+
+                        validateClassNames(expectedClassNames);
+
+                        done();
+                    }, DefaultWaitForRender);
+                });
+            });
+        });
+
+        it("1x2 table (one measure)", (done) => {
+
+            let dataView = tableOneMeasure;
             v.onDataChanged({ dataViews: [dataView] });
 
             setTimeout(() => {
 
-                var cellValue: string = formatter(dataView.table.rows[0][0], measureSource1);
-                var expectedCells: string[][] = [
-                    ['', measureSource1.displayName, ''],
-                    ['', cellValue]
+                let cellValue: string = formatter(dataView.table.rows[0][0], measureSource1);
+                let expectedCells: string[][] = [
+                    [measureSource1.displayName],
+                    [cellValue]
                 ];
 
                 validateTable(expectedCells);
 
-                var expectedClassNames: string[][] = [
-                    ['', ColumnHeaderClassName + NumericCellClassName, ''],
-                    ['', LastRowClassName + NumericCellClassName]
+                let expectedClassNames: string[][] = [
+                    [ColumnHeaderClassNameIconHidden],
+                    [LastRowClassName + CssClassTablixValueNumeric]
                 ];
 
                 validateClassNames(expectedClassNames);
@@ -1033,16 +1873,16 @@ module powerbitests {
             }, DefaultWaitForRender);
         });
 
-        it('1x2 table (one group null)',(done) => {
+        it("1x2 table (one group null)", (done) => {
 
-            var dataView = tableOneGroupNulls;
+            let dataView = tableOneGroupNulls;
             v.onDataChanged({ dataViews: [dataView] });
 
             setTimeout(() => {
-                var expectedCells: string[][] = [
-                    ['', groupSource1.displayName, ''],
-                    [EmptyHeaderCell, ''],
-                    [EmptyHeaderCell, '']
+                let expectedCells: string[][] = [
+                    [groupSource1.displayName],
+                    [EmptyHeaderCell],
+                    [EmptyHeaderCell]
                 ];
 
                 validateTable(expectedCells);
@@ -1050,19 +1890,17 @@ module powerbitests {
             }, DefaultWaitForRender);
         });
 
-        it('3x5 table (2 groups 1 measure nulls)',(done) => {
+        it("1x3 table (one group with leading spaces)", (done) => {
 
-            var dataView = tableTwoGroups1MeasureNulls;
+            let dataView = tableOneGroupLeadingSpaces;
             v.onDataChanged({ dataViews: [dataView] });
 
             setTimeout(() => {
-                var expectedCells: string[][] = [
-                    ['', groupSource1.displayName, groupSource2.displayName, measureSource1.displayName, ''],
-                    ['', 'A', 'a1', '100.0'],
-                    ['', '', '', '103.0'],
-                    ['', '', 'a3', '106.0'],
-                    ['', 'B', '', '112.0'],
-                    [EmptyHeaderCell, '', '', '']
+                let expectedCells: string[][] = [
+                    ["    group1"],
+                    ["    A"],
+                    ["B"],
+                    ["C"]
                 ];
 
                 validateTable(expectedCells);
@@ -1070,30 +1908,50 @@ module powerbitests {
             }, DefaultWaitForRender);
         });
 
-        it('1x3 table (group instances)',(done) => {
+        it("3x5 table (2 groups 1 measure nulls)", (done) => {
 
-            var dataView = tableOneGroup;
+            let dataView = tableTwoGroups1MeasureNulls;
+            v.onDataChanged({ dataViews: [dataView] });
+
+            setTimeout(() => {
+                let expectedCells: string[][] = [
+                    [groupSource1.displayName, groupSource2.displayName, measureSource1.displayName],
+                    ["A", "a1", "100.0"],
+                    [EmptyHeaderCell, EmptyHeaderCell, "103.0"],
+                    [EmptyHeaderCell, "a3", "106.0"],
+                    ["B", EmptyHeaderCell, "112.0"],
+                    [EmptyHeaderCell, EmptyHeaderCell, EmptyHeaderCell]
+                ];
+
+                validateTable(expectedCells);
+                done();
+            }, DefaultWaitForRender);
+        });
+
+        it("1x3 table (group instances)", (done) => {
+
+            let dataView = tableOneGroup;
             v.onDataChanged({ dataViews: [dataView] });
 
             setTimeout(() => {
 
-                var cellValue1: string = formatter(dataView.table.rows[0][0], groupSource1);
-                var cellValue2: string = formatter(dataView.table.rows[1][0], groupSource1);
-                var cellValue3: string = formatter(dataView.table.rows[2][0], groupSource1);
-                var expectedCells: string[][] = [
-                    ['', groupSource1.displayName, ''],
-                    ['', cellValue1],
-                    ['', cellValue2],
-                    ['', cellValue3]
+                let cellValue1: string = formatter(dataView.table.rows[0][0], groupSource1);
+                let cellValue2: string = formatter(dataView.table.rows[1][0], groupSource1);
+                let cellValue3: string = formatter(dataView.table.rows[2][0], groupSource1);
+                let expectedCells: string[][] = [
+                    [groupSource1.displayName],
+                    [cellValue1],
+                    [cellValue2],
+                    [cellValue3]
                 ];
 
                 validateTable(expectedCells);
 
-                var expectedClassNames: string[][] = [
-                    ['', ColumnHeaderClassName, ''],
-                    ['', RowClassName],
-                    ['', RowClassName],
-                    ['', LastRowClassName]
+                let expectedClassNames: string[][] = [
+                    [ColumnHeaderClassNameIconHidden],
+                    [RowClassName],
+                    [RowClassName],
+                    [LastRowClassName]
                 ];
 
                 validateClassNames(expectedClassNames);
@@ -1102,37 +1960,37 @@ module powerbitests {
             }, DefaultWaitForRender);
         });
 
-        it('2x8 table (group instances)',(done) => {
+        it("2x8 table (group instances)", (done) => {
 
-            var dataView = tableTwoGroups;
+            let dataView = tableTwoGroups;
             v.onDataChanged({ dataViews: [dataView] });
 
             setTimeout(() => {
 
-                var cellValue1: string = formatter(dataView.table.rows[0][0], groupSource1);
-                var cellValue2: string = formatter(dataView.table.rows[1][0], groupSource1);
-                var cellValue3: string = formatter(dataView.table.rows[2][0], groupSource1);
-                var cellValue4: string = formatter(dataView.table.rows[3][0], groupSource1);
-                var cellValue5: string = formatter(dataView.table.rows[4][0], groupSource1);
-                var cellValue6: string = formatter(dataView.table.rows[5][0], groupSource1);
-                var cellValue7: string = formatter(dataView.table.rows[6][0], groupSource1);
-                var cellValue8: string = formatter(dataView.table.rows[0][1], groupSource2);
-                var cellValue9: string = formatter(dataView.table.rows[1][1], groupSource2);
-                var cellValue10: string = formatter(dataView.table.rows[2][1], groupSource2);
-                var cellValue11: string = formatter(dataView.table.rows[3][1], groupSource2);
-                var cellValue12: string = formatter(dataView.table.rows[4][1], groupSource2);
-                var cellValue13: string = formatter(dataView.table.rows[5][1], groupSource2);
-                var cellValue14: string = formatter(dataView.table.rows[6][1], groupSource2);
+                let cellValue1: string = formatter(dataView.table.rows[0][0], groupSource1);
+                let cellValue2: string = formatter(dataView.table.rows[1][0], groupSource1);
+                let cellValue3: string = formatter(dataView.table.rows[2][0], groupSource1);
+                let cellValue4: string = formatter(dataView.table.rows[3][0], groupSource1);
+                let cellValue5: string = formatter(dataView.table.rows[4][0], groupSource1);
+                let cellValue6: string = formatter(dataView.table.rows[5][0], groupSource1);
+                let cellValue7: string = formatter(dataView.table.rows[6][0], groupSource1);
+                let cellValue8: string = formatter(dataView.table.rows[0][1], groupSource2);
+                let cellValue9: string = formatter(dataView.table.rows[1][1], groupSource2);
+                let cellValue10: string = formatter(dataView.table.rows[2][1], groupSource2);
+                let cellValue11: string = formatter(dataView.table.rows[3][1], groupSource2);
+                let cellValue12: string = formatter(dataView.table.rows[4][1], groupSource2);
+                let cellValue13: string = formatter(dataView.table.rows[5][1], groupSource2);
+                let cellValue14: string = formatter(dataView.table.rows[6][1], groupSource2);
 
-                var expectedCells: string[][] = [
-                    ['', groupSource1.displayName, groupSource2.displayName, ''],
-                    ['', cellValue1, cellValue8],
-                    ['', cellValue2, cellValue9],
-                    ['', cellValue3, cellValue10],
-                    ['', cellValue4, cellValue11],
-                    ['', cellValue5, cellValue12],
-                    ['', cellValue6, cellValue13],
-                    ['', cellValue7, cellValue14]
+                let expectedCells: string[][] = [
+                    [groupSource1.displayName, groupSource2.displayName],
+                    [cellValue1, cellValue8],
+                    [cellValue2, cellValue9],
+                    [cellValue3, cellValue10],
+                    [cellValue4, cellValue11],
+                    [cellValue5, cellValue12],
+                    [cellValue6, cellValue13],
+                    [cellValue7, cellValue14]
                 ];
 
                 validateTable(expectedCells);
@@ -1141,9 +1999,8 @@ module powerbitests {
             }, DefaultWaitForRender);
         });
 
-        it('5x9 table (group instances and measure values) with totals',(done) => {
-            powerbitests.mocks.setLocale();
-            var dataView = tableTwoGroupsThreeMeasures;
+        it("5x9 table (group instances and measure values) with totals", (done) => {
+            let dataView = tableTwoGroupsThreeMeasures;
             measureSource1.index = 2;
             measureSource2.index = 3;
             measureSource3.index = 4;
@@ -1152,56 +2009,56 @@ module powerbitests {
 
             setTimeout(() => {
 
-                var cellValue1: string = formatter(dataView.table.rows[0][2], measureSource1);
-                var cellValue2: string = formatter(dataView.table.rows[1][2], measureSource1);
-                var cellValue3: string = formatter(dataView.table.rows[2][2], measureSource1);
-                var cellValue4: string = formatter(dataView.table.rows[3][2], measureSource1);
-                var cellValue5: string = formatter(dataView.table.rows[4][2], measureSource1);
-                var cellValue6: string = formatter(dataView.table.rows[5][2], measureSource1);
-                var cellValue7: string = formatter(dataView.table.rows[6][2], measureSource1);
-                var cellValue8: string = formatter(dataView.table.rows[0][3], measureSource2);
-                var cellValue9: string = formatter(dataView.table.rows[1][3], measureSource2);
-                var cellValue10: string = formatter(dataView.table.rows[2][3], measureSource2);
-                var cellValue11: string = formatter(dataView.table.rows[3][3], measureSource2);
-                var cellValue12: string = formatter(dataView.table.rows[4][3], measureSource2);
-                var cellValue13: string = formatter(dataView.table.rows[5][3], measureSource2);
-                var cellValue14: string = formatter(dataView.table.rows[6][3], measureSource2);
-                var cellValue15: string = formatter(dataView.table.rows[0][4], measureSource3);
-                var cellValue16: string = formatter(dataView.table.rows[1][4], measureSource3);
-                var cellValue17: string = formatter(dataView.table.rows[2][4], measureSource3);
-                var cellValue18: string = formatter(dataView.table.rows[3][4], measureSource3);
-                var cellValue19: string = formatter(dataView.table.rows[4][4], measureSource3);
-                var cellValue20: string = formatter(dataView.table.rows[5][4], measureSource3);
-                var cellValue21: string = formatter(dataView.table.rows[6][4], measureSource3);
+                let cellValue1: string = formatter(dataView.table.rows[0][2], measureSource1);
+                let cellValue2: string = formatter(dataView.table.rows[1][2], measureSource1);
+                let cellValue3: string = formatter(dataView.table.rows[2][2], measureSource1);
+                let cellValue4: string = formatter(dataView.table.rows[3][2], measureSource1);
+                let cellValue5: string = formatter(dataView.table.rows[4][2], measureSource1);
+                let cellValue6: string = formatter(dataView.table.rows[5][2], measureSource1);
+                let cellValue7: string = formatter(dataView.table.rows[6][2], measureSource1);
+                let cellValue8: string = formatter(dataView.table.rows[0][3], measureSource2);
+                let cellValue9: string = formatter(dataView.table.rows[1][3], measureSource2);
+                let cellValue10: string = formatter(dataView.table.rows[2][3], measureSource2);
+                let cellValue11: string = formatter(dataView.table.rows[3][3], measureSource2);
+                let cellValue12: string = formatter(dataView.table.rows[4][3], measureSource2);
+                let cellValue13: string = formatter(dataView.table.rows[5][3], measureSource2);
+                let cellValue14: string = formatter(dataView.table.rows[6][3], measureSource2);
+                let cellValue15: string = formatter(dataView.table.rows[0][4], measureSource3);
+                let cellValue16: string = formatter(dataView.table.rows[1][4], measureSource3);
+                let cellValue17: string = formatter(dataView.table.rows[2][4], measureSource3);
+                let cellValue18: string = formatter(dataView.table.rows[3][4], measureSource3);
+                let cellValue19: string = formatter(dataView.table.rows[4][4], measureSource3);
+                let cellValue20: string = formatter(dataView.table.rows[5][4], measureSource3);
+                let cellValue21: string = formatter(dataView.table.rows[6][4], measureSource3);
 
-                var total1: string = formatter(dataView.table.totals[2], measureSource1);
-                var total2: string = formatter(dataView.table.totals[3], measureSource2);
-                var total3: string = formatter(dataView.table.totals[4], measureSource3);
+                let total1: string = formatter(dataView.table.totals[2], measureSource1);
+                let total2: string = formatter(dataView.table.totals[3], measureSource2);
+                let total3: string = formatter(dataView.table.totals[4], measureSource3);
 
-                var expectedCells: string[][] = [
-                    ['', groupSource1.displayName, groupSource2.displayName, measureSource1.displayName, measureSource2.displayName, measureSource3.displayName, ''],
-                    ['', dataView.table.rows[0][0], dataView.table.rows[0][1], cellValue1, cellValue8, cellValue15],
-                    ['', dataView.table.rows[1][0], dataView.table.rows[1][1], cellValue2, cellValue9, cellValue16],
-                    ['', dataView.table.rows[2][0], dataView.table.rows[2][1], cellValue3, cellValue10, cellValue17],
-                    ['', dataView.table.rows[3][0], dataView.table.rows[3][1], cellValue4, cellValue11, cellValue18],
-                    ['', dataView.table.rows[4][0], dataView.table.rows[4][1], cellValue5, cellValue12, cellValue19],
-                    ['', dataView.table.rows[5][0], dataView.table.rows[5][1], cellValue6, cellValue13, cellValue20],
-                    ['', dataView.table.rows[6][0], dataView.table.rows[6][1], cellValue7, cellValue14, cellValue21],
-                    ['', 'Total', '', total1, total2, total3, '']
+                let expectedCells: string[][] = [
+                    [groupSource1.displayName, groupSource2.displayName, measureSource1.displayName, measureSource2.displayName, measureSource3.displayName],
+                    [dataView.table.rows[0][0], dataView.table.rows[0][1], cellValue1, cellValue8, cellValue15],
+                    [dataView.table.rows[1][0], dataView.table.rows[1][1], cellValue2, cellValue9, cellValue16],
+                    [dataView.table.rows[2][0], dataView.table.rows[2][1], cellValue3, cellValue10, cellValue17],
+                    [dataView.table.rows[3][0], dataView.table.rows[3][1], cellValue4, cellValue11, cellValue18],
+                    [dataView.table.rows[4][0], dataView.table.rows[4][1], cellValue5, cellValue12, cellValue19],
+                    [dataView.table.rows[5][0], dataView.table.rows[5][1], cellValue6, cellValue13, cellValue20],
+                    [dataView.table.rows[6][0], dataView.table.rows[6][1], cellValue7, cellValue14, cellValue21],
+                    ["Total", EmptyHeaderCell, total1, total2, total3]
                 ];
 
                 validateTable(expectedCells);
 
-                var expectedClassNames: string[][] = [
-                    ['', ColumnHeaderClassName, ColumnHeaderClassName, ColumnHeaderClassName + NumericCellClassName, ColumnHeaderClassName + NumericCellClassName, ColumnHeaderClassName + NumericCellClassName, ''],
-                    ['', RowClassName, RowClassName, RowClassName + NumericCellClassName, RowClassName + NumericCellClassName, RowClassName + NumericCellClassName],
-                    ['', RowClassName, RowClassName, RowClassName + NumericCellClassName, RowClassName + NumericCellClassName, RowClassName + NumericCellClassName],
-                    ['', RowClassName, RowClassName, RowClassName + NumericCellClassName, RowClassName + NumericCellClassName, RowClassName + NumericCellClassName],
-                    ['', RowClassName, RowClassName, RowClassName + NumericCellClassName, RowClassName + NumericCellClassName, RowClassName + NumericCellClassName],
-                    ['', RowClassName, RowClassName, RowClassName + NumericCellClassName, RowClassName + NumericCellClassName, RowClassName + NumericCellClassName],
-                    ['', RowClassName, RowClassName, RowClassName + NumericCellClassName, RowClassName + NumericCellClassName, RowClassName + NumericCellClassName],
-                    ['', LastRowClassName, LastRowClassName, LastRowClassName + NumericCellClassName, LastRowClassName + NumericCellClassName, LastRowClassName + NumericCellClassName],
-                    ['', FooterClassName, FooterClassName, FooterClassName + NumericCellClassName, FooterClassName + NumericCellClassName, FooterClassName + NumericCellClassName, '']
+                let expectedClassNames: string[][] = [
+                    [ColumnHeaderClassNameIconHidden, ColumnHeaderClassNameIconHidden, ColumnHeaderClassNameIconHidden, ColumnHeaderClassNameIconHidden, ColumnHeaderClassNameIconHidden],
+                    [RowClassName, RowClassName, RowClassName + CssClassTablixValueNumeric, RowClassName + CssClassTablixValueNumeric, RowClassName + CssClassTablixValueNumeric],
+                    [RowClassName, RowClassName, RowClassName + CssClassTablixValueNumeric, RowClassName + CssClassTablixValueNumeric, RowClassName + CssClassTablixValueNumeric],
+                    [RowClassName, RowClassName, RowClassName + CssClassTablixValueNumeric, RowClassName + CssClassTablixValueNumeric, RowClassName + CssClassTablixValueNumeric],
+                    [RowClassName, RowClassName, RowClassName + CssClassTablixValueNumeric, RowClassName + CssClassTablixValueNumeric, RowClassName + CssClassTablixValueNumeric],
+                    [RowClassName, RowClassName, RowClassName + CssClassTablixValueNumeric, RowClassName + CssClassTablixValueNumeric, RowClassName + CssClassTablixValueNumeric],
+                    [RowClassName, RowClassName, RowClassName + CssClassTablixValueNumeric, RowClassName + CssClassTablixValueNumeric, RowClassName + CssClassTablixValueNumeric],
+                    [LastRowClassName, LastRowClassName, LastRowClassName + CssClassTablixValueNumeric, LastRowClassName + CssClassTablixValueNumeric, LastRowClassName + CssClassTablixValueNumeric],
+                    [FooterClassName, FooterClassName, FooterClassName + CssClassTablixValueNumeric, FooterClassName + CssClassTablixValueNumeric, FooterClassName + CssClassTablixValueNumeric]
                 ];
 
                 validateClassNames(expectedClassNames);
@@ -1210,9 +2067,9 @@ module powerbitests {
             }, DefaultWaitForRender);
         });
 
-        it('2x5 table (group instances and measure values) with totals, total value comes first',(done) => {
+        it("2x5 table (group instances and measure values) with totals, total value comes first", (done) => {
 
-            var dataView = tableOneMeasureOneGroupSubtotals;
+            let dataView = tableOneMeasureOneGroupSubtotals;
             measureSource1.index = 0;
             groupSource1.index = 1;
 
@@ -1220,28 +2077,28 @@ module powerbitests {
 
             setTimeout(() => {
 
-                var cellValue1: string = formatter(dataView.table.rows[0][0], measureSource1);
-                var cellValue2: string = formatter(dataView.table.rows[1][0], measureSource1);
-                var cellValue3: string = formatter(dataView.table.rows[2][0], measureSource1);
+                let cellValue1: string = formatter(dataView.table.rows[0][0], measureSource1);
+                let cellValue2: string = formatter(dataView.table.rows[1][0], measureSource1);
+                let cellValue3: string = formatter(dataView.table.rows[2][0], measureSource1);
 
-                var total: string = formatter(dataView.table.totals[0], measureSource1);
+                let total: string = formatter(dataView.table.totals[0], measureSource1);
 
-                var expectedCells: string[][] = [
-                    ['', measureSource1.displayName, groupSource1.displayName, ''],
-                    ['', cellValue1, dataView.table.rows[0][1]],
-                    ['', cellValue2, dataView.table.rows[1][1]],
-                    ['', cellValue3, dataView.table.rows[2][1]],
-                    ['', total, '', '']
+                let expectedCells: string[][] = [
+                    [measureSource1.displayName, groupSource1.displayName],
+                    [cellValue1, dataView.table.rows[0][1]],
+                    [cellValue2, dataView.table.rows[1][1]],
+                    [cellValue3, dataView.table.rows[2][1]],
+                    [total, EmptyHeaderCell]
                 ];
 
                 validateTable(expectedCells);
 
-                var expectedClassNames: string[][] = [
-                    ['', ColumnHeaderClassName + NumericCellClassName, ColumnHeaderClassName, ''],
-                    ['', RowClassName + NumericCellClassName, RowClassName],
-                    ['', RowClassName + NumericCellClassName, RowClassName],
-                    ['', LastRowClassName + NumericCellClassName, LastRowClassName],
-                    ['', FooterClassName + NumericCellClassName, FooterClassName, '']
+                let expectedClassNames: string[][] = [
+                    [ColumnHeaderClassNameIconHidden, ColumnHeaderClassNameIconHidden],
+                    [RowClassName + CssClassTablixValueNumeric, RowClassName],
+                    [RowClassName + CssClassTablixValueNumeric, RowClassName],
+                    [LastRowClassName + CssClassTablixValueNumeric, LastRowClassName],
+                    [FooterClassName + CssClassTablixValueNumeric, FooterClassName]
                 ];
 
                 validateClassNames(expectedClassNames);
@@ -1250,9 +2107,9 @@ module powerbitests {
             }, DefaultWaitForRender);
         });
 
-        it('2x5 table (group instances and measure values) totals on then off',(done) => {
+        it("2x5 table (group instances and measure values) totals on then off", (done) => {
 
-            var dataView = tableOneMeasureOneGroupSubtotals;
+            let dataView = tableOneMeasureOneGroupSubtotals;
             measureSource1.index = 0;
             groupSource1.index = 1;
 
@@ -1260,34 +2117,34 @@ module powerbitests {
 
             setTimeout(() => {
 
-                var cellValue1: string = formatter(dataView.table.rows[0][0], measureSource1);
-                var cellValue2: string = formatter(dataView.table.rows[1][0], measureSource1);
-                var cellValue3: string = formatter(dataView.table.rows[2][0], measureSource1);
+                let cellValue1: string = formatter(dataView.table.rows[0][0], measureSource1);
+                let cellValue2: string = formatter(dataView.table.rows[1][0], measureSource1);
+                let cellValue3: string = formatter(dataView.table.rows[2][0], measureSource1);
 
-                var total: string = formatter(dataView.table.totals[0], measureSource1);
+                let total: string = formatter(dataView.table.totals[0], measureSource1);
 
-                var expectedCells: string[][] = [
-                    ['', measureSource1.displayName, groupSource1.displayName, ''],
-                    ['', cellValue1, dataView.table.rows[0][1]],
-                    ['', cellValue2, dataView.table.rows[1][1]],
-                    ['', cellValue3, dataView.table.rows[2][1]],
-                    ['', total, '', '']
+                let expectedCells: string[][] = [
+                    [measureSource1.displayName, groupSource1.displayName],
+                    [cellValue1, dataView.table.rows[0][1]],
+                    [cellValue2, dataView.table.rows[1][1]],
+                    [cellValue3, dataView.table.rows[2][1]],
+                    [total, EmptyHeaderCell]
                 ];
 
                 validateTable(expectedCells);
 
                 // Now update with totals off
-                var dataViewNoTotal = tableOneMeasureOneGroup;
+                let dataViewNoTotal = tableOneMeasureOneGroup;
 
                 v.onDataChanged({ dataViews: [dataViewNoTotal] });
 
                 setTimeout(() => {
 
-                    var expectedCellsNoTotal: string[][] = [
-                        ['', measureSource1.displayName, groupSource1.displayName, ''],
-                        ['', cellValue1, dataViewNoTotal.table.rows[0][1]],
-                        ['', cellValue2, dataViewNoTotal.table.rows[1][1]],
-                        ['', cellValue3, dataViewNoTotal.table.rows[2][1]]
+                    let expectedCellsNoTotal: string[][] = [
+                        [measureSource1.displayName, groupSource1.displayName],
+                        [cellValue1, dataViewNoTotal.table.rows[0][1]],
+                        [cellValue2, dataViewNoTotal.table.rows[1][1]],
+                        [cellValue3, dataViewNoTotal.table.rows[2][1]]
                     ];
 
                     validateTable(expectedCellsNoTotal);
@@ -1298,56 +2155,92 @@ module powerbitests {
             }, DefaultWaitForRender);
         });
 
-        it('1x3 table (group instances with WebUrl)',(done) => {
-            var dataView = tableWebUrl;
+        it("1x3 table (group instances with WebUrl)", (done) => {
+            let dataView = tableWebUrl;
             v.onDataChanged({ dataViews: [dataView] });
 
             setTimeout(() => {
 
-                var cellValue1: string = formatter(dataView.table.rows[0][0], groupSourceWebUrl);
-                var cellValue2: string = formatter(dataView.table.rows[1][0], groupSourceWebUrl);
-                var cellValue3: string = formatter(dataView.table.rows[2][0], groupSourceWebUrl);
-                var expectedCells: string[][] = [
-                    ['', groupSourceWebUrl.displayName, ''],
-                    ['', cellValue1],
-                    ['', cellValue2],
-                    ['', cellValue3]
+                let cellValue1: string = formatter(dataView.table.rows[0][0], groupSourceWebUrl);
+                let cellValue2: string = formatter(dataView.table.rows[1][0], groupSourceWebUrl);
+                let cellValue3: string = formatter(dataView.table.rows[2][0], groupSourceWebUrl);
+                let expectedCells: string[][] = [
+                    [groupSourceWebUrl.displayName],
+                    [cellValue1],
+                    [cellValue2],
+                    [cellValue3]
                 ];
 
                 validateTable(expectedCells);
 
-                var expectedClassNames: string[][] = [
-                    ['', ColumnHeaderClassName, ''],
-                    ['', RowClassName],
-                    ['', RowClassName],
-                    ['', LastRowClassName]
+                let expectedClassNames: string[][] = [
+                    [ColumnHeaderClassNameIconHidden],
+                    [RowClassName],
+                    [RowClassName],
+                    [LastRowClassName]
                 ];
 
                 validateClassNames(expectedClassNames);
 
-                var expectedChildTags: string[][] = [
-                    [undefined, undefined, undefined],
-                    [undefined, 'A'],
-                    [undefined, undefined],
-                    [undefined, 'A']
+                let expectedChildTags: string[][] = [
+                    [undefined],
+                    ["A"],
+                    [undefined],
+                    ["A"]
                 ];
 
-                validateChildTag(expectedChildTags);
+                validateChildTag(expectedChildTags, $(".tablixCanvas tr"));
 
                 done();
             }, DefaultWaitForRender);
         });
 
-        it('1x1 table loadMoreData',(done) => {
+        it("1x3 table (group instances with Kpi)", (done) => {
+            let dataView = tableKpi;
+            v.onDataChanged({ dataViews: [dataView] });
 
-            var dataView: DataView = {
+            setTimeout(() => {
+                let expectedCells: string[][] = [
+                    [groupSourceKpiStatus.displayName],
+                    [""],
+                    [""],
+                    [""]
+                ];
+
+                validateTable(expectedCells);
+
+                let expectedClassNames: string[][] = [
+                    [ColumnHeaderClassNameIconHidden],
+                    [RowClassName],
+                    [RowClassName],
+                    [LastRowClassName]
+                ];
+
+                validateClassNames(expectedClassNames);
+
+                let expectedChildTags: string[][] = [
+                    [undefined],
+                    [".powervisuals-glyph.circle.kpi-red"],
+                    [".powervisuals-glyph.circle.kpi-yellow"],
+                    [".powervisuals-glyph.circle.kpi-green"],
+                ];
+
+                validateChildTag(expectedChildTags, $(".tablixCanvas tr"));
+
+                done();
+            }, DefaultWaitForRender);
+        });
+
+        it("1x1 table loadMoreData", (done) => {
+
+            let dataView: DataView = {
                 metadata: { columns: [groupSource1], segment: {} },
                 table: {
                     columns: [groupSource1],
                     rows: [
-                        ['A'],
-                        ['B'],
-                        ['C']
+                        ["A"],
+                        ["B"],
+                        ["C"]
                     ]
                 }
             };
@@ -1356,13 +2249,13 @@ module powerbitests {
                 dataViews: [dataView]
             });
 
-            var segment2: DataView = {
+            let segment2: DataView = {
                 metadata: { columns: [groupSource1] },
                 table: {
                     columns: [groupSource1],
                     rows: [
-                        ['D'],
-                        ['E']
+                        ["D"],
+                        ["E"]
                     ]
                 }
             };
@@ -1376,18 +2269,18 @@ module powerbitests {
 
             setTimeout(() => {
 
-                var cellValue1: string = formatter(dataView.table.rows[0][0], groupSource1);
-                var cellValue2: string = formatter(dataView.table.rows[1][0], groupSource1);
-                var cellValue3: string = formatter(dataView.table.rows[2][0], groupSource1);
-                var cellValue4: string = formatter(dataView.table.rows[3][0], groupSource1);
-                var cellValue5: string = formatter(dataView.table.rows[4][0], groupSource1);
-                var expectedCells: string[][] = [
-                    ['', groupSource1.displayName, ''],
-                    ['', cellValue1],
-                    ['', cellValue2],
-                    ['', cellValue3],
-                    ['', cellValue4],
-                    ['', cellValue5]
+                let cellValue1: string = formatter(dataView.table.rows[0][0], groupSource1);
+                let cellValue2: string = formatter(dataView.table.rows[1][0], groupSource1);
+                let cellValue3: string = formatter(dataView.table.rows[2][0], groupSource1);
+                let cellValue4: string = formatter(dataView.table.rows[3][0], groupSource1);
+                let cellValue5: string = formatter(dataView.table.rows[4][0], groupSource1);
+                let expectedCells: string[][] = [
+                    [groupSource1.displayName],
+                    [cellValue1],
+                    [cellValue2],
+                    [cellValue3],
+                    [cellValue4],
+                    [cellValue5]
                 ];
 
                 validateTable(expectedCells);
@@ -1396,16 +2289,16 @@ module powerbitests {
             }, DefaultWaitForRender);
         });
 
-        it('2x5 table reorder loadMoreData',(done) => {
+        it("2x5 table reorder loadMoreData", (done) => {
 
-            var dataView: DataView = {
+            let dataView: DataView = {
                 metadata: { columns: [groupSource1, groupSource2], segment: {} },
                 table: {
                     columns: [groupSource1, groupSource2],
                     rows: [
-                        ['A', '1'],
-                        ['B', '2'],
-                        ['C', '3']
+                        ["A", "1"],
+                        ["B", "2"],
+                        ["C", "3"]
                     ]
                 }
             };
@@ -1415,38 +2308,36 @@ module powerbitests {
             });
 
             // Simulate column reordering
-            var transformedDataView = applyTransform(dataView);
-            v.onDataChanged({ dataViews: [transformedDataView] });
+            v.onDataChanged({ dataViews: [applyTransform(dataView)] });
 
-            var segment2: DataView = {
+            let segment2: DataView = {
                 metadata: { columns: [groupSource1] },
                 table: {
                     columns: [groupSource1],
                     rows: [
-                        ['D', '4'],
-                        ['E', '5']
+                        ["D", "4"],
+                        ["E", "5"]
                     ]
                 }
             };
 
             // Simulate a load more merge
             powerbi.data.segmentation.DataViewMerger.mergeTables(dataView.table, segment2.table);
-            var transformedDataView = applyTransform(dataView);
 
             v.onDataChanged({
-                dataViews: [transformedDataView],
+                dataViews: [applyTransform(dataView)],
                 operationKind: powerbi.VisualDataChangeOperationKind.Append
             });
 
             setTimeout(() => {
 
-                var expectedCells: string[][] = [
-                    ['', groupSource2.displayName, groupSource1.displayName, ''],
-                    ['', '1', 'A'],
-                    ['', '2', 'B'],
-                    ['', '3', 'C'],
-                    ['', '4', 'D'],
-                    ['', '5', 'E']
+                let expectedCells: string[][] = [
+                    [groupSource2.displayName, groupSource1.displayName],
+                    ["1", "A"],
+                    ["2", "B"],
+                    ["3", "C"],
+                    ["4", "D"],
+                    ["5", "E"]
                 ];
 
                 validateTable(expectedCells);
@@ -1455,49 +2346,95 @@ module powerbitests {
             }, DefaultWaitForRender);
         });
 
+        it("header sort arrow down", (done) => {
+            let dataView = tableOneMeasurSortDescending;
+            v.onDataChanged({ dataViews: [dataView] });
+
+            setTimeout(() => {
+                let expectedCells: string[] =
+                    ['tablixSortIconContainer sorted powervisuals-glyph caret-down', 'tablixSortIconContainer future powervisuals-glyph caret-up'];
+
+                validateSortIcons(expectedCells);
+                done();
+            }, DefaultWaitForRender);
+        });
+
+        it("header sort arrow up", (done) => {
+
+            let dataView = tableOneMeasurSortAscending;
+            v.onDataChanged({ dataViews: [dataView] });
+
+            setTimeout(() => {
+                let expectedCells: string[] =
+                    ['tablixSortIconContainer sorted powervisuals-glyph caret-up', 'tablixSortIconContainer future powervisuals-glyph caret-down'];
+
+                validateSortIcons(expectedCells);
+                done();
+            }, DefaultWaitForRender);
+        });
+
+        it("ensure table elements have tooltip", (done) => {
+
+            let dataView = tableWithLongText;
+            v.onDataChanged({ dataViews: [dataView] });
+
+            setTimeout(() => {
+                //Validate Column Headers title
+                tablixHelper.validateTableColumnHeaderTooltip(SelectorHeaderCell, dataView);
+
+                //Validate Items Title
+                for (let i = 0; i < dataView.table.rows.length - 1; i++) {
+                    tablixHelper.validateTableRowTooltip(SelectorBodyCell, dataView, i);
+                }
+               
+                //Validate last row and title 
+                tablixHelper.validateTableRowTooltip(SelectorBodyCellLast, dataView, dataView.table.rows.length - 1);
+
+                //Validate row footer tooltip
+                tablixHelper.validateTableRowFooterTooltip(SelectorFooterCell, dataView, dataView.table.rows.length);
+
+                done();
+            }, DefaultWaitForRender);
+        });
+
         function applyTransform(dataView: DataView): DataView {
-            var transforms: powerbi.data.DataViewTransformActions = {
+            let transforms: powerbi.data.DataViewTransformActions = {
                 selects: [
                     {
                         displayName: groupSource1.displayName,
-                        type: powerbi.ValueType.fromDescriptor({ text: true }),
+                        type: powerbi.ValueType.fromDescriptor({ text: true })
                     }, {
                         displayName: groupSource2.displayName,
-                        type: powerbi.ValueType.fromDescriptor({ text: true }),
+                        type: powerbi.ValueType.fromDescriptor({ text: true })
                     }
                 ],
-                projectionOrdering: {
-                    Values: [1, 0]
+                roles: {
+                    ordering: {
+                        Values: [1, 0]
+                    }
                 }
             };
 
-            var transformedDataView = powerbi.data.DataViewTransform.apply(
+            let transformedDataView = powerbi.data.DataViewTransform.apply(
                 {
                     prototype: dataView,
                     objectDescriptors: null,
                     transforms: transforms,
-                    dataViewMappings: powerbi.visuals.Table.capabilities.dataViewMappings,
-                    colorAllocatorFactory: powerbi.visuals.createColorAllocatorFactory()
+                    dataViewMappings: powerbi.visuals.tableCapabilities.dataViewMappings,
+                    colorAllocatorFactory: powerbi.visuals.createColorAllocatorFactory(),
+                    dataRoles: powerbi.visuals.tableCapabilities.dataRoles,
                 })[0];
 
             return transformedDataView;
         }
 
-        function formatter(value: any, source: DataViewMetadataColumn): string {
-            return valueFormatter.formatRaw(value, valueFormatter.getFormatString(source, Table.formatStringProp, false));
-        }
     });
 
-    describe('Dashboard table DOM validation',() => {
-        var v: powerbi.IVisual,
+    describe("Dashboard table DOM validation", () => {
+        let v: powerbi.IVisual,
             element: JQuery,
-            NoMarginClass = 'bi-tablix-cellNoMarginStyle',
-            ColumnHeaderClassName = 'bi-table-column-header',
-            RowClassName = 'bi-table-row',
-            LastRowClassName = 'bi-table-last-row',
-            FooterClassName = 'bi-table-footer',
-            NumericCellClassName = ' bi-table-cell-numeric',
-            EmptyHeaderCell = '\xa0';
+            SelectorContainer = '.tablixDashboard',
+            host = powerbitests.mocks.createVisualHostServices();
 
         beforeEach(() => {
 
@@ -1510,12 +2447,12 @@ module powerbitests {
         });
 
         beforeEach(() => {
-            element = powerbitests.helpers.testDom('500', '500');
-            element['visible'] = () => { return false; };
-            v = webPluginService.getPlugin('table').create();
+            element = powerbitests.helpers.testDom("500", "500");
+            element["visible"] = () => { return false; };
+            v = dashboardPluginService.getPlugin("table").create();
             v.init({
                 element: element,
-                host: powerbitests.mocks.createVisualHostServices(),
+                host: host,
                 style: powerbi.visuals.visualStyles.create(),
                 viewport: {
                     height: element.height(),
@@ -1529,56 +2466,200 @@ module powerbitests {
         });
 
         function validateTable(expectedValues: string[][]): void {
-            tablixHelper.validateTable(expectedValues, '.bi-dashboard-tablix tr');
-        }
-
-        function validateChildTag(expectedChildTag: string[][]): void {
-            var rows = $('.bi-dashboard-tablix tr');
-
-            var result: string[][] = [];
-
-            for (var i = 0, ilen = rows.length; i < ilen; i++) {
-                result[i] = [];
-                var cells = rows.eq(i).find('td');
-                for (var j = 0, jlen = cells.length; j < jlen; j++) {
-                    var childTag = expectedChildTag[i][j];
-                    if (childTag) {
-                        var child = cells.eq(j).find(childTag);
-                        if (child.length > 0)
-                            result[i][j] = childTag;
-                        else
-                            result[i][j] = undefined;
-                    }
-                    else
-                        result[i][j] = undefined;
-                }
-            }
-
-            expect(result).toEqual(expectedChildTag);
+            tablixHelper.validateTable(expectedValues, ".tablixDashboard tr");
         }
 
         function validateClassNames(expectedValues: string[][]): void {
-            tablixHelper.validateClassNames(expectedValues, '.bi-dashboard-tablix tr', NoMarginClass);
+            tablixHelper.validateClassNames(expectedValues, ".tablixDashboard tr");
         }
 
-        it('1x2 table (one measure)',(done) => {
+        describe('text size', () => {
+            describe('default', () => {
+                it('font size set on container', (done) => {
+                    let newMeasureSource2: DataViewMetadataColumn = {
+                        displayName: "measure2",
+                        queryName: "measure2",
+                        type: dataTypeNumber,
+                        isMeasure: true,
+                        index: 4,
+                        objects: {
+                            general: {
+                                formatString: "#.00",
+                                columnWidth: 45,
+                            },
+                        },
+                    };
 
-            var dataView = tableOneMeasure;
-            v.onDataChanged({ dataViews: [dataView] });
+                    // AutoSize property off
+                    v.onDataChanged({
+                        dataViews: [{
+                            metadata: {
+                                columns: [measureSource1, newMeasureSource2, measureSource3],
+                                objects: {
+                                    general: {
+                                        totals: true,
+                                        autoSizeColumnWidth: false,
+                                    }
+                                }
+                            },
+                            table: dataViewTableThreeMeasures
+                        }]
+                    });
+                    setTimeout(() => {
+                        let actualFontSize = element.find(`${SelectorContainer}`).css('font-size');
+                        tablixHelper.validateFontSize(actualFontSize, 8);
+                        done();
+                    }, DefaultWaitForRender);
+                });
+
+                it("2x8 table with default text size row height", (done) => {
+                    let dataView = tableTwoGroups;
+                    v.onDataChanged({ dataViews: [dataView] });
+
+                    setTimeout(() => {
+                        let cells = element
+                            .find(`${SelectorHeaderCell}, ${SelectorBodyCell}, ${SelectorBodyCellLast}`);
+
+                        expect(cells.length).toBe(16);
+                        tablixHelper.validateCellHeights(cells, 14);
+
+                        done();
+                    }, DefaultWaitForRender);
+                });
+            });
+
+            describe('specified', () => {
+                it('font size set on container', (done) => {
+                    let newMeasureSource2: DataViewMetadataColumn = {
+                        displayName: "measure2",
+                        queryName: "measure2",
+                        type: dataTypeNumber,
+                        isMeasure: true,
+                        index: 4,
+                        objects: {
+                            general: {
+                                formatString: "#.00",
+                                columnWidth: 45,
+                            },
+                        },
+                    };
+
+                    // AutoSize property off
+                    v.onDataChanged({
+                        dataViews: [{
+                            metadata: {
+                                columns: [measureSource1, newMeasureSource2, measureSource3],
+                                objects: {
+                                    general: {
+                                        totals: true,
+                                        autoSizeColumnWidth: false,
+                                        textSize: 18,
+                                    }
+                                }
+                            },
+                            table: dataViewTableThreeMeasures,
+                        }]
+                    });
+                    setTimeout(() => {
+                        let actualFontSize = element.find(`${SelectorContainer}`).css('font-size');
+                        tablixHelper.validateFontSize(actualFontSize, 18);
+                        done();
+                    }, DefaultWaitForRender);
+                });
+
+                it("2x8 table with specified text size adjusted row height", (done) => {
+                    let dataView = tableTwoGroupsIncreasedFontSize;
+                    v.onDataChanged({ dataViews: [dataView] });
+
+                    setTimeout(() => {
+                        let cells = element
+                            .find(`${SelectorHeaderCell}, ${SelectorBodyCell}, ${SelectorBodyCellLast}`);
+
+                        expect(cells.length).toBe(16);
+                        tablixHelper.validateCellHeights(cells, 21);
+
+                        done();
+                    }, DefaultWaitForRender);
+                });
+
+                it("5x9 table with text size scaling factor adjusts minimum column width", (done) => {
+                    let dataView = tableTwoGroupsThreeMeasuresIncreasedFontSize;
+                    measureSource1.index = 2;
+                    measureSource2.index = 3;
+                    measureSource3.index = 4;
+
+                    v.onDataChanged({ dataViews: [dataView] });
+
+                    setTimeout(() => {
+                        // Dashboard crops out columns which do not fit (minimum width based on text size)
+                        let cellValue1: string = formatter(dataView.table.rows[0][2], measureSource1);
+                        let cellValue2: string = formatter(dataView.table.rows[1][2], measureSource1);
+                        let cellValue3: string = formatter(dataView.table.rows[2][2], measureSource1);
+                        let cellValue4: string = formatter(dataView.table.rows[3][2], measureSource1);
+                        let cellValue5: string = formatter(dataView.table.rows[4][2], measureSource1);
+                        let cellValue6: string = formatter(dataView.table.rows[5][2], measureSource1);
+                        let cellValue7: string = formatter(dataView.table.rows[6][2], measureSource1);
+                        let cellValue8: string = formatter(dataView.table.rows[0][3], measureSource2);
+                        let cellValue9: string = formatter(dataView.table.rows[1][3], measureSource2);
+                        let cellValue10: string = formatter(dataView.table.rows[2][3], measureSource2);
+                        let cellValue11: string = formatter(dataView.table.rows[3][3], measureSource2);
+                        let cellValue12: string = formatter(dataView.table.rows[4][3], measureSource2);
+                        let cellValue13: string = formatter(dataView.table.rows[5][3], measureSource2);
+                        let cellValue14: string = formatter(dataView.table.rows[6][3], measureSource2);
+
+                        let total1: string = formatter(dataView.table.totals[2], measureSource1);
+                        let total2: string = formatter(dataView.table.totals[3], measureSource2);
+
+                        let expectedCells: string[][] = [
+                            [groupSource1.displayName, groupSource2.displayName, measureSource1.displayName, measureSource2.displayName],
+                            [dataView.table.rows[0][0], dataView.table.rows[0][1], cellValue1, cellValue8],
+                            [dataView.table.rows[1][0], dataView.table.rows[1][1], cellValue2, cellValue9],
+                            [dataView.table.rows[2][0], dataView.table.rows[2][1], cellValue3, cellValue10],
+                            [dataView.table.rows[3][0], dataView.table.rows[3][1], cellValue4, cellValue11],
+                            [dataView.table.rows[4][0], dataView.table.rows[4][1], cellValue5, cellValue12],
+                            [dataView.table.rows[5][0], dataView.table.rows[5][1], cellValue6, cellValue13],
+                            [dataView.table.rows[6][0], dataView.table.rows[6][1], cellValue7, cellValue14],
+                            ["Total", EmptyHeaderCell, total1, total2],
+                        ];
+
+                        validateTable(expectedCells);
+
+                        let expectedClassNames: string[][] = [
+                            [ColumnHeaderClassNameIconHidden, ColumnHeaderClassNameIconHidden, ColumnHeaderClassNameIconHidden, ColumnHeaderClassNameIconHidden],
+                            [RowClassName, RowClassName, RowClassName + CssClassTablixValueNumeric, RowClassName + CssClassTablixValueNumeric],
+                            [RowClassName, RowClassName, RowClassName + CssClassTablixValueNumeric, RowClassName + CssClassTablixValueNumeric],
+                            [RowClassName, RowClassName, RowClassName + CssClassTablixValueNumeric, RowClassName + CssClassTablixValueNumeric],
+                            [RowClassName, RowClassName, RowClassName + CssClassTablixValueNumeric, RowClassName + CssClassTablixValueNumeric],
+                            [RowClassName, RowClassName, RowClassName + CssClassTablixValueNumeric, RowClassName + CssClassTablixValueNumeric],
+                            [RowClassName, RowClassName, RowClassName + CssClassTablixValueNumeric, RowClassName + CssClassTablixValueNumeric],
+                            [LastRowClassName, LastRowClassName, LastRowClassName + CssClassTablixValueNumeric, LastRowClassName + CssClassTablixValueNumeric],
+                            [FooterClassName, FooterClassName, FooterClassName + CssClassTablixValueNumeric, FooterClassName + CssClassTablixValueNumeric],
+                        ];
+
+                        validateClassNames(expectedClassNames);
+
+                        done();
+                    }, DefaultWaitForRender);
+                });
+            });
+        });
+
+        it("1x2 table (one measure)", (done) => {
+            v.onDataChanged({ dataViews: [tableOneMeasure] });
 
             setTimeout(() => {
 
-                var cellValue: string = formatter(dataView.table.rows[0][0], measureSource1);
-                var expectedCells: string[][] = [
-                    ['', measureSource1.displayName],
-                    ['', cellValue]
+                let cellValue: string = formatter(tableOneMeasure.table.rows[0][0], measureSource1);
+                let expectedCells: string[][] = [
+                    [measureSource1.displayName],
+                    [cellValue]
                 ];
 
                 validateTable(expectedCells);
 
-                var expectedClassNames: string[][] = [
-                    ['', ColumnHeaderClassName + NumericCellClassName],
-                    ['', LastRowClassName + NumericCellClassName]
+                let expectedClassNames: string[][] = [
+                    [ColumnHeaderClassNameIconHidden],
+                    [LastRowClassName + CssClassTablixValueNumeric]
                 ];
 
                 validateClassNames(expectedClassNames);
@@ -1587,16 +2668,14 @@ module powerbitests {
             }, DefaultWaitForRender);
         });
 
-        it('1x2 table (one group null)',(done) => {
-
-            var dataView = tableOneGroupNulls;
-            v.onDataChanged({ dataViews: [dataView] });
+        it("1x2 table (one group null)", (done) => {
+            v.onDataChanged({ dataViews: [tableOneGroupNulls] });
 
             setTimeout(() => {
-                var expectedCells: string[][] = [
-                    ['', groupSource1.displayName],
-                    [EmptyHeaderCell, ''],
-                    [EmptyHeaderCell, '']
+                let expectedCells: string[][] = [
+                    [groupSource1.displayName],
+                    [EmptyHeaderCell],
+                    [EmptyHeaderCell]
                 ];
 
                 validateTable(expectedCells);
@@ -1604,19 +2683,17 @@ module powerbitests {
             }, DefaultWaitForRender);
         });
 
-        it('3x5 table (2 groups 1 measure nulls)',(done) => {
-
-            var dataView = tableTwoGroups1MeasureNulls;
-            v.onDataChanged({ dataViews: [dataView] });
+        it("3x5 table (2 groups 1 measure nulls)", (done) => {
+            v.onDataChanged({ dataViews: [tableTwoGroups1MeasureNulls] });
 
             setTimeout(() => {
-                var expectedCells: string[][] = [
-                    ['', groupSource1.displayName, groupSource2.displayName, measureSource1.displayName],
-                    ['', 'A', 'a1', '100.0'],
-                    ['', '', '', '103.0'],
-                    ['', '', 'a3', '106.0'],
-                    ['', 'B', '', '112.0'],
-                    [EmptyHeaderCell, '', '', '']
+                let expectedCells: string[][] = [
+                    [groupSource1.displayName, groupSource2.displayName, measureSource1.displayName],
+                    ["A", "a1", "100.0"],
+                    [EmptyHeaderCell, EmptyHeaderCell, "103.0"],
+                    [EmptyHeaderCell, "a3", "106.0"],
+                    ["B", EmptyHeaderCell, "112.0"],
+                    [EmptyHeaderCell, EmptyHeaderCell, EmptyHeaderCell]
                 ];
 
                 validateTable(expectedCells);
@@ -1624,30 +2701,30 @@ module powerbitests {
             }, DefaultWaitForRender);
         });
 
-        it('1x3 table (group instances)',(done) => {
+        it("1x3 table (group instances)", (done) => {
 
-            var dataView = tableOneGroup;
+            let dataView = tableOneGroup;
             v.onDataChanged({ dataViews: [dataView] });
 
             setTimeout(() => {
 
-                var cellValue1: string = formatter(dataView.table.rows[0][0], groupSource1);
-                var cellValue2: string = formatter(dataView.table.rows[1][0], groupSource1);
-                var cellValue3: string = formatter(dataView.table.rows[2][0], groupSource1);
-                var expectedCells: string[][] = [
-                    ['', groupSource1.displayName],
-                    ['', cellValue1],
-                    ['', cellValue2],
-                    ['', cellValue3]
+                let cellValue1: string = formatter(dataView.table.rows[0][0], groupSource1);
+                let cellValue2: string = formatter(dataView.table.rows[1][0], groupSource1);
+                let cellValue3: string = formatter(dataView.table.rows[2][0], groupSource1);
+                let expectedCells: string[][] = [
+                    [groupSource1.displayName],
+                    [cellValue1],
+                    [cellValue2],
+                    [cellValue3]
                 ];
 
                 validateTable(expectedCells);
 
-                var expectedClassNames: string[][] = [
-                    ['', ColumnHeaderClassName],
-                    ['', RowClassName],
-                    ['', RowClassName],
-                    ['', LastRowClassName]
+                let expectedClassNames: string[][] = [
+                    [ColumnHeaderClassNameIconHidden],
+                    [RowClassName],
+                    [RowClassName],
+                    [LastRowClassName]
                 ];
 
                 validateClassNames(expectedClassNames);
@@ -1656,37 +2733,37 @@ module powerbitests {
             }, DefaultWaitForRender);
         });
 
-        it('2x8 table (group instances)',(done) => {
+        it("2x8 table (group instances)", (done) => {
 
-            var dataView = tableTwoGroups;
+            let dataView = tableTwoGroups;
             v.onDataChanged({ dataViews: [dataView] });
 
             setTimeout(() => {
 
-                var cellValue1: string = formatter(dataView.table.rows[0][0], groupSource1);
-                var cellValue2: string = formatter(dataView.table.rows[1][0], groupSource1);
-                var cellValue3: string = formatter(dataView.table.rows[2][0], groupSource1);
-                var cellValue4: string = formatter(dataView.table.rows[3][0], groupSource1);
-                var cellValue5: string = formatter(dataView.table.rows[4][0], groupSource1);
-                var cellValue6: string = formatter(dataView.table.rows[5][0], groupSource1);
-                var cellValue7: string = formatter(dataView.table.rows[6][0], groupSource1);
-                var cellValue8: string = formatter(dataView.table.rows[0][1], groupSource2);
-                var cellValue9: string = formatter(dataView.table.rows[1][1], groupSource2);
-                var cellValue10: string = formatter(dataView.table.rows[2][1], groupSource2);
-                var cellValue11: string = formatter(dataView.table.rows[3][1], groupSource2);
-                var cellValue12: string = formatter(dataView.table.rows[4][1], groupSource2);
-                var cellValue13: string = formatter(dataView.table.rows[5][1], groupSource2);
-                var cellValue14: string = formatter(dataView.table.rows[6][1], groupSource2);
+                let cellValue1: string = formatter(dataView.table.rows[0][0], groupSource1);
+                let cellValue2: string = formatter(dataView.table.rows[1][0], groupSource1);
+                let cellValue3: string = formatter(dataView.table.rows[2][0], groupSource1);
+                let cellValue4: string = formatter(dataView.table.rows[3][0], groupSource1);
+                let cellValue5: string = formatter(dataView.table.rows[4][0], groupSource1);
+                let cellValue6: string = formatter(dataView.table.rows[5][0], groupSource1);
+                let cellValue7: string = formatter(dataView.table.rows[6][0], groupSource1);
+                let cellValue8: string = formatter(dataView.table.rows[0][1], groupSource2);
+                let cellValue9: string = formatter(dataView.table.rows[1][1], groupSource2);
+                let cellValue10: string = formatter(dataView.table.rows[2][1], groupSource2);
+                let cellValue11: string = formatter(dataView.table.rows[3][1], groupSource2);
+                let cellValue12: string = formatter(dataView.table.rows[4][1], groupSource2);
+                let cellValue13: string = formatter(dataView.table.rows[5][1], groupSource2);
+                let cellValue14: string = formatter(dataView.table.rows[6][1], groupSource2);
 
-                var expectedCells: string[][] = [
-                    ['', groupSource1.displayName, groupSource2.displayName],
-                    ['', cellValue1, cellValue8],
-                    ['', cellValue2, cellValue9],
-                    ['', cellValue3, cellValue10],
-                    ['', cellValue4, cellValue11],
-                    ['', cellValue5, cellValue12],
-                    ['', cellValue6, cellValue13],
-                    ['', cellValue7, cellValue14]
+                let expectedCells: string[][] = [
+                    [groupSource1.displayName, groupSource2.displayName],
+                    [cellValue1, cellValue8],
+                    [cellValue2, cellValue9],
+                    [cellValue3, cellValue10],
+                    [cellValue4, cellValue11],
+                    [cellValue5, cellValue12],
+                    [cellValue6, cellValue13],
+                    [cellValue7, cellValue14]
                 ];
 
                 validateTable(expectedCells);
@@ -1695,9 +2772,9 @@ module powerbitests {
             }, DefaultWaitForRender);
         });
 
-        it('5x9 table (group instances and measure values) with totals',(done) => {
+        it("5x9 table (group instances and measure values) with totals", (done) => {
 
-            var dataView = tableTwoGroupsThreeMeasures;
+            let dataView = tableTwoGroupsThreeMeasures;
             measureSource1.index = 2;
             measureSource2.index = 3;
             measureSource3.index = 4;
@@ -1706,56 +2783,56 @@ module powerbitests {
 
             setTimeout(() => {
 
-                var cellValue1: string = formatter(dataView.table.rows[0][2], measureSource1);
-                var cellValue2: string = formatter(dataView.table.rows[1][2], measureSource1);
-                var cellValue3: string = formatter(dataView.table.rows[2][2], measureSource1);
-                var cellValue4: string = formatter(dataView.table.rows[3][2], measureSource1);
-                var cellValue5: string = formatter(dataView.table.rows[4][2], measureSource1);
-                var cellValue6: string = formatter(dataView.table.rows[5][2], measureSource1);
-                var cellValue7: string = formatter(dataView.table.rows[6][2], measureSource1);
-                var cellValue8: string = formatter(dataView.table.rows[0][3], measureSource2);
-                var cellValue9: string = formatter(dataView.table.rows[1][3], measureSource2);
-                var cellValue10: string = formatter(dataView.table.rows[2][3], measureSource2);
-                var cellValue11: string = formatter(dataView.table.rows[3][3], measureSource2);
-                var cellValue12: string = formatter(dataView.table.rows[4][3], measureSource2);
-                var cellValue13: string = formatter(dataView.table.rows[5][3], measureSource2);
-                var cellValue14: string = formatter(dataView.table.rows[6][3], measureSource2);
-                var cellValue15: string = formatter(dataView.table.rows[0][4], measureSource3);
-                var cellValue16: string = formatter(dataView.table.rows[1][4], measureSource3);
-                var cellValue17: string = formatter(dataView.table.rows[2][4], measureSource3);
-                var cellValue18: string = formatter(dataView.table.rows[3][4], measureSource3);
-                var cellValue19: string = formatter(dataView.table.rows[4][4], measureSource3);
-                var cellValue20: string = formatter(dataView.table.rows[5][4], measureSource3);
-                var cellValue21: string = formatter(dataView.table.rows[6][4], measureSource3);
+                let cellValue1: string = formatter(dataView.table.rows[0][2], measureSource1);
+                let cellValue2: string = formatter(dataView.table.rows[1][2], measureSource1);
+                let cellValue3: string = formatter(dataView.table.rows[2][2], measureSource1);
+                let cellValue4: string = formatter(dataView.table.rows[3][2], measureSource1);
+                let cellValue5: string = formatter(dataView.table.rows[4][2], measureSource1);
+                let cellValue6: string = formatter(dataView.table.rows[5][2], measureSource1);
+                let cellValue7: string = formatter(dataView.table.rows[6][2], measureSource1);
+                let cellValue8: string = formatter(dataView.table.rows[0][3], measureSource2);
+                let cellValue9: string = formatter(dataView.table.rows[1][3], measureSource2);
+                let cellValue10: string = formatter(dataView.table.rows[2][3], measureSource2);
+                let cellValue11: string = formatter(dataView.table.rows[3][3], measureSource2);
+                let cellValue12: string = formatter(dataView.table.rows[4][3], measureSource2);
+                let cellValue13: string = formatter(dataView.table.rows[5][3], measureSource2);
+                let cellValue14: string = formatter(dataView.table.rows[6][3], measureSource2);
+                let cellValue15: string = formatter(dataView.table.rows[0][4], measureSource3);
+                let cellValue16: string = formatter(dataView.table.rows[1][4], measureSource3);
+                let cellValue17: string = formatter(dataView.table.rows[2][4], measureSource3);
+                let cellValue18: string = formatter(dataView.table.rows[3][4], measureSource3);
+                let cellValue19: string = formatter(dataView.table.rows[4][4], measureSource3);
+                let cellValue20: string = formatter(dataView.table.rows[5][4], measureSource3);
+                let cellValue21: string = formatter(dataView.table.rows[6][4], measureSource3);
 
-                var total1: string = formatter(dataView.table.totals[2], measureSource1);
-                var total2: string = formatter(dataView.table.totals[3], measureSource2);
-                var total3: string = formatter(dataView.table.totals[4], measureSource3);
+                let total1: string = formatter(dataView.table.totals[2], measureSource1);
+                let total2: string = formatter(dataView.table.totals[3], measureSource2);
+                let total3: string = formatter(dataView.table.totals[4], measureSource3);
 
-                var expectedCells: string[][] = [
-                    ['', groupSource1.displayName, groupSource2.displayName, measureSource1.displayName, measureSource2.displayName, measureSource3.displayName],
-                    ['', dataView.table.rows[0][0], dataView.table.rows[0][1], cellValue1, cellValue8, cellValue15],
-                    ['', dataView.table.rows[1][0], dataView.table.rows[1][1], cellValue2, cellValue9, cellValue16],
-                    ['', dataView.table.rows[2][0], dataView.table.rows[2][1], cellValue3, cellValue10, cellValue17],
-                    ['', dataView.table.rows[3][0], dataView.table.rows[3][1], cellValue4, cellValue11, cellValue18],
-                    ['', dataView.table.rows[4][0], dataView.table.rows[4][1], cellValue5, cellValue12, cellValue19],
-                    ['', dataView.table.rows[5][0], dataView.table.rows[5][1], cellValue6, cellValue13, cellValue20],
-                    ['', dataView.table.rows[6][0], dataView.table.rows[6][1], cellValue7, cellValue14, cellValue21],
-                    ['', 'Total', '', total1, total2, total3]
+                let expectedCells: string[][] = [
+                    [groupSource1.displayName, groupSource2.displayName, measureSource1.displayName, measureSource2.displayName, measureSource3.displayName],
+                    [dataView.table.rows[0][0], dataView.table.rows[0][1], cellValue1, cellValue8, cellValue15],
+                    [dataView.table.rows[1][0], dataView.table.rows[1][1], cellValue2, cellValue9, cellValue16],
+                    [dataView.table.rows[2][0], dataView.table.rows[2][1], cellValue3, cellValue10, cellValue17],
+                    [dataView.table.rows[3][0], dataView.table.rows[3][1], cellValue4, cellValue11, cellValue18],
+                    [dataView.table.rows[4][0], dataView.table.rows[4][1], cellValue5, cellValue12, cellValue19],
+                    [dataView.table.rows[5][0], dataView.table.rows[5][1], cellValue6, cellValue13, cellValue20],
+                    [dataView.table.rows[6][0], dataView.table.rows[6][1], cellValue7, cellValue14, cellValue21],
+                    ["Total", EmptyHeaderCell, total1, total2, total3]
                 ];
 
                 validateTable(expectedCells);
 
-                var expectedClassNames: string[][] = [
-                    ['', ColumnHeaderClassName, ColumnHeaderClassName, ColumnHeaderClassName + NumericCellClassName, ColumnHeaderClassName + NumericCellClassName, ColumnHeaderClassName + NumericCellClassName],
-                    ['', RowClassName, RowClassName, RowClassName + NumericCellClassName, RowClassName + NumericCellClassName, RowClassName + NumericCellClassName],
-                    ['', RowClassName, RowClassName, RowClassName + NumericCellClassName, RowClassName + NumericCellClassName, RowClassName + NumericCellClassName],
-                    ['', RowClassName, RowClassName, RowClassName + NumericCellClassName, RowClassName + NumericCellClassName, RowClassName + NumericCellClassName],
-                    ['', RowClassName, RowClassName, RowClassName + NumericCellClassName, RowClassName + NumericCellClassName, RowClassName + NumericCellClassName],
-                    ['', RowClassName, RowClassName, RowClassName + NumericCellClassName, RowClassName + NumericCellClassName, RowClassName + NumericCellClassName],
-                    ['', RowClassName, RowClassName, RowClassName + NumericCellClassName, RowClassName + NumericCellClassName, RowClassName + NumericCellClassName],
-                    ['', LastRowClassName, LastRowClassName, LastRowClassName + NumericCellClassName, LastRowClassName + NumericCellClassName, LastRowClassName + NumericCellClassName],
-                    ['', FooterClassName, FooterClassName, FooterClassName + NumericCellClassName, FooterClassName + NumericCellClassName, FooterClassName + NumericCellClassName]
+                let expectedClassNames: string[][] = [
+                    [ColumnHeaderClassNameIconHidden, ColumnHeaderClassNameIconHidden, ColumnHeaderClassNameIconHidden, ColumnHeaderClassNameIconHidden, ColumnHeaderClassNameIconHidden],
+                    [RowClassName, RowClassName, RowClassName + CssClassTablixValueNumeric, RowClassName + CssClassTablixValueNumeric, RowClassName + CssClassTablixValueNumeric],
+                    [RowClassName, RowClassName, RowClassName + CssClassTablixValueNumeric, RowClassName + CssClassTablixValueNumeric, RowClassName + CssClassTablixValueNumeric],
+                    [RowClassName, RowClassName, RowClassName + CssClassTablixValueNumeric, RowClassName + CssClassTablixValueNumeric, RowClassName + CssClassTablixValueNumeric],
+                    [RowClassName, RowClassName, RowClassName + CssClassTablixValueNumeric, RowClassName + CssClassTablixValueNumeric, RowClassName + CssClassTablixValueNumeric],
+                    [RowClassName, RowClassName, RowClassName + CssClassTablixValueNumeric, RowClassName + CssClassTablixValueNumeric, RowClassName + CssClassTablixValueNumeric],
+                    [RowClassName, RowClassName, RowClassName + CssClassTablixValueNumeric, RowClassName + CssClassTablixValueNumeric, RowClassName + CssClassTablixValueNumeric],
+                    [LastRowClassName, LastRowClassName, LastRowClassName + CssClassTablixValueNumeric, LastRowClassName + CssClassTablixValueNumeric, LastRowClassName + CssClassTablixValueNumeric],
+                    [FooterClassName, FooterClassName, FooterClassName + CssClassTablixValueNumeric, FooterClassName + CssClassTablixValueNumeric, FooterClassName + CssClassTablixValueNumeric]
                 ];
 
                 validateClassNames(expectedClassNames);
@@ -1764,9 +2841,9 @@ module powerbitests {
             }, DefaultWaitForRender);
         });
 
-        it('2x5 table (group instances and measure values) with totals, total value comes first',(done) => {
+        it("2x5 table (group instances and measure values) with totals, total value comes first", (done) => {
 
-            var dataView = tableOneMeasureOneGroupSubtotals;
+            let dataView = tableOneMeasureOneGroupSubtotals;
             measureSource1.index = 0;
             groupSource1.index = 1;
 
@@ -1774,28 +2851,28 @@ module powerbitests {
 
             setTimeout(() => {
 
-                var cellValue1: string = formatter(dataView.table.rows[0][0], measureSource1);
-                var cellValue2: string = formatter(dataView.table.rows[1][0], measureSource1);
-                var cellValue3: string = formatter(dataView.table.rows[2][0], measureSource1);
+                let cellValue1: string = formatter(dataView.table.rows[0][0], measureSource1);
+                let cellValue2: string = formatter(dataView.table.rows[1][0], measureSource1);
+                let cellValue3: string = formatter(dataView.table.rows[2][0], measureSource1);
 
-                var total: string = formatter(dataView.table.totals[0], measureSource1);
+                let total: string = formatter(dataView.table.totals[0], measureSource1);
 
-                var expectedCells: string[][] = [
-                    ['', measureSource1.displayName, groupSource1.displayName],
-                    ['', cellValue1, dataView.table.rows[0][1]],
-                    ['', cellValue2, dataView.table.rows[1][1]],
-                    ['', cellValue3, dataView.table.rows[2][1]],
-                    ['', total, '']
+                let expectedCells: string[][] = [
+                    [measureSource1.displayName, groupSource1.displayName],
+                    [cellValue1, dataView.table.rows[0][1]],
+                    [cellValue2, dataView.table.rows[1][1]],
+                    [cellValue3, dataView.table.rows[2][1]],
+                    [total, EmptyHeaderCell]
                 ];
 
                 validateTable(expectedCells);
 
-                var expectedClassNames: string[][] = [
-                    ['', ColumnHeaderClassName + NumericCellClassName, ColumnHeaderClassName],
-                    ['', RowClassName + NumericCellClassName, RowClassName],
-                    ['', RowClassName + NumericCellClassName, RowClassName],
-                    ['', LastRowClassName + NumericCellClassName, LastRowClassName],
-                    ['', FooterClassName + NumericCellClassName, FooterClassName]
+                let expectedClassNames: string[][] = [
+                    [ColumnHeaderClassNameIconHidden, ColumnHeaderClassNameIconHidden],
+                    [RowClassName + CssClassTablixValueNumeric, RowClassName],
+                    [RowClassName + CssClassTablixValueNumeric, RowClassName],
+                    [LastRowClassName + CssClassTablixValueNumeric, LastRowClassName],
+                    [FooterClassName + CssClassTablixValueNumeric, FooterClassName]
                 ];
 
                 validateClassNames(expectedClassNames);
@@ -1804,9 +2881,9 @@ module powerbitests {
             }, DefaultWaitForRender);
         });
 
-        it('2x5 table (group instances and measure values) totals on then off',(done) => {
+        it("2x5 table (group instances and measure values) totals on then off", (done) => {
 
-            var dataView = tableOneMeasureOneGroupSubtotals;
+            let dataView = tableOneMeasureOneGroupSubtotals;
             measureSource1.index = 0;
             groupSource1.index = 1;
 
@@ -1814,34 +2891,34 @@ module powerbitests {
 
             setTimeout(() => {
 
-                var cellValue1: string = formatter(dataView.table.rows[0][0], measureSource1);
-                var cellValue2: string = formatter(dataView.table.rows[1][0], measureSource1);
-                var cellValue3: string = formatter(dataView.table.rows[2][0], measureSource1);
+                let cellValue1: string = formatter(dataView.table.rows[0][0], measureSource1);
+                let cellValue2: string = formatter(dataView.table.rows[1][0], measureSource1);
+                let cellValue3: string = formatter(dataView.table.rows[2][0], measureSource1);
 
-                var total: string = formatter(dataView.table.totals[0], measureSource1);
+                let total: string = formatter(dataView.table.totals[0], measureSource1);
 
-                var expectedCells: string[][] = [
-                    ['', measureSource1.displayName, groupSource1.displayName],
-                    ['', cellValue1, dataView.table.rows[0][1]],
-                    ['', cellValue2, dataView.table.rows[1][1]],
-                    ['', cellValue3, dataView.table.rows[2][1]],
-                    ['', total, '']
+                let expectedCells: string[][] = [
+                    [measureSource1.displayName, groupSource1.displayName],
+                    [cellValue1, dataView.table.rows[0][1]],
+                    [cellValue2, dataView.table.rows[1][1]],
+                    [cellValue3, dataView.table.rows[2][1]],
+                    [total, EmptyHeaderCell]
                 ];
 
                 validateTable(expectedCells);
 
                 // Now update with totals off
-                var dataViewNoTotal = tableOneMeasureOneGroup;
+                let dataViewNoTotal = tableOneMeasureOneGroup;
 
                 v.onDataChanged({ dataViews: [dataViewNoTotal] });
 
                 setTimeout(() => {
 
-                    var expectedCellsNoTotal: string[][] = [
-                        ['', measureSource1.displayName, groupSource1.displayName],
-                        ['', cellValue1, dataViewNoTotal.table.rows[0][1]],
-                        ['', cellValue2, dataViewNoTotal.table.rows[1][1]],
-                        ['', cellValue3, dataViewNoTotal.table.rows[2][1]]
+                    let expectedCellsNoTotal: string[][] = [
+                        [measureSource1.displayName, groupSource1.displayName],
+                        [cellValue1, dataViewNoTotal.table.rows[0][1]],
+                        [cellValue2, dataViewNoTotal.table.rows[1][1]],
+                        [cellValue3, dataViewNoTotal.table.rows[2][1]]
                     ];
 
                     validateTable(expectedCellsNoTotal);
@@ -1852,103 +2929,148 @@ module powerbitests {
             }, DefaultWaitForRender);
         });
 
-        it('1x3 table (group instances with WebUrl)',(done) => {
-            var dataView = tableWebUrl;
+        it("1x3 table (group instances with WebUrl)", (done) => {
+            let dataView = tableWebUrl;
             v.onDataChanged({ dataViews: [dataView] });
 
             setTimeout(() => {
 
-                var cellValue1: string = formatter(dataView.table.rows[0][0], groupSourceWebUrl);
-                var cellValue2: string = formatter(dataView.table.rows[1][0], groupSourceWebUrl);
-                var cellValue3: string = formatter(dataView.table.rows[2][0], groupSourceWebUrl);
-                var expectedCells: string[][] = [
-                    ['', groupSourceWebUrl.displayName],
-                    ['', cellValue1],
-                    ['', cellValue2],
-                    ['', cellValue3]
+                let cellValue1: string = formatter(dataView.table.rows[0][0], groupSourceWebUrl);
+                let cellValue2: string = formatter(dataView.table.rows[1][0], groupSourceWebUrl);
+                let cellValue3: string = formatter(dataView.table.rows[2][0], groupSourceWebUrl);
+                let expectedCells: string[][] = [
+                    [groupSourceWebUrl.displayName],
+                    [cellValue1],
+                    [cellValue2],
+                    [cellValue3]
                 ];
 
                 validateTable(expectedCells);
 
-                var expectedClassNames: string[][] = [
-                    ['', ColumnHeaderClassName],
-                    ['', RowClassName],
-                    ['', RowClassName],
-                    ['', LastRowClassName]
+                let expectedClassNames: string[][] = [
+                    [ColumnHeaderClassNameIconHidden],
+                    [RowClassName],
+                    [RowClassName],
+                    [LastRowClassName]
                 ];
 
                 validateClassNames(expectedClassNames);
 
-                var expectedChildTags: string[][] = [
-                    [undefined, undefined],
-                    [undefined, 'A'],
-                    [undefined, undefined],
-                    [undefined, 'A']
+                let expectedChildTags: string[][] = [
+                    [undefined],
+                    ["A"],
+                    [undefined],
+                    ["A"]
                 ];
 
-                validateChildTag(expectedChildTags);
+                validateChildTag(expectedChildTags, $(".tablixDashboard tr"));
 
                 done();
             }, DefaultWaitForRender);
         });
 
-        function formatter(value: any, source: DataViewMetadataColumn): string {
-            return valueFormatter.formatRaw(value, valueFormatter.getFormatString(source, Table.formatStringProp, false));
-        }
+        it("dashboard table has no sort icons", (done) => {
+            let dataView = tableOneMeasurSortAscending;
+            v.onDataChanged({ dataViews: [dataView] });
+            setTimeout(() => {
+                let sortIcons = element.find(".caret-down, .caret-up");
+                expect(sortIcons.length).toEqual(0);
+                done();
+            }, DefaultWaitForRender);
+        });
     });
 
-    describe("Table sort validation",() => {
-        var element: JQuery;
+    describe("Table sort validation", () => {
+        let element: JQuery;
 
         beforeEach((done) => {
-            element = powerbitests.helpers.testDom('800', '800');
-            element['visible'] = () => { return true; };
+            element = powerbitests.helpers.testDom("800", "800");
+            element["visible"] = () => { return true; };
             done();
         });
 
-        it('table with single measure',(done) => {
+        it("table with single measure", (done) => {
             // Clicking on the measure will result in a sort event
-            var data: DataView = tableOneMeasure;
-            var expectedColumnHeaders = [{ row: 0, col: 1, expectedText: "measure1" }];
-            var clicks = [{ row: 0, col: 1 }, { row: 1, col: 1 }];
-            var expectedSorts = [
-                [{ queryName: "measure1" }]
+            let data: DataView = tableOneMeasure;
+            let expectedColumnHeaders = [{ row: 0, col: 1, expectedText: "measure1" }];
+            let clicks = [{ row: 0, col: 1 }, { row: 1, col: 1 }];
+            let expectedSorts = [
+                [{ queryName: "measure1", sortDirection: powerbi.SortDirection.Descending }]
             ];
-            tablixHelper.runTablixSortTest(element, done, 'table', data, expectedColumnHeaders, clicks, expectedSorts);
+            tablixHelper.runTablixSortTest(element, done, "table", data, expectedColumnHeaders, clicks, expectedSorts);
         });
 
-        it('table with single group',(done) => {
+        it("table with single group", (done) => {
             // Clicking on the group header multiple times will result in multiple sort events.
             // Clicking on non-header cells will not result in sort events.
-            var data: DataView = tableOneGroup;
-            var expectedColumnHeaders = [{ row: 0, col: 1, expectedText: "group1" }];
-            var clicks = [{ row: 0, col: 1 }, { row: 1, col: 1 }, { row: 2, col: 1 }, { row: 0, col: 1 }];
-            var expectedSorts = [
-                [{ queryName: "group1" }], [{ queryName: "group1" }]
+            let data: DataView = tableOneGroup;
+            let expectedColumnHeaders = [{ row: 0, col: 1, expectedText: "group1" }];
+            let clicks = [{ row: 0, col: 1 }, { row: 1, col: 1 }, { row: 2, col: 1 }, { row: 0, col: 1 }];
+            let expectedSorts = [
+                [{ queryName: "group1", sortDirection: powerbi.SortDirection.Descending }], [{ queryName: "group1", sortDirection: powerbi.SortDirection.Descending }]
             ];
-            tablixHelper.runTablixSortTest(element, done, 'table', data, expectedColumnHeaders, clicks, expectedSorts);
+            tablixHelper.runTablixSortTest(element, done, "table", data, expectedColumnHeaders, clicks, expectedSorts);
         });
 
-        it('table with two groups',(done) => {
+        it("table with two groups", (done) => {
             // Clicking on different group headers multiple times results in a sort event for each click
-            var data: DataView = tableTwoGroups;
-            var expectedColumnHeaders = [{ row: 0, col: 1, expectedText: "group1" }, { row: 0, col: 2, expectedText: "group2" }];
-            var clicks = [{ row: 0, col: 1 }, { row: 0, col: 2 }, { row: 0, col: 1 }, { row: 0, col: 2 }];
-            var expectedSorts = [
-                [{ queryName: "group1" }], [{ queryName: "group2" }], [{ queryName: "group1" }], [{ queryName: "group2" }]
+            let data: DataView = tableTwoGroups;
+            let expectedColumnHeaders = [{ row: 0, col: 1, expectedText: "group1" }, { row: 0, col: 2, expectedText: "group2" }];
+            let clicks = [{ row: 0, col: 1 }, { row: 0, col: 2 }, { row: 0, col: 1 }, { row: 0, col: 2 }];
+            let expectedSorts = [
+                [{ queryName: "group1", sortDirection: powerbi.SortDirection.Descending }], [{ queryName: "group2", sortDirection: powerbi.SortDirection.Descending }], [{ queryName: "group1", sortDirection: powerbi.SortDirection.Descending }], [{ queryName: "group2", sortDirection: powerbi.SortDirection.Descending }]
             ];
-            tablixHelper.runTablixSortTest(element, done, 'table', data, expectedColumnHeaders, clicks, expectedSorts);
+            tablixHelper.runTablixSortTest(element, done, "table", data, expectedColumnHeaders, clicks, expectedSorts);
         });
 
-        it('table with two groups and three measures',(done) => {
+        it("table with two groups and three measures", (done) => {
             // Clicking on different group headers multiple times results in a sort event for each click
-            var data: DataView = tableTwoGroupsThreeMeasures;
-            var expectedColumnHeaders = [{ row: 0, col: 1, expectedText: "group1" }, { row: 0, col: 2, expectedText: "group2" }, { row: 0, col: 3, expectedText: "measure1" }, { row: 0, col: 4, expectedText: "measure2" }, { row: 0, col: 5, expectedText: "measure3" }];
-            var clicks = [{ row: 0, col: 5 }, { row: 0, col: 2 }, { row: 0, col: 4 }, { row: 0, col: 1 }, { row: 0, col: 3 }, { row: 0, col: 1 }, { row: 0, col: 5 }];
-            var expectedSorts = [
-                [{ queryName: "measure3" }], [{ queryName: "group2" }], [{ queryName: "measure2" }], [{ queryName: "group1" }], [{ queryName: "measure1" }], [{ queryName: "group1" }], [{ queryName: "measure3" }]
+            let data: DataView = tableTwoGroupsThreeMeasures;
+            let expectedColumnHeaders = [{ row: 0, col: 1, expectedText: "group1" }, { row: 0, col: 2, expectedText: "group2" }, { row: 0, col: 3, expectedText: "measure1" }, { row: 0, col: 4, expectedText: "measure2" }, { row: 0, col: 5, expectedText: "measure3" }];
+            let clicks = [{ row: 0, col: 5 }, { row: 0, col: 2 }, { row: 0, col: 4 }, { row: 0, col: 1 }, { row: 0, col: 3 }, { row: 0, col: 1 }, { row: 0, col: 5 }];
+            let expectedSorts = [
+                [{ queryName: "measure3", sortDirection: powerbi.SortDirection.Descending }], [{ queryName: "group2", sortDirection: powerbi.SortDirection.Descending }], [{ queryName: "measure2", sortDirection: powerbi.SortDirection.Descending }], [{ queryName: "group1", sortDirection: powerbi.SortDirection.Descending }], [{ queryName: "measure1", sortDirection: powerbi.SortDirection.Descending }], [{ queryName: "group1", sortDirection: powerbi.SortDirection.Descending }], [{ queryName: "measure3", sortDirection: powerbi.SortDirection.Descending }]
             ];
-            tablixHelper.runTablixSortTest(element, done, 'table', data, expectedColumnHeaders, clicks, expectedSorts);
+            tablixHelper.runTablixSortTest(element, done, "table", data, expectedColumnHeaders, clicks, expectedSorts);
         });
     });
+
+    function formatter(value: any, source: DataViewMetadataColumn): string {
+        return valueFormatter.formatValueColumn(value, source, TablixObjects.PropColumnFormatString);
+    }
+
+    function validateChildTag(expectedChildTag: string[][], rows: JQuery): void {
+        let result: string[][] = [];
+
+        for (let i = 0, ilen = rows.length; i < ilen; i++) {
+            result[i] = [];
+            let cells = rows.eq(i).find(".tablixCellContentHost");
+            for (let j = 0, jlen = cells.length; j < jlen; j++) {
+                let childTag = expectedChildTag[i][j];
+                if (childTag) {
+                    let child = cells.eq(j).find(childTag);
+                    if (child.length > 0)
+                        result[i][j] = childTag;
+                    else
+                        result[i][j] = undefined;
+                }
+                else
+                    result[i][j] = undefined;
+            }
+        }
+
+        expect(result).toEqual(expectedChildTag);
+    }
+
+    function createColumnWithWidth(src: DataViewMetadataColumn, width: number): DataViewMetadataColumn {
+        let column = powerbi.Prototype.inheritSingle(src);
+        column.objects = { general: { columnWidth: width } };
+
+        return column;
+    }
+
+    interface TableColumn {
+        title: string;
+        width: number;
+    }
 }

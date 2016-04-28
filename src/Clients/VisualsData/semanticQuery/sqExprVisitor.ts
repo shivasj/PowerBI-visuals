@@ -24,8 +24,6 @@
  *  THE SOFTWARE.
  */
 
-//// <reference path="../_references.ts"/>
-
 module powerbi.data {
 
     /** Allows generic traversal and type discovery for a SQExpr tree. */
@@ -34,6 +32,9 @@ module powerbi.data {
         visitColumnRef(expr: SQColumnRefExpr, arg: TArg): T;
         visitMeasureRef(expr: SQMeasureRefExpr, arg: TArg): T;
         visitAggr(expr: SQAggregationExpr, arg: TArg): T;
+        visitHierarchy(expr: SQHierarchyExpr, arg: TArg): T;
+        visitHierarchyLevel(expr: SQHierarchyLevelExpr, arg: TArg): T;
+        visitPropertyVariationSource(expr: SQPropertyVariationSourceExpr, arg: TArg): T;
         visitAnd(expr: SQAndExpr, arg: TArg): T;
         visitBetween(expr: SQBetweenExpr, arg: TArg): T;
         visitIn(expr: SQInExpr, arg: TArg): T;
@@ -47,6 +48,12 @@ module powerbi.data {
         visitDateSpan(expr: SQDateSpanExpr, arg: TArg): T;
         visitDateAdd(expr: SQDateAddExpr, arg: TArg): T;
         visitNow(expr: SQNowExpr, arg: TArg): T;
+        visitDefaultValue(expr: SQDefaultValueExpr, arg: TArg): T;
+        visitAnyValue(expr: SQAnyValueExpr, arg: TArg): T;
+        visitArithmetic(expr: SQArithmeticExpr, arg: TArg): T;
+        visitFillRule(expr: SQFillRuleExpr, arg: TArg): T;
+        visitResourcePackageItem(expr: SQResourcePackageItemExpr, arg: TArg): T;
+        visitScopedEval(expr: SQScopedEvalExpr, arg: TArg): T;
     }
 
     export interface ISQExprVisitor<T> extends ISQExprVisitorWithArg<T, void> {
@@ -67,6 +74,18 @@ module powerbi.data {
         }
 
         public visitAggr(expr: SQAggregationExpr, arg: TArg): T {
+            return this.visitDefault(expr, arg);
+        }
+
+        public visitHierarchy(expr: SQHierarchyExpr, arg: TArg): T {
+            return this.visitDefault(expr, arg);
+        }
+
+        public visitHierarchyLevel(expr: SQHierarchyLevelExpr, arg: TArg): T {
+            return this.visitDefault(expr, arg);
+        }
+
+        public visitPropertyVariationSource(expr: SQPropertyVariationSourceExpr, arg: TArg): T {
             return this.visitDefault(expr, arg);
         }
 
@@ -122,6 +141,30 @@ module powerbi.data {
             return this.visitDefault(expr, arg);
         }
 
+        public visitDefaultValue(expr: SQDefaultValueExpr, arg: TArg): T {
+            return this.visitDefault(expr, arg);
+        }
+
+        public visitAnyValue(expr: SQAnyValueExpr, arg: TArg): T {
+            return this.visitDefault(expr, arg);
+        }
+
+        public visitArithmetic(expr: SQArithmeticExpr, arg: TArg): T {
+            return this.visitDefault(expr, arg);
+        }
+
+        public visitFillRule(expr: SQFillRuleExpr, arg: TArg): T {
+            return this.visitDefault(expr, arg);
+        }
+
+        public visitResourcePackageItem(expr: SQResourcePackageItemExpr, arg: TArg): T {
+            return this.visitDefault(expr, arg);
+        }
+
+        public visitScopedEval(expr: SQScopedEvalExpr, arg: TArg): T {
+            return this.visitDefault(expr, arg);
+        }
+
         public visitDefault(expr: SQExpr, arg: TArg): T {
             return;
         }
@@ -132,7 +175,7 @@ module powerbi.data {
     }
 
     /** Default ISQExprVisitor implementation that implements default traversal and that others may derive from. */
-    export class DefaultSQExprVisitorWithTraversal implements ISQExprVisitor<void> {
+    export class DefaultSQExprVisitorWithTraversal implements ISQExprVisitor<void>, IFillRuleDefinitionVisitor<void, void> {
         public visitEntity(expr: SQEntityExpr): void {
             this.visitDefault(expr);
         }
@@ -147,6 +190,18 @@ module powerbi.data {
 
         public visitAggr(expr: SQAggregationExpr): void {
             expr.arg.accept(this);
+        } 
+
+        public visitHierarchy(expr: SQHierarchyExpr): void {
+            expr.arg.accept(this);
+        }
+
+        public visitHierarchyLevel(expr: SQHierarchyLevelExpr): void {
+            expr.arg.accept(this);
+        }
+
+        public visitPropertyVariationSource(expr: SQPropertyVariationSourceExpr): void {
+            expr.arg.accept(this);
         }
 
         public visitBetween(expr: SQBetweenExpr): void {
@@ -156,14 +211,14 @@ module powerbi.data {
         }
 
         public visitIn(expr: SQInExpr): void {
-            var args = expr.args;
-            for (var i = 0, len = args.length; i < len; i++)
+            let args = expr.args;
+            for (let i = 0, len = args.length; i < len; i++)
                 args[i].accept(this);
 
-            var values = expr.values;
-            for (var i = 0, len = values.length; i < len; i++) {
-                var valueTuple = values[i];
-                for (var j = 0, jlen = values.length; j < jlen; j++)
+            let values = expr.values;
+            for (let i = 0, len = values.length; i < len; i++) {
+                let valueTuple = values[i];
+                for (let j = 0, jlen = valueTuple.length; j < jlen; j++)
                     valueTuple[j].accept(this);
             }
         }
@@ -217,8 +272,73 @@ module powerbi.data {
             this.visitDefault(expr);
         }
 
+        public visitDefaultValue(expr: SQDefaultValueExpr): void {
+            this.visitDefault(expr);
+        }
+
+        public visitAnyValue(expr: SQAnyValueExpr): void {
+            this.visitDefault(expr);
+        }
+
+        public visitArithmetic(expr: SQArithmeticExpr): void {
+            expr.left.accept(this);
+            expr.right.accept(this);
+        }
+
+        public visitFillRule(expr: SQFillRuleExpr): void {
+            expr.input.accept(this);
+
+            let rule = expr.rule,
+                gradient2 = rule.linearGradient2,
+                gradient3 = rule.linearGradient3;
+
+            if (gradient2) {
+                this.visitLinearGradient2(gradient2);
+            }
+
+            if (gradient3) {
+                this.visitLinearGradient3(gradient3);
+            }
+        }
+
+        public visitLinearGradient2(gradient2: LinearGradient2Definition): void {
+            debug.assertValue(gradient2, 'gradient2');
+
+            this.visitFillRuleStop(gradient2.min);
+            this.visitFillRuleStop(gradient2.max);
+        }
+
+        public visitLinearGradient3(gradient3: LinearGradient3Definition): void {
+            debug.assertValue(gradient3, 'gradient3');
+
+            this.visitFillRuleStop(gradient3.min);
+            this.visitFillRuleStop(gradient3.mid);
+            this.visitFillRuleStop(gradient3.max);
+        }
+
+        public visitResourcePackageItem(expr: SQResourcePackageItemExpr): void {
+            this.visitDefault(expr);
+        }
+
+        public visitScopedEval(expr: SQScopedEvalExpr): void {
+            expr.expression.accept(this);
+            for (let scopeExpr of expr.scope) {
+                scopeExpr.accept(this);
+            }
+        }
+
         public visitDefault(expr: SQExpr): void {
             return;
+        }
+
+        private visitFillRuleStop(stop: RuleColorStopDefinition): void {
+            debug.assertValue(stop, 'stop');
+
+            stop.color.accept(this);
+
+            let value = stop.value;
+            if (value)
+                value.accept(this);
         }
     }
 } 

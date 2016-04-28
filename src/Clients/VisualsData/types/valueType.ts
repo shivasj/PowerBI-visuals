@@ -24,71 +24,13 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
-
 module powerbi {
     import EnumExtensions = jsCommon.EnumExtensions;
 
-    /** Describes instances of value type objects. */
-    export type PrimitiveValue = string | number | boolean | Date;
-
-    /** Describes a data value type in the client type system. Can be used to get a concrete ValueType instance. */
     export interface ValueTypeDescriptor {
-        // Simplified primitive types
-        text?: boolean;
-        numeric?: boolean;
-        integer?: boolean;
-        bool?: boolean;
-        dateTime?: boolean;
-        duration?: boolean;
-        binary?: boolean;
-        none?: boolean; //TODO: 5005022 remove none type when we introduce property categories.
-
-        // Extended types
-        temporal?: TemporalTypeDescriptor;
-        geography?: GeographyTypeDescriptor;
-        misc?: MiscellaneousTypeDescriptor;
-        formatting?: FormattingTypeDescriptor;
         extendedType?: ExtendedType;
     }
-
-    export interface TemporalTypeDescriptor {
-        year?: boolean;
-        month?: boolean;
-    }
-
-    export interface GeographyTypeDescriptor {
-        address?: boolean;
-        city?: boolean;
-        continent?: boolean;
-        country?: boolean;
-        county?: boolean;
-        region?: boolean;
-        postalCode?: boolean;
-        stateOrProvince?: boolean;
-        place?: boolean;
-        latitude?: boolean;
-        longitude?: boolean;
-    }
-
-    export interface MiscellaneousTypeDescriptor {
-        image?: boolean;
-        imageUrl?: boolean;
-        webUrl?: boolean;
-    }
-
-    export interface FormattingTypeDescriptor {
-        color?: boolean;
-        formatString?: boolean;
-        legendPosition?: boolean;
-        axisType?: boolean;
-        yAxisPosition?: boolean;
-        axisStyle?: boolean;
-        alignment?: boolean;
-        labelDisplayUnits?: boolean;
-        labelPosition?: boolean;
-    }
-
+    
     /** Describes a data value type, including a primitive type and extended type if any (derived from data category). */
     export class ValueType implements ValueTypeDescriptor {
         private static typeCache: { [id: string]: ValueType } = {};
@@ -100,11 +42,14 @@ module powerbi {
         private geographyType: GeographyType;
         private miscType: MiscellaneousType;
         private formattingType: FormattingType;
+        private enumType: IEnumType;
+        private scriptingType: ScriptType;
 
         /** Do not call the ValueType constructor directly. Use the ValueType.fromXXX methods. */
-        constructor(type: ExtendedType, category?: string) {
+        constructor(type: ExtendedType, category?: string, enumType?: IEnumType) {
             debug.assert((!!type && ExtendedType[type] != null) || type === ExtendedType.Null, 'type');
             debug.assert(!!category || category === null, 'category');
+            debug.assert(type !== ExtendedType.Enumeration || !!enumType, 'enumType');
 
             this.underlyingType = type;
             this.category = category;
@@ -120,6 +65,12 @@ module powerbi {
             }
             if (EnumExtensions.hasFlag(type, ExtendedType.Formatting)) {
                 this.formattingType = new FormattingType(type);
+            }
+            if (EnumExtensions.hasFlag(type, ExtendedType.Enumeration)) {
+                this.enumType = enumType;
+            }
+            if (EnumExtensions.hasFlag(type, ExtendedType.Scripting)) {
+                this.scriptingType = new ScriptType(type);
             }
         }
 
@@ -138,6 +89,10 @@ module powerbi {
             if (descriptor.none) return ValueType.fromExtendedType(ExtendedType.None);
 
             // Extended types
+            if (descriptor.scripting) {
+                if (descriptor.scripting.source) return ValueType.fromExtendedType(ExtendedType.ScriptSource);
+            }
+            if (descriptor.enumeration) return ValueType.fromEnum(descriptor.enumeration);
             if (descriptor.temporal) {
                 if (descriptor.temporal.year) return ValueType.fromExtendedType(ExtendedType.Year_Integer);
                 if (descriptor.temporal.month) return ValueType.fromExtendedType(ExtendedType.Month_Integer);
@@ -163,13 +118,10 @@ module powerbi {
             if (descriptor.formatting) {
                 if (descriptor.formatting.color) return ValueType.fromExtendedType(ExtendedType.Color);
                 if (descriptor.formatting.formatString) return ValueType.fromExtendedType(ExtendedType.FormatString);
-                if (descriptor.formatting.legendPosition) return ValueType.fromExtendedType(ExtendedType.LegendPosition);
-                if (descriptor.formatting.axisType) return ValueType.fromExtendedType(ExtendedType.AxisType);
-                if (descriptor.formatting.yAxisPosition) return ValueType.fromExtendedType(ExtendedType.YAxisPosition);
-                if (descriptor.formatting.axisStyle) return ValueType.fromExtendedType(ExtendedType.AxisStyle);
                 if (descriptor.formatting.alignment) return ValueType.fromExtendedType(ExtendedType.Alignment);
                 if (descriptor.formatting.labelDisplayUnits) return ValueType.fromExtendedType(ExtendedType.LabelDisplayUnits);
-                if (descriptor.formatting.labelPosition) return ValueType.fromExtendedType(ExtendedType.LabelPosition);
+                if (descriptor.formatting.fontSize) return ValueType.fromExtendedType(ExtendedType.FontSize);
+                if (descriptor.formatting.labelDensity) return ValueType.fromExtendedType(ExtendedType.LabelDensity);
             }
             if (descriptor.extendedType) {
                 return ValueType.fromExtendedType(descriptor.extendedType);
@@ -182,7 +134,7 @@ module powerbi {
         public static fromExtendedType(extendedType: ExtendedType): ValueType {
             extendedType = extendedType || ExtendedType.Null;
 
-            var primitiveType = getPrimitiveType(extendedType),
+            let primitiveType = getPrimitiveType(extendedType),
                 category = getCategoryFromExtendedType(extendedType);
             debug.assert(
                 primitiveType !== PrimitiveType.Null || extendedType === ExtendedType.Null,
@@ -195,11 +147,46 @@ module powerbi {
             primitiveType = primitiveType || PrimitiveType.Null;
             category = category || null;
 
-            var id = primitiveType.toString();
+            let id = primitiveType.toString();
             if (category)
                 id += '|' + category;
 
             return ValueType.typeCache[id] || (ValueType.typeCache[id] = new ValueType(toExtendedType(primitiveType, category), category));
+        }
+
+        /** Creates a ValueType to describe the given IEnumType. */
+        public static fromEnum(enumType: IEnumType): ValueType {
+            debug.assertValue(enumType, 'enumType');
+
+            return new ValueType(ExtendedType.Enumeration, null, enumType);
+        }
+
+        /** Determines if the specified type is compatible from at least one of the otherTypes. */
+        public static isCompatibleTo(type: ValueTypeDescriptor, otherTypes: ValueTypeDescriptor[]): boolean {
+            debug.assertValue(type, 'type');
+            debug.assertValue(otherTypes, 'otherTypes');
+
+            let valueType = ValueType.fromDescriptor(type);
+            for (let otherType of otherTypes) {
+                let otherValueType = ValueType.fromDescriptor(otherType);
+
+                if (otherValueType.isCompatibleFrom(valueType))
+                    return true;
+            }
+
+            return false;
+        }
+
+        /** Determines if the instance ValueType is convertable from the 'other' ValueType. */
+        public isCompatibleFrom(other: ValueType): boolean {
+            debug.assertValue(other, 'other');
+
+            let otherPrimitiveType = other.primitiveType;
+            if (this === other ||
+                this.primitiveType === otherPrimitiveType ||
+                otherPrimitiveType === PrimitiveType.Null)
+                return true;
+            return false;
         }
 
         /** Gets the exact primitive type of this ValueType. */
@@ -223,28 +210,34 @@ module powerbi {
         public get text(): boolean {
             return this.primitiveType === PrimitiveType.Text;
         }
+
         /** Indicates whether the type represents any numeric value. */
         public get numeric(): boolean {
             return EnumExtensions.hasFlag(this.underlyingType, ExtendedType.Numeric);
         }
+
         /** Indicates whether the type represents integer numeric values. */
         public get integer(): boolean {
             return this.primitiveType === PrimitiveType.Integer;
         }
+
         /** Indicates whether the type represents Boolean values. */
         public get bool(): boolean {
             return this.primitiveType === PrimitiveType.Boolean;
         }
+
         /** Indicates whether the type represents any date/time values. */
         public get dateTime(): boolean {
             return this.primitiveType === PrimitiveType.DateTime ||
                 this.primitiveType === PrimitiveType.Date ||
                 this.primitiveType === PrimitiveType.Time;
         }
+
         /** Indicates whether the type represents duration values. */
         public get duration(): boolean {
             return this.primitiveType === PrimitiveType.Duration;
         }
+
         /** Indicates whether the type represents binary values. */
         public get binary(): boolean {
             return this.primitiveType === PrimitiveType.Binary;
@@ -254,23 +247,49 @@ module powerbi {
         public get none(): boolean {
             return this.primitiveType === PrimitiveType.None;
         }
+
         // Extended types
 
         /** Returns an object describing temporal values represented by the type, if it represents a temporal type. */
         public get temporal(): TemporalType {
             return this.temporalType;
         }
+
         /** Returns an object describing geographic values represented by the type, if it represents a geographic type. */
         public get geography(): GeographyType {
             return this.geographyType;
         }
+
         /** Returns an object describing the specific values represented by the type, if it represents a miscellaneous extended type. */
         public get misc(): MiscellaneousType {
             return this.miscType;
         }
+
         /** Returns an object describing the formatting values represented by the type, if it represents a formatting type. */
         public get formatting(): FormattingType {
             return this.formattingType;
+        }
+
+        /** Returns an object describing the enum values represented by the type, if it represents an enumeration type. */
+        public get enum(): IEnumType {
+            return this.enumType;
+        }
+
+        public get scripting(): ScriptType {
+            return this.scriptingType;
+        }
+    }
+
+    export class ScriptType implements ScriptTypeDescriptor {
+        private underlyingType: ExtendedType;
+
+        constructor(type: ExtendedType) {
+            debug.assert(!!type && EnumExtensions.hasFlag(type, ExtendedType.Scripting), 'type');
+            this.underlyingType = type;
+        }
+
+        public get source(): boolean {
+            return matchesExtendedTypeWithAnyPrimitive(this.underlyingType, ExtendedType.ScriptSource);
         }
     }
 
@@ -368,22 +387,6 @@ module powerbi {
             return matchesExtendedTypeWithAnyPrimitive(this.underlyingType, ExtendedType.FormatString);
         }
 
-        public get legendPosition(): boolean {
-            return matchesExtendedTypeWithAnyPrimitive(this.underlyingType, ExtendedType.LegendPosition);
-        }
-
-        public get axisType(): boolean {
-            return matchesExtendedTypeWithAnyPrimitive(this.underlyingType, ExtendedType.AxisType);
-        }
-
-        public get yAxisPosition(): boolean {
-            return matchesExtendedTypeWithAnyPrimitive(this.underlyingType, ExtendedType.YAxisPosition);
-        }
-
-        public get axisStyle(): boolean {
-            return matchesExtendedTypeWithAnyPrimitive(this.underlyingType, ExtendedType.AxisStyle);
-        }
-
         public get alignment(): boolean {
             return matchesExtendedTypeWithAnyPrimitive(this.underlyingType, ExtendedType.Alignment);
         }
@@ -392,8 +395,12 @@ module powerbi {
             return matchesExtendedTypeWithAnyPrimitive(this.underlyingType, ExtendedType.LabelDisplayUnits);
         }
 
-        public get labelPosition(): boolean {
-            return matchesExtendedTypeWithAnyPrimitive(this.underlyingType, ExtendedType.LabelPosition);
+        public get fontSize(): boolean {
+            return matchesExtendedTypeWithAnyPrimitive(this.underlyingType, ExtendedType.FontSize);
+        }
+
+        public get labelDensity(): boolean {
+            return matchesExtendedTypeWithAnyPrimitive(this.underlyingType, ExtendedType.LabelDensity);
         }
     }
 
@@ -423,6 +430,7 @@ module powerbi {
         Geography = 1 << 10,
         Miscellaneous = 1 << 11,
         Formatting = 1 << 12,
+        Scripting = 1 << 13,        
 
         // Primitive types (0-255 range [0xFF] | flags)
         // The member names and base values must match those in PrimitiveType.
@@ -477,21 +485,21 @@ module powerbi {
         // Formatting
         Color = Text | Formatting | (300 << 16),
         FormatString = Text | Formatting | (301 << 16),
-        LegendPosition = Text | Formatting | (302 << 16),
-        AxisType = Text | Formatting | (303 << 16),
-        YAxisPosition = Text | Formatting | (304 << 16),
-        AxisStyle = Text | Formatting | (305 << 16),
         Alignment = Text | Formatting | (306 << 16),
         LabelDisplayUnits = Text | Formatting | (307 << 16),
-        LabelPosition = Text | Formatting | (308 << 16),
-
+        FontSize = Double | Formatting | (308 << 16),
+        LabelDensity = Double | Formatting | (309 << 16),
+        // Enumeration
+        Enumeration = Text | 400 << 16,
+        // Scripting
+        ScriptSource = Text | Scripting | (500 << 16),        
         // NOTE: To avoid confusion, underscores should be used only to delimit primitive type variants of an extended type
         // (e.g. Year_Integer or Latitude_Double above)
     }
 
-    var PrimitiveTypeMask = 0xFF; // const
-    var PrimitiveTypeWithFlagsMask = 0xFFFF; // const
-    var PrimitiveTypeFlagsExcludedMask = 0xFFFF0000; // const
+    const PrimitiveTypeMask = 0xFF;
+    const PrimitiveTypeWithFlagsMask = 0xFFFF;
+    const PrimitiveTypeFlagsExcludedMask = 0xFFFF0000;
 
     function getPrimitiveType(extendedType: ExtendedType): PrimitiveType {
         return extendedType & PrimitiveTypeMask;
@@ -505,14 +513,14 @@ module powerbi {
         if (isPrimitiveType(extendedType))
             return null;
 
-        var category = ExtendedType[extendedType];
+        let category = ExtendedType[extendedType];
         if (category) {
             // Check for ExtendedType declaration without a primitive type.
             // If exists, use it as category (e.g. Longitude rather than Longitude_Double)
             // Otherwise use the ExtendedType declaration with a primitive type (e.g. Address)
-            var delimIdx = category.lastIndexOf('_');
+            let delimIdx = category.lastIndexOf('_');
             if (delimIdx > 0) {
-                var baseCategory = category.slice(0, delimIdx);
+                let baseCategory = category.slice(0, delimIdx);
                 if (ExtendedType[baseCategory]) {
                     debug.assert(
                         (ExtendedType[baseCategory] & PrimitiveTypeFlagsExcludedMask) === (extendedType & PrimitiveTypeFlagsExcludedMask),
@@ -525,17 +533,17 @@ module powerbi {
     }
 
     function toExtendedType(primitiveType: PrimitiveType, category?: string): ExtendedType {
-        var primitiveString = PrimitiveType[primitiveType];
-        var t = ExtendedType[primitiveString];
+        let primitiveString = PrimitiveType[primitiveType];
+        let t = ExtendedType[primitiveString];
         if (t == null) {
             debug.assertFail('Unexpected primitiveType ' + primitiveType);
             t = ExtendedType.Null;
         }
 
         if (primitiveType && category) {
-            var categoryType: ExtendedType = ExtendedType[category];
+            let categoryType: ExtendedType = ExtendedType[category];
             if (categoryType) {
-                var categoryPrimitiveType = getPrimitiveType(categoryType);
+                let categoryPrimitiveType = getPrimitiveType(categoryType);
                 if (categoryPrimitiveType === PrimitiveType.Null) {
                     // Category supports multiple primitive types, check if requested primitive type is supported
                     // (note: important to use t here rather than primitiveType as it may include primitive type flags)

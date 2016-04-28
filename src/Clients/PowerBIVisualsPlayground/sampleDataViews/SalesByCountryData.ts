@@ -1,4 +1,4 @@
-﻿/*
+/*
 *  Power BI Visualizations
 *
 *  Copyright (c) Microsoft Corporation
@@ -24,12 +24,9 @@
 *  THE SOFTWARE.
 */
 
-/// <reference path="../_references.ts"/>
-
 module powerbi.visuals.sampleDataViews {
-
     import DataViewTransform = powerbi.data.DataViewTransform;
-    
+
     export class SalesByCountryData extends SampleDataViews implements ISampleDataViewsMethods {
 
         public name: string = "SalesByCountryData";
@@ -49,7 +46,7 @@ module powerbi.visuals.sampleDataViews {
 
         public getDataViews(): DataView[] {
 
-            var fieldExpr = powerbi.data.SQExprBuilder.fieldDef({ schema: 's', entity: "table1", column: "country" });
+            var fieldExpr = powerbi.data.SQExprBuilder.fieldExpr({ column: { schema: 's', entity: "table1", name: "country" } });
 
             var categoryValues = ["Australia", "Canada", "France", "Germany", "United Kingdom", "United States"];
             var categoryIdentities = categoryValues.map(function (value) {
@@ -73,13 +70,15 @@ module powerbi.visuals.sampleDataViews {
                         queryName: 'sales1',
                         type: powerbi.ValueType.fromDescriptor({ numeric: true }),
                         objects: { dataPoint: { fill: { solid: { color: 'purple' } } } },
+                        roles: { Y: true }
                     },
                     {
                         displayName: 'Sales Amount (2015)',
                         isMeasure: true,
                         format: "$0,000.00",
                         queryName: 'sales2',
-                        type: powerbi.ValueType.fromDescriptor({ numeric: true })
+                        type: powerbi.ValueType.fromDescriptor({ numeric: true }),
+                        roles: { Y: true }
                     }
                 ]
             };
@@ -119,6 +118,7 @@ module powerbi.visuals.sampleDataViews {
                 single: { value: this.sampleSingleData }
             }];
         }
+
         
         public randomize(): void {
 

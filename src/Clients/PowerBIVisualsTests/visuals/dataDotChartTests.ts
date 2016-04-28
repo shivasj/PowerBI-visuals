@@ -24,10 +24,9 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
-
 module powerbitests {
     import DataDotChart = powerbi.visuals.DataDotChart;
+    import dataDotChartCapabilities = powerbi.visuals.dataDotChartCapabilities;
     import DataViewTransform = powerbi.data.DataViewTransform;
     import EventType = powerbitests.helpers.ClickEventType;
     import ColumnUtil = powerbi.visuals.ColumnUtil;
@@ -39,32 +38,32 @@ module powerbitests {
     describe("Check DataDotChart capabilities", () => {
 
         it("DataDotChart registered capabilities", () => {
-            expect(powerbi.visuals.visualPluginFactory.create().getPlugin("dataDotChart").capabilities).toBe(DataDotChart.capabilities);
+            expect(powerbi.visuals.visualPluginFactory.create().getPlugin("dataDotChart").capabilities).toBe(dataDotChartCapabilities);
         });
 
         it("DataDotChart capabilities should include dataRoles", () => {
-            expect(DataDotChart.capabilities.dataRoles).toBeDefined();
+            expect(dataDotChartCapabilities.dataRoles).toBeDefined();
         });
 
         it("DataDotChart capabilities should include dataViewMappings", () => {
-            expect(DataDotChart.capabilities.dataViewMappings).toBeDefined();
+            expect(dataDotChartCapabilities.dataViewMappings).toBeDefined();
         });
 
         it("Capabilities should not suppressDefaultTitle", () => {
-            expect(DataDotChart.capabilities.suppressDefaultTitle).toBeUndefined();
+            expect(dataDotChartCapabilities.suppressDefaultTitle).toBeUndefined();
         });
 
         it("FormatString property should match calculated", () => {
-            expect(powerbi.data.DataViewObjectDescriptors.findFormatString(DataDotChart.capabilities.objects)).toEqual(DataDotChart.formatStringProp);
+            expect(powerbi.data.DataViewObjectDescriptors.findFormatString(dataDotChartCapabilities.objects)).toEqual(DataDotChart.formatStringProp);
         });
     });
 
     describe("DataDotChart converter", () => {
-        var dataViewBuilder: DataViewBuilder;
+        let dataViewBuilder: DataViewBuilder;
 
-        var blankCategoryValue = "(Blank)";
+        let blankCategoryValue = "(Blank)";
 
-        var dataViewMetadata: powerbi.DataViewMetadata = {
+        let dataViewMetadata: powerbi.DataViewMetadata = {
             columns: [
                 {
                     displayName: "stringColumn",
@@ -99,9 +98,9 @@ module powerbitests {
 
             dataViewBuilder.categoricalValues = undefined;
 
-            var dataView: powerbi.DataView = dataViewBuilder.dataView;
+            let dataView: powerbi.DataView = dataViewBuilder.dataView;
 
-            var actualData = DataDotChart.converter(dataView, blankCategoryValue);
+            let actualData = DataDotChart.converter(dataView, blankCategoryValue, null);
             expect(actualData).toBeDefined();
             expect(actualData.series).toBeDefined();
             expect(actualData.series.data).toBeDefined();
@@ -115,9 +114,9 @@ module powerbitests {
 
             dataViewBuilder.update();
 
-            var dataView: powerbi.DataView = dataViewBuilder.dataView;
+            let dataView: powerbi.DataView = dataViewBuilder.dataView;
 
-            var actualData = DataDotChart.converter(dataView, blankCategoryValue);
+            let actualData = DataDotChart.converter(dataView, blankCategoryValue, null);
             expect(actualData).toEqual({
                 series: {
                     xCol: dataView.metadata.columns[0],
@@ -136,9 +135,9 @@ module powerbitests {
 
             dataViewBuilder.update();
 
-            var dataView: powerbi.DataView = dataViewBuilder.dataView;
+            let dataView: powerbi.DataView = dataViewBuilder.dataView;
 
-            var actualData = DataDotChart.converter(dataView, blankCategoryValue);
+            let actualData = DataDotChart.converter(dataView, blankCategoryValue, null);
 
             expect(actualData.series).toBeDefined();
             expect(actualData.series.xCol).toEqual(dataView.metadata.columns[0]);
@@ -146,8 +145,8 @@ module powerbitests {
             expect(actualData.series.data).toBeDefined();
             expect(actualData.series.data.length).toEqual(3);
 
-            for (var i = 0; i < actualData.series.data.length; i++) {
-                var seriesData = actualData.series.data[i];
+            for (let i = 0; i < actualData.series.data.length; i++) {
+                let seriesData = actualData.series.data[i];
                 expect(seriesData.categoryValue).toBe(dataView.categorical.categories[0].values[i]);
                 expect(seriesData.value).toBe(dataView.categorical.values[0].values[i]);
                 expect(seriesData.categoryIndex).toBe(i);
@@ -164,9 +163,9 @@ module powerbitests {
 
             dataViewBuilder.categoricalCategories = [];
 
-            var dataView: powerbi.DataView = dataViewBuilder.dataView;
+            let dataView: powerbi.DataView = dataViewBuilder.dataView;
 
-            var actualData = DataDotChart.converter(dataView, blankCategoryValue);
+            let actualData = DataDotChart.converter(dataView, blankCategoryValue, null);
 
             expect(actualData.series).toBeDefined();
             expect(actualData.series.xCol).toBeUndefined();
@@ -174,8 +173,8 @@ module powerbitests {
             expect(actualData.series.data).toBeDefined();
             expect(actualData.series.data.length).toEqual(1);
 
-            for (var i = 0; i < actualData.series.data.length; i++) {
-                var seriesData = actualData.series.data[i];
+            for (let i = 0; i < actualData.series.data.length; i++) {
+                let seriesData = actualData.series.data[i];
                 expect(seriesData.categoryValue).toBe(blankCategoryValue);
                 expect(seriesData.value).toBe(dataView.categorical.values[0].values[i]);
                 expect(seriesData.categoryIndex).toBe(i);
@@ -192,9 +191,9 @@ module powerbitests {
 
             dataViewBuilder.categoricalCategories = [];
 
-            var dataView: powerbi.DataView = dataViewBuilder.dataView;
+            let dataView: powerbi.DataView = dataViewBuilder.dataView;
 
-            var actualData = DataDotChart.converter(dataView, blankCategoryValue);
+            let actualData = DataDotChart.converter(dataView, blankCategoryValue, null);
 
             expect(actualData.series).toBeDefined();
             expect(actualData.series.xCol).toBeUndefined();
@@ -202,8 +201,8 @@ module powerbitests {
             expect(actualData.series.data).toBeDefined();
             expect(actualData.series.data.length).toEqual(1);
 
-            for (var i = 0; i < actualData.series.data.length; i++) {
-                var seriesData = actualData.series.data[i];
+            for (let i = 0; i < actualData.series.data.length; i++) {
+                let seriesData = actualData.series.data[i];
                 expect(seriesData.categoryValue).toBe(blankCategoryValue);
                 expect(seriesData.value).toBe(dataView.categorical.values[0].values[i]);
                 expect(seriesData.categoryIndex).toBe(i);
@@ -223,9 +222,9 @@ module powerbitests {
 
             dataViewBuilder.update();
 
-            var dataView: powerbi.DataView = dataViewBuilder.dataView;
+            let dataView: powerbi.DataView = dataViewBuilder.dataView;
             
-            var actualData = DataDotChart.converter(dataView, blankCategoryValue);
+            let actualData = DataDotChart.converter(dataView, blankCategoryValue, null);
 
             expect(actualData.series).toBeDefined();
             expect(actualData.series.xCol).toEqual(dataView.metadata.columns[0]);
@@ -233,8 +232,8 @@ module powerbitests {
             expect(actualData.series.data).toBeDefined();
             expect(actualData.series.data.length).toEqual(3);
 
-            for (var i = 0; i < actualData.series.data.length; i++) {
-                var seriesData = actualData.series.data[i];
+            for (let i = 0; i < actualData.series.data.length; i++) {
+                let seriesData = actualData.series.data[i];
                 expect(seriesData.categoryValue).toBe(dataView.categorical.categories[0].values[i]);
                 expect(seriesData.value).toBe(dataView.categorical.values[0].values[i]);
                 expect(seriesData.categoryIndex).toBe(i);
@@ -244,7 +243,7 @@ module powerbitests {
         });
 
         it("Check converter with date-time categories and a numeric series", () => {
-            var dates = [new Date("2014/9/25"), new Date("2014/12/12"), new Date("2015/9/25")];
+            let dates = [new Date("2014/9/25"), new Date("2014/12/12"), new Date("2015/9/25")];
 
             dataViewBuilder.categoryValues = dates;
             dataViewBuilder.columns = [dataViewMetadata.columns[2], dataViewMetadata.columns[1]];
@@ -252,9 +251,9 @@ module powerbitests {
 
             dataViewBuilder.update();
 
-            var dataView: powerbi.DataView = dataViewBuilder.dataView;
+            let dataView: powerbi.DataView = dataViewBuilder.dataView;
 
-            var actualData = DataDotChart.converter(dataView, blankCategoryValue);
+            let actualData = DataDotChart.converter(dataView, blankCategoryValue, null);
 
             expect(actualData.series).toBeDefined();
             expect(actualData.series.xCol).toEqual(dataView.metadata.columns[2]);
@@ -262,8 +261,8 @@ module powerbitests {
             expect(actualData.series.data).toBeDefined();
             expect(actualData.series.data.length).toEqual(3);
 
-            for (var i = 0; i < actualData.series.data.length; i++) {
-                var seriesData = actualData.series.data[i];
+            for (let i = 0; i < actualData.series.data.length; i++) {
+                let seriesData = actualData.series.data[i];
                 expect(seriesData.categoryValue).toBe(dates[i].getTime());
                 expect(seriesData.value).toBe(dataView.categorical.values[0].values[i]);
                 expect(seriesData.categoryIndex).toBe(i);
@@ -273,7 +272,7 @@ module powerbitests {
         });
 
         it("Check converter with date-time categories and a numeric series where category value is null", () => {
-            var dates = [new Date("2014/9/25"), null, new Date("2015/9/25")];
+            let dates = [new Date("2014/9/25"), null, new Date("2015/9/25")];
 
             dataViewBuilder.categoryValues = dates;
             dataViewBuilder.columns = [dataViewMetadata.columns[2], dataViewMetadata.columns[1]];
@@ -281,9 +280,9 @@ module powerbitests {
 
             dataViewBuilder.update();
 
-            var dataView: powerbi.DataView = dataViewBuilder.dataView;
+            let dataView: powerbi.DataView = dataViewBuilder.dataView;
 
-            var actualData = DataDotChart.converter(dataView, blankCategoryValue);
+            let actualData = DataDotChart.converter(dataView, blankCategoryValue, null);
 
             expect(actualData.series).toBeDefined();
             expect(actualData.series.xCol).toEqual(dataView.metadata.columns[2]);
@@ -291,8 +290,8 @@ module powerbitests {
             expect(actualData.series.data).toBeDefined();
             expect(actualData.series.data.length).toEqual(3);
 
-            for (var i = 0; i < actualData.series.data.length; i++) {
-                var seriesData = actualData.series.data[i];
+            for (let i = 0; i < actualData.series.data.length; i++) {
+                let seriesData = actualData.series.data[i];
 
                 expect(seriesData.categoryValue).toBe(dates[i] ? dates[i].getTime() : null);
                 expect(seriesData.value).toBe(dataView.categorical.values[0].values[i]);
@@ -303,8 +302,8 @@ module powerbitests {
         });
 
         it("Check converter pass string categories and a numeric series produces identities", () => {
-            var identityNames = ["John Domo", "Delta Force", "Jean Tablau"];
-            var categoryIdentities = identityNames.map((item) => mocks.dataViewScopeIdentity(item));
+            let identityNames = ["John Domo", "Delta Force", "Jean Tablau"];
+            let categoryIdentities = identityNames.map((item) => mocks.dataViewScopeIdentity(item));
             
             dataViewBuilder.categoryIdentities = categoryIdentities;
             dataViewBuilder.categoryValues = ["Cat 1", "Cat 2", "Cat 3"];
@@ -313,16 +312,16 @@ module powerbitests {
 
             dataViewBuilder.update();
 
-            var dataView: powerbi.DataView = dataViewBuilder.dataView;
+            let dataView: powerbi.DataView = dataViewBuilder.dataView;
 
-            var actualData = DataDotChart.converter(dataView, blankCategoryValue);
+            let actualData = DataDotChart.converter(dataView, blankCategoryValue, null);
 
             expect(actualData.series).toBeDefined();
             expect(actualData.series.data).toBeDefined();
             expect(actualData.series.data.length).toEqual(3);
 
-            for (var i = 0; i < actualData.series.data.length; i++) {
-                var seriesData = actualData.series.data[i];
+            for (let i = 0; i < actualData.series.data.length; i++) {
+                let seriesData = actualData.series.data[i];
                 expect(seriesData.identity).toBeDefined();
                 expect(seriesData.identity.getKey()).toContain(identityNames[i]);
             }
@@ -336,23 +335,23 @@ module powerbitests {
 
             dataViewBuilder.categoricalCategories = [];
 
-            var dataView: powerbi.DataView = dataViewBuilder.dataView;
+            let dataView: powerbi.DataView = dataViewBuilder.dataView;
 
-            var actualData = DataDotChart.converter(dataView, blankCategoryValue);
+            let actualData = DataDotChart.converter(dataView, blankCategoryValue, null);
 
             expect(actualData.series).toBeDefined();
             expect(actualData.series.data).toBeDefined();
             expect(actualData.series.data.length).toEqual(1);
 
-            for (var i = 0; i < actualData.series.data.length; i++) {
-                var seriesData = actualData.series.data[i];
+            for (let i = 0; i < actualData.series.data.length; i++) {
+                let seriesData = actualData.series.data[i];
                 expect(seriesData.identity).toBeDefined();
                 expect(seriesData.identity.getKey()).toContain(dataViewMetadata.columns[1].displayName);
             }
         });
     });
 
-    var dataViewMetadataDefault: powerbi.DataViewMetadata = {
+    let dataViewMetadataDefault: powerbi.DataViewMetadata = {
         columns: [
             {
                 displayName: "stringColumn",
@@ -373,10 +372,10 @@ module powerbitests {
     };
 
     describe("DataDotChart render to DOM", () => {
-        var dataViewBuilder: DataViewBuilder;
+        let dataViewBuilder: DataViewBuilder;
 
-        var categoryValues = ["a", "b", "c", "d", "e"];
-        var categoryIdentities = categoryValues.map(n => mocks.dataViewScopeIdentity(n));
+        let categoryValues = ["a", "b", "c", "d", "e"];
+        let categoryIdentities = categoryValues.map(n => mocks.dataViewScopeIdentity(n));
 
         beforeEach(() => {
             dataViewBuilder = new DataViewBuilder();
@@ -467,11 +466,17 @@ module powerbitests {
 
             dataViewBuilder.onDataChanged();
 
+            let labels = helpers.getAxisTicks('y').find("text");
+
             setTimeout(() => {
-                expect($(".dataDotChart .axisGraphicsContext .x.axis .tick").length).toBeGreaterThan(0);
-                expect($(".dataDotChart .axisGraphicsContext .y.axis .tick").length).toBeGreaterThan(0);
-                expect($(".dataDotChart .axisGraphicsContext .y.axis .tick").find("text").first().text()).toBe("0M");
-                expect($(".dataDotChart .axisGraphicsContext .y.axis .tick").find("text").last().text()).toBe("0.5M");
+                expect(helpers.getAxisTicks('x').length).toBeGreaterThan(0);
+                expect(helpers.getAxisTicks('y').length).toBeGreaterThan(0);
+
+                expect(helpers.findElementText($(labels).first())).toBe("0.0M");
+                expect(helpers.findElementTitle($(labels).first())).toBe("0.0M");
+
+                expect(helpers.findElementText($(labels).last())).toBe("0.5M");
+                expect(helpers.findElementTitle($(labels).last())).toBe("0.5M");
                 done();
             }, DefaultWaitForRender);
         });
@@ -484,16 +489,16 @@ module powerbitests {
             dataViewBuilder.onDataChanged();
 
             setTimeout(() => {
-                var $dots = $(".dataDotChart .dot");
+                let $dots = $(".dataDotChart .dot");
                 expect($dots.length).toBe(5);
 
-                var dotRadius = 0;
+                let dotRadius = 0;
                 $dots.each((index, elem) => {
 
-                    var $elem = $(elem);
+                    let $elem = $(elem);
 
                     // I verify all dots have the same non-zero radius
-                    var radius = +$elem.attr("r");
+                    let radius = +$elem.attr("r");
                     if (index === 0) {
                         expect(radius).toBeGreaterThan(0);
                         dotRadius = radius;
@@ -525,12 +530,12 @@ module powerbitests {
             dataViewBuilder.onDataChanged();
 
             setTimeout(() => {
-                var $labels = $(".dataDotChart .label");
+                let $labels = $(".dataDotChart .label");
                 expect($labels.length).toBe(5);
 
                 $labels.each((index, elem) => {
 
-                    var $elem = $(elem);
+                    let $elem = $(elem);
 
                     expect(+$elem.attr("x")).toBeGreaterThan(0);
 
@@ -543,18 +548,18 @@ module powerbitests {
                     }
                 });
 
-                var $label1 = $($labels.get(0));
+                let $label1 = $($labels.get(0));
                 expect($label1.text()).toBe("0.5M");
 
-                var $label3 = $($labels.get(2));
-                expect($label3.text()).toBe("0.49M");
+                let $label3 = $($labels.get(2));
+                expect($label3.text()).toBe("0.5M");
 
                 done();
             }, DefaultWaitForRender);
         });
 
-        var overflowCategoryValues = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"];
-        var overflowCategoryIdentities = overflowCategoryValues.map(n => mocks.dataViewScopeIdentity(n));
+        let overflowCategoryValues = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"];
+        let overflowCategoryIdentities = overflowCategoryValues.map(n => mocks.dataViewScopeIdentity(n));
 
         it("Check dots text overflow handled in DOM", (done) => {
             dataViewBuilder.categoryValues = overflowCategoryValues;
@@ -573,12 +578,12 @@ module powerbitests {
             dataViewBuilder.onDataChanged();
 
             setTimeout(() => {
-                var $labels = $(".dataDotChart .label");
+                let $labels = $(".dataDotChart .label");
                 expect($labels.length).toBeGreaterThan(0);
 
                 $labels.each((index, elem) => {
 
-                    var $elem = $(elem);
+                    let $elem = $(elem);
 
                     expect($elem.attr("class")).toContain("overflowed");
                 });
@@ -596,12 +601,12 @@ module powerbitests {
             dataViewBuilder.onDataChanged();
 
             setTimeout(() => {
-                var $dots = $(".dataDotChart .dot");
+                let $dots = $(".dataDotChart .dot");
                 expect($dots.length).toBe(10);
                 
                 // I check partial highlighting
-                var defaultOpacity = ColumnUtil.DefaultOpacity.toString();
-                var dimmedOpacity = ColumnUtil.DimmedOpacity.toString();
+                let defaultOpacity = ColumnUtil.DefaultOpacity.toString();
+                let dimmedOpacity = ColumnUtil.DimmedOpacity.toString();
 
                 expect($dots[0].style.fillOpacity).toBe(dimmedOpacity);
                 expect($dots[1].style.fillOpacity).toBe(defaultOpacity);
@@ -629,7 +634,7 @@ module powerbitests {
             dataViewBuilder.onDataChanged();
 
             setTimeout(() => {
-                var zeroTicks = $("g.tick:has(line.zero-line)");
+                let zeroTicks = $("g.tick:has(line.zero-line)");
 
                 expect(zeroTicks.length).toBe(2);
                 zeroTicks.each((i, item) => {
@@ -642,13 +647,13 @@ module powerbitests {
     });
 
     describe("DataDotChart interactivity in DOM", () => {
-        var dataViewBuilder: DataViewBuilder;
+        let dataViewBuilder: DataViewBuilder;
 
-        var defaultOpacity = ColumnUtil.DefaultOpacity.toString();
-        var dimmedOpacity = ColumnUtil.DimmedOpacity.toString();
+        let defaultOpacity = ColumnUtil.DefaultOpacity.toString();
+        let dimmedOpacity = ColumnUtil.DimmedOpacity.toString();
 
-        var categoryValues = ["a", "b", "c", "d", "e"];
-        var categoryIdentities = categoryValues.map(n => mocks.dataViewScopeIdentity(n));
+        let categoryValues = ["a", "b", "c", "d", "e"];
+        let categoryIdentities = categoryValues.map(n => mocks.dataViewScopeIdentity(n));
 
         beforeEach(() => {
             dataViewBuilder = new DataViewBuilder();
@@ -667,11 +672,11 @@ module powerbitests {
 
             setTimeout(() => {
 
-                var dots = $(".dataDotChart .dot");
+                let dots = $(".dataDotChart .dot");
 
                 spyOn(dataViewBuilder.hostServices, "onSelect").and.callThrough();
 
-                (<any>dots.first()).d3Click(0, 0);
+                dots.first().d3Click(0, 0);
 
                 expect(dots[0].style.fillOpacity).toBe(defaultOpacity);
                 expect(dots[1].style.fillOpacity).toBe(dimmedOpacity);
@@ -699,11 +704,11 @@ module powerbitests {
 
             setTimeout(() => {
 
-                var dots = $(".dataDotChart .dot");
+                let dots = $(".dataDotChart .dot");
 
                 spyOn(dataViewBuilder.hostServices, "onSelect").and.callThrough();
 
-                (<any>dots.first()).d3Click(0, 0);
+                dots.first().d3Click(0, 0);
                 
                 expect(dots[0].style.fillOpacity).toBe(defaultOpacity);
                 expect(dots[1].style.fillOpacity).toBe(dimmedOpacity);
@@ -730,12 +735,12 @@ module powerbitests {
 
             setTimeout(() => {
 
-                var dots = $(".dataDotChart .dot");
+                let dots = $(".dataDotChart .dot");
 
                 spyOn(dataViewBuilder.hostServices, "onSelect").and.callThrough();
 
-                (<any>dots.first()).d3Click(0, 0);
-                (<any>dots.last()).d3Click(0, 0, EventType.CtrlKey);
+                dots.first().d3Click(0, 0);
+                dots.last().d3Click(0, 0, EventType.CtrlKey);
 
                 dataViewBuilder.visual.onClearSelection();
 
@@ -756,14 +761,14 @@ module powerbitests {
 
             setTimeout(() => {
 
-                var dots = $(".dataDotChart .dot");                
+                let dots = $(".dataDotChart .dot");                
 
-                (<any>dots.first()).d3Click(0, 0);
-                (<any>dots.last()).d3Click(0, 0, EventType.CtrlKey);
+                dots.first().d3Click(0, 0);
+                dots.last().d3Click(0, 0, EventType.CtrlKey);
 
                 spyOn(dataViewBuilder.hostServices, "onSelect").and.callThrough();
 
-                (<any>($(".clearCatcher").last())).d3Click(0, 0);
+                $(".clearCatcher").last().d3Click(0, 0);
 
                 expect(dots[0].style.fillOpacity).toBe(defaultOpacity);
                 expect(dots[1].style.fillOpacity).toBe(defaultOpacity);
@@ -830,7 +835,7 @@ module powerbitests {
 
         constructor(width: string = "500", height: string = "500") {
             this.element = powerbitests.helpers.testDom(height, width);
-            this._visual = powerbi.visuals.visualPluginFactory.create().getPlugin("dataDotChart").create();
+            this._visual = new powerbi.visuals.CartesianChart({ chartType: powerbi.visuals.CartesianChartType.DataDot, behavior: new powerbi.visuals.CartesianChartBehavior([new powerbi.visuals.DataDotChartWebBehavior()]) });
             this._hostServices = mocks.createVisualHostServices();
             this._warningSpy = jasmine.createSpy("warning");
             this._hostServices.setWarnings = this.warningSpy;
@@ -868,9 +873,9 @@ module powerbitests {
         }
 
         private buildCategoricalValues() {
-            var categoricalValues = [];
+            let categoricalValues = [];
 
-            for (var i = 0; i < this.values.length; i++) {
+            for (let i = 0; i < this.values.length; i++) {
                 categoricalValues.push({
                     source: this.getValuesSource(i + 1),
                     values: this.values[i],

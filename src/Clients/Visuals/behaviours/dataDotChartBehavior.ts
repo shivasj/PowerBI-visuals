@@ -24,18 +24,30 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
-
 module powerbi.visuals {
     export interface DataDotChartBehaviorOptions {
-        datapoints: SelectableDataPoint[];
         dots: D3.Selection;
-        clearCatcher: D3.Selection;
+        dotLabels: D3.Selection;
+        isPartOfCombo?: boolean;
+        datapoints?: DataDotChartDataPoint[];
     }
 
-    export class DataDotChartWebBehavior {
-        public select(hasSelection: boolean, selection: D3.Selection) {
-            selection.style("fill-opacity",(d: DataDotChartDataPoint) => ColumnUtil.getFillOpacity(d.selected, d.highlight, hasSelection, false));
+    export class DataDotChartWebBehavior implements IInteractiveBehavior {
+        private dots: D3.Selection;
+
+        public bindEvents(options: DataDotChartBehaviorOptions, selectionHandler: ISelectionHandler): void {
+            let dots = this.dots = options.dots;
+            let dotLabels = options.dotLabels;
+
+            InteractivityUtils.registerStandardInteractivityHandlers(dots, selectionHandler);
+
+            if (dotLabels) {
+                InteractivityUtils.registerStandardInteractivityHandlers(dotLabels, selectionHandler);
+            }
+        }
+
+        public renderSelection(hasSelection: boolean): void {
+            this.dots.style("fill-opacity",(d: DataDotChartDataPoint) => ColumnUtil.getFillOpacity(d.selected, d.highlight, hasSelection, false));
         }
     }
 }  

@@ -24,12 +24,11 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../../../_references.ts"/>
-
 module powerbi.visuals.controls.internal {
 
-    /** Base class for Tablix realization manager
-      */
+    /**
+     * Base class for Tablix realization manager.
+     */
     export class TablixDimensionRealizationManager {
         private _realizedLeavesCount: number;
         private _adjustmentFactor: number;
@@ -72,7 +71,7 @@ module powerbi.visuals.controls.internal {
         }
 
         public onStartRenderingIteration(): void {
-            var owner = this._getOwner();
+            let owner = this._getOwner();
             if (owner.measureEnabled && !owner.done) {
                 this._getEstimatedItemsToRealizeCount();
             }
@@ -111,8 +110,9 @@ module powerbi.visuals.controls.internal {
         }
     }
 
-    /** DOM implementation for Row Tablix realization manager
-      */
+    /** 
+     * DOM implementation for Row Tablix realization manager.
+     */
     export class RowRealizationManager extends TablixDimensionRealizationManager {
         private _owner: RowLayoutManager;
 
@@ -146,16 +146,16 @@ module powerbi.visuals.controls.internal {
             if (!this._owner.dimension.model || this._owner.dimension.getItemsCount() === 0)
                 return 0;
 
-            var levels: RowWidths = new RowWidths();
+            let levels: RowWidths = new RowWidths();
             this.updateRowHiearchyEstimatedWidth(this._owner.dimension.model, this._owner.dimension._hierarchyNavigator.getIndex(this._owner.dimension.getFirstVisibleItem(0)), levels);
 
-            var levelsArray: RowWidth[] = levels.items;
-            var levelCount: number = levelsArray.length;
+            let levelsArray: RowWidth[] = levels.items;
+            let levelCount: number = levelsArray.length;
 
-            var width = 0;
+            let width = 0;
 
-            for (var i = 0; i < levelCount; i++) {
-                var level = levelsArray[i];
+            for (let i = 0; i < levelCount; i++) {
+                let level = levelsArray[i];
 
                 if (level.maxNonLeafWidth !== 0)
                     width += level.maxNonLeafWidth;
@@ -167,20 +167,20 @@ module powerbi.visuals.controls.internal {
         }
 
         private updateRowHiearchyEstimatedWidth(items: any, firstVisibleIndex: number, levels: RowWidths) {
-            var hierarchyNavigator: ITablixHierarchyNavigator = this._owner.owner.owner.hierarchyNavigator;
-            var binder: ITablixBinder = this.binder;
-            var length = hierarchyNavigator.getCount(items);
+            let hierarchyNavigator: ITablixHierarchyNavigator = this._owner.owner.owner.hierarchyNavigator;
+            let binder: ITablixBinder = this.binder;
+            let length = hierarchyNavigator.getCount(items);
 
-            for (var i = firstVisibleIndex; i < length; i++) {
+            for (let i = firstVisibleIndex; i < length; i++) {
                 if (levels.leafCount === this.itemsToRealizeCount)
                     return;
-                var item: any = hierarchyNavigator.getAt(items, i);
-                var label = binder.getHeaderLabel(item);
-                var itemWidth = this._owner.getEstimatedHeaderWidth(label, firstVisibleIndex);
-                var isLeaf: boolean = hierarchyNavigator.isLeaf(item);
-                var l: number = hierarchyNavigator.getLevel(item);
+                let item: any = hierarchyNavigator.getAt(items, i);
+                let label = binder.getHeaderLabel(item);
+                let itemWidth = this._owner.getEstimatedHeaderWidth(label, firstVisibleIndex);
+                let isLeaf: boolean = hierarchyNavigator.isLeaf(item);
+                let l: number = hierarchyNavigator.getLevel(item);
 
-                var level = levels.items[l];
+                let level = levels.items[l];
                 if (!level) {
                     level = new RowWidth();
                     levels.items[l] = level;
@@ -202,8 +202,9 @@ module powerbi.visuals.controls.internal {
         }
     }
 
-    /** DOM implementation for Column Tablix realization manager
-      */
+    /**
+     * DOM implementation for Column Tablix realization manager.
+     */
     export class ColumnRealizationManager extends TablixDimensionRealizationManager {
         private _owner: ColumnLayoutManager;
 
@@ -231,37 +232,38 @@ module powerbi.visuals.controls.internal {
         }
 
         private estimateColumnsToRealizeCount(rowHierarchyWidth: number): void {
-            var widthToFill: number = this._owner.contextualWidthToFill - rowHierarchyWidth;
+            let widthToFill: number = this._owner.contextualWidthToFill - rowHierarchyWidth;
 
             if (!this._owner.dimension.model || Double.lessOrEqualWithPrecision(widthToFill, 0, DimensionLayoutManager._pixelPrecision)) {
                 this.itemsToRealizeCount = 0;
                 return;
             }
 
-            var binder: ITablixBinder = this.binder;
-            var hierarchyNavigator: ITablixHierarchyNavigator = this._owner.owner.owner.hierarchyNavigator;
+            let binder: ITablixBinder = this.binder;
+            let hierarchyNavigator: ITablixHierarchyNavigator = this._owner.owner.owner.hierarchyNavigator;
 
-            var startColumnIndex: number = this._owner.dimension.getIntegerScrollOffset();
-            var endColumnIndex: number = this._owner.dimension.getItemsCount();
+            let startColumnIndex: number = this._owner.dimension.getIntegerScrollOffset();
+            let endColumnIndex: number = this._owner.dimension.getItemsCount();
+            let columnCount = endColumnIndex - startColumnIndex;
+
+            let startRowIndex: number = this._owner.otherLayoutManager.dimension.getIntegerScrollOffset();
+            let endRowIndex = this._owner.otherLayoutManager.dimension.getItemsCount();
+
             this.itemsEstimatedContextualWidth = 0;
-
-            var startRowIndex: number = this._owner.otherLayoutManager.dimension.getIntegerScrollOffset();
-            var endRowIndex = Math.min(startRowIndex + this.rowRealizationManager.itemsToRealizeCount, this._owner.otherLayoutManager.dimension.getItemsCount() - 1);
-            var columnCount = endColumnIndex - startColumnIndex;
 
             if (this._owner.alignToEnd) {
                 this.itemsToRealizeCount = columnCount;
                 return;
             }
 
-            for (var i = startColumnIndex; i < endColumnIndex; i++) {
+            for (let i = startColumnIndex; i < endColumnIndex; i++) {
                 if (Double.greaterOrEqualWithPrecision(this.itemsEstimatedContextualWidth, widthToFill, DimensionLayoutManager._pixelPrecision)) {
                     this.itemsToRealizeCount = i - startColumnIndex;
                     return;
                 }
 
-                var maxWidth = 0;
-                var visibleSizeRatio;
+                let maxWidth = 0;
+                let visibleSizeRatio;
 
                 if (i === startColumnIndex) {
                     visibleSizeRatio = this._owner.getVisibleSizeRatio();
@@ -270,12 +272,12 @@ module powerbi.visuals.controls.internal {
                     visibleSizeRatio = 1;
                 }
 
-                var columnMember: any = hierarchyNavigator.getLeafAt(this._owner.dimension.model, i);
-                var label = binder.getHeaderLabel(columnMember);
+                let columnMember: any = hierarchyNavigator.getLeafAt(this._owner.dimension.model, i);
+                let label = binder.getHeaderLabel(columnMember);
                 maxWidth = Math.max(maxWidth, this._owner.getEstimatedHeaderWidth(label, i));
 
-                for (var j = startRowIndex; j < endRowIndex; j++) {
-                    var intersection = hierarchyNavigator.getIntersection(hierarchyNavigator.getLeafAt(this._owner.otherLayoutManager.dimension.model, j), columnMember);
+                for (let j = startRowIndex; j < endRowIndex; j++) {
+                    let intersection = hierarchyNavigator.getIntersection(hierarchyNavigator.getLeafAt(this._owner.otherLayoutManager.dimension.model, j), columnMember);
                     label = binder.getCellContent(intersection);
                     maxWidth = Math.max(maxWidth, this._owner.getEstimatedBodyCellWidth(label));
                 }

@@ -24,51 +24,7 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
-
 module powerbi.data {
-    export interface DataViewObjectDescriptors {
-        /** Defines general properties for a visualization. */
-        general?: DataViewObjectDescriptor;
-
-        [objectName: string]: DataViewObjectDescriptor;
-    }
-
-    /** Defines a logical object in a visualization. */
-    export interface DataViewObjectDescriptor {
-        displayName?: DisplayNameGetter;
-        properties: DataViewObjectPropertyDescriptors;
-    }
-
-    export interface DataViewObjectPropertyDescriptors {
-        [propertyName: string]: DataViewObjectPropertyDescriptor;
-    }
-
-    /** Defines a property of a DataViewObjectDefinition. */
-    export interface DataViewObjectPropertyDescriptor {
-        displayName?: DisplayNameGetter;
-        type: DataViewObjectPropertyTypeDescriptor;
-
-        rule?: DataViewObjectPropertyRuleDescriptor;
-    }
-
-    export type DataViewObjectPropertyTypeDescriptor = ValueTypeDescriptor | StructuralTypeDescriptor;
-
-    export interface DataViewObjectPropertyRuleDescriptor {
-        /** For rule typed properties, defines the input visual role name. */
-        inputRole?: string;
-
-        /** Defines the output for rule-typed properties. */
-        output?: DataViewObjectPropertyRuleOutputDescriptor;
-    }
-
-    export interface DataViewObjectPropertyRuleOutputDescriptor {
-        /** Name of the target property for rule output. */
-        property: string;
-
-        /** Names roles that define the selector for the output properties. */
-        selector: string[];
-    }
 
     export module DataViewObjectDescriptors {
         /** Attempts to find the format string property.  This can be useful for upgrade and conversion. */
@@ -76,7 +32,7 @@ module powerbi.data {
             return findProperty(
                 descriptors,
                 (propDesc: DataViewObjectPropertyDescriptor) => {
-                    var formattingTypeDesc = ValueType.fromDescriptor(propDesc.type).formatting;
+                    let formattingTypeDesc = ValueType.fromDescriptor(propDesc.type).formatting;
                     return formattingTypeDesc && formattingTypeDesc.formatString;
                 });
         }
@@ -86,8 +42,18 @@ module powerbi.data {
             return findProperty(
                 descriptors,
                 (propDesc: DataViewObjectPropertyDescriptor) => {
-                    var propType: StructuralTypeDescriptor = propDesc.type;
+                    let propType: StructuralTypeDescriptor = propDesc.type;
                     return propType && !!propType.filter;
+                });
+        }
+
+        /** Attempts to find the default value property.  This can be useful for propagating schema default value. */
+        export function findDefaultValue(descriptors: DataViewObjectDescriptors): DataViewObjectPropertyIdentifier {
+            return findProperty(
+                descriptors,
+                (propDesc: DataViewObjectPropertyDescriptor) => {
+                    let propType: StructuralTypeDescriptor = propDesc.type;
+                    return propType && !!propType.expression && propType.expression.defaultValue;
                 });
         }
 
@@ -98,10 +64,10 @@ module powerbi.data {
             if (!descriptors)
                 return;
 
-            for (var objectName in descriptors) {
-                var objPropDescs = descriptors[objectName].properties;
+            for (let objectName in descriptors) {
+                let objPropDescs = descriptors[objectName].properties;
 
-                for (var propertyName in objPropDescs) {
+                for (let propertyName in objPropDescs) {
                     if (propPredicate(objPropDescs[propertyName])) {
                         return {
                             objectName: objectName,

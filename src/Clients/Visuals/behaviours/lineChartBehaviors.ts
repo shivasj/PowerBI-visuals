@@ -24,24 +24,45 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
-
 module powerbi.visuals {
     export interface LineChartBehaviorOptions {
-        dataPoints: SelectableDataPoint[];
         lines: D3.Selection;
         interactivityLines: D3.Selection;
         dots: D3.Selection;
         areas: D3.Selection;
-        clearCatcher: D3.Selection;
+        isPartOfCombo?: boolean;
+        tooltipOverlay: D3.Selection;
     }
 
-    export class LineChartWebBehavior {
-        public select(hasSelection: boolean, lines: D3.Selection, dots: D3.Selection, areas: D3.Selection) {
-            lines.style("stroke-opacity", (d: SelectableDataPoint) => ColumnUtil.getFillOpacity(d.selected, false, hasSelection, false));
-            dots.style("fill-opacity", (d: SelectableDataPoint) => ColumnUtil.getFillOpacity(d.selected, false, hasSelection, false));
-            if (areas)
-                areas.style("fill-opacity", (d: SelectableDataPoint) => (hasSelection && !d.selected) ? LineChart.DimmedAreaFillOpacity : LineChart.AreaFillOpacity);
+    export class LineChartWebBehavior implements IInteractiveBehavior {
+        private lines: D3.Selection;
+        private dots: D3.Selection;
+        private areas: D3.Selection;
+        private tooltipOverlay: D3.Selection;
+
+        public bindEvents(options: LineChartBehaviorOptions, selectionHandler: ISelectionHandler): void {
+            this.lines = options.lines;
+            let interactivityLines = options.interactivityLines;
+            let dots = this.dots = options.dots;
+            let areas = this.areas = options.areas;
+            let tooltipOverlay = this.tooltipOverlay = options.tooltipOverlay;
+
+            InteractivityUtils.registerStandardInteractivityHandlers(interactivityLines, selectionHandler);
+            InteractivityUtils.registerStandardInteractivityHandlers(dots, selectionHandler);
+
+            if (areas) {
+                InteractivityUtils.registerStandardInteractivityHandlers(areas, selectionHandler);
+            }
+
+            if (tooltipOverlay)
+                tooltipOverlay.on('click', () => selectionHandler.handleClearSelection());
+        }
+
+        public renderSelection(hasSelection: boolean) {
+            this.lines.style("stroke-opacity", (d: SelectableDataPoint) => ColumnUtil.getFillOpacity(d.selected, false, hasSelection, false));
+            this.dots.style("fill-opacity", (d: SelectableDataPoint) => ColumnUtil.getFillOpacity(d.selected, false, hasSelection, false));
+            if (this.areas)
+                this.areas.style("fill-opacity", (d: SelectableDataPoint) => (hasSelection && !d.selected) ? LineChart.DimmedAreaFillOpacity : LineChart.AreaFillOpacity);
         }
     }
 } 

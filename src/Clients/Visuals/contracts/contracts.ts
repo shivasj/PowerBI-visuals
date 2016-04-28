@@ -24,8 +24,6 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
-
 module powerbi.visuals {
 
     export interface VisualConfig {
@@ -33,9 +31,11 @@ module powerbi.visuals {
         visualType: string;
 
         projections: data.QueryProjectionsByRole[];
-
-        // this is the one that has info like Total, Combochart viz types, legend settings, etc...
-        // each IVisual implementation, should simply cast this to whatever object they expect
+        
+        /**
+         * This is the one that has info like Total, Combochart viz types, legend settings, etc...
+         * Each IVisual implementation, should simply cast this to whatever object they expect.
+         */
         config?: any;
     }
 }

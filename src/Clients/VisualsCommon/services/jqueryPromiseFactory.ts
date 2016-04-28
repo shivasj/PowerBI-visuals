@@ -24,8 +24,6 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
-
 module powerbi {
     export function createJQueryPromiseFactory(): IPromiseFactory {
         return new JQueryPromiseFactory();
@@ -41,19 +39,38 @@ module powerbi {
         }
 
         public reject<TError>(reason?: TError): IPromise2<any, TError> {
-            var deferred = this.defer();
+            let deferred = this.defer();
             deferred.reject(reason);
             return deferred.promise;
         }
 
         public resolve<TSuccess>(value: TSuccess): IPromise2<TSuccess, any> {
-            var deferred = this.defer();
+            let deferred = this.defer();
             deferred.resolve(value);
             return deferred.promise;
         }
+
+        public all(promises: IPromise2<any, any>[]): IPromise<any[]>;
+
+        public all(promises: any): IPromise<any[]> {
+            let unwrappedPromises = jQuery.map(promises, (value) => {
+                return value && value.promise ? value.promise : value;
+            });
+
+            return new JQueryPromiseWrapper($.when.apply($, unwrappedPromises));
+        }
+
+        public when<T>(value: T | IPromise<T>): IPromise<T>;
+
+        public when<T>(value: any): IPromise<T> {
+            let unwrappedPromise = value && value.promise ? value.promise : value;
+            return new JQueryPromiseWrapper($.when(unwrappedPromise));
+        }
     }
 
-    /** Implements IDeferred via a wrapped a jQuery Deferred. */
+    /** 
+     * Implements IDeferred via a wrapped a jQuery Deferred.
+     */
     class JQueryDeferredWrapper<TSuccess, TError> implements IDeferred2<TSuccess, TError> {
         public promise: IPromise2<TSuccess, TError>;
         private deferred: JQueryDeferred<any>;
@@ -65,7 +82,7 @@ module powerbi {
             this.promise = new JQueryPromiseWrapper(deferred.promise());
         }
 
-        public resolve(value: TSuccess| IPromise<any>): void {
+        public resolve(value: TSuccess | IPromise<any>): void {
             this.deferred.resolve(value);
         }
 
@@ -74,7 +91,9 @@ module powerbi {
         }
     }
 
-    /** Implements IDeferred via a wrapped a jQuery Promise. */
+    /** 
+     * Implements IDeferred via a wrapped a jQuery Promise.
+     */
     class JQueryPromiseWrapper<TSuccess, TError> implements IPromise2<TSuccess, TError> {
         private promise: JQueryPromise<any>;
 
@@ -101,11 +120,13 @@ module powerbi {
             return this;
         }
 
-        /** Wraps a callback, which may return a IPromise. */
+        /** 
+         * Wraps a callback, which may return a IPromise. 
+         */
         private static wrapCallback(callback: (arg: any) => any): (arg: any) => any {
             if (callback)
                 return arg => {
-                    var value = callback(arg);
+                    let value = callback(arg);
 
                     // If the callback returns a Promise, unwrap that to allow jQuery to chain.
                     if (value instanceof JQueryPromiseWrapper)

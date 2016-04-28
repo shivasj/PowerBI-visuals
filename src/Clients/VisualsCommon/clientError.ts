@@ -24,8 +24,6 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="_references.ts"/>
-
 module powerbi {
     import IStringResourceProvider = jsCommon.IStringResourceProvider;
 
@@ -37,24 +35,73 @@ module powerbi {
         code: string;
         debugInfo?: string;
         ignorable?: boolean;
+        requestId?: string;
     }
 
     export interface IClientWarning extends ILocalizableError {
+        code: string;
         columnNameFromIndex: (index: number) => string;
     }
 
-    export class UnknownClientError implements IClientError {
+    /**
+     this base class should be derived to give a generic error message but with a unique error code.
+     */
+    export abstract class UnknownClientError implements IClientError {
+        private errorCode: string;
+
         public get code(): string {
-            return 'UnknownClientError';
+            return this.errorCode;
         }
         public get ignorable(): boolean {
             return false;
         }
 
+        constructor(code: string) {
+            debug.assertValue(code, 'code');
+
+            this.errorCode = code;
+        }
+
         public getDetails(resourceProvider: IStringResourceProvider): ErrorDetails {
-            var details: ErrorDetails = {
+            let details: ErrorDetails = {
                 message: resourceProvider.get('ClientError_UnknownClientErrorValue'),
                 additionalErrorInfo: [{ errorInfoKey: resourceProvider.get('ClientError_UnknownClientErrorKey'), errorInfoValue: resourceProvider.get('ClientError_UnknownClientErrorValue'), }],
+            };
+
+            return details;
+        }
+    }
+
+    export class HttpClientError implements IClientError {
+        private httpRequestId: string;
+        private httpStatusCode: number;
+        
+        constructor(httpStatusCode: number, requestId: string) {
+            debug.assertValue(httpStatusCode, 'httpStatusCode');
+            debug.assertValue(requestId, 'requestId');
+            this.httpStatusCode = httpStatusCode;
+            this.httpRequestId = requestId;
+        }
+
+        public get code(): string {
+            return 'HttpClientError';
+        }
+
+        public get ignorable(): boolean {
+            return false;
+        }
+
+        public get requestId(): string {
+            return this.httpRequestId;
+        }
+
+        public getDetails(resourceProvider: IStringResourceProvider): ErrorDetails {
+            // Use a general error message for a HTTP request failure, since we currently do not know of any specifc error cases at this point in time.
+            let details: ErrorDetails = {
+                message: null,
+                additionalErrorInfo: [
+                    { errorInfoKey: resourceProvider.get('DsrError_Key'), errorInfoValue: resourceProvider.get('DsrError_UnknownErrorValue')},
+                    { errorInfoKey: resourceProvider.get('ClientError_HttpResponseStatusCodeKey'), errorInfoValue: this.httpStatusCode.toString() }],
             };
 
             return details;
@@ -70,7 +117,7 @@ module powerbi {
         }
 
         public getDetails(resourceProvider: IStringResourceProvider): ErrorDetails {
-            var details: ErrorDetails = {
+            let details: ErrorDetails = {
                 message: '',
                 additionalErrorInfo: [],
             };

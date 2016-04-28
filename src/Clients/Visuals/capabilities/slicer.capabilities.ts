@@ -24,17 +24,83 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
-
 module powerbi.visuals {
-    export var slicerCapabilities: VisualCapabilities = {
+    export const slicerCapabilities: VisualCapabilities = {
         dataRoles: [
             {
                 name: 'Values',
                 kind: VisualDataRoleKind.Grouping,
                 displayName: powerbi.data.createDisplayNameGetter('Role_DisplayName_Field'),
+                description: data.createDisplayNameGetter('Role_DisplayName_FieldDescription')
             }
         ],
+        objects: {
+            general: {
+                displayName: data.createDisplayNameGetter('Visual_General'),
+                properties: {
+                    filter: {
+                        type: { filter: {} },
+                    },
+                    defaultValue: {
+                        type: { expression: { defaultValue: true } },
+                    },
+                    formatString: StandardObjectProperties.formatString,
+                    outlineColor: StandardObjectProperties.outlineColor,
+                    outlineWeight: StandardObjectProperties.outlineWeight,
+                    orientation: {
+                        displayName: data.createDisplayNameGetter('Slicer_Orientation'),
+                        type: { enumeration: slicerOrientation.type }
+                    },
+                    count: {
+                        type: { integer: true }
+                    },
+                },
+            },
+            selection: {
+                displayName: data.createDisplayNameGetter('Visual_SelectionControls'),
+                properties: {
+                    selectAllCheckboxEnabled: {
+                        displayName: data.createDisplayNameGetter('Visual_SelectAll'),
+                        type: { bool: true }
+                    },
+                    singleSelect: {
+                        displayName: data.createDisplayNameGetter('Visual_SingleSelect'),
+                        type: { bool: true }
+                    }
+                },
+            },
+            header: {
+                displayName: data.createDisplayNameGetter('Visual_Header'),
+                properties: {
+                    show: StandardObjectProperties.show,
+                    fontColor: StandardObjectProperties.fontColor,
+                    background: {
+                        displayName: data.createDisplayNameGetter('Visual_Background'),
+                        type: { fill: { solid: { color: true } } }
+                    },
+                    outline: StandardObjectProperties.outline,
+                    textSize: {
+                        displayName: data.createDisplayNameGetter('Visual_TextSize'),
+                        type: { numeric: true }
+                    },
+                }
+            },
+            items: {
+                displayName: data.createDisplayNameGetter('Role_DisplayName_Items'),
+                properties: {
+                    fontColor: StandardObjectProperties.fontColor,
+                    background: {
+                        displayName: data.createDisplayNameGetter('Visual_Background'),
+                        type: { fill: { solid: { color: true } } }
+                    },
+                    outline: StandardObjectProperties.outline,
+                    textSize: {
+                        displayName: data.createDisplayNameGetter('Visual_TextSize'),
+                        type: { numeric: true }
+                    },
+                }
+            }
+        },
         dataViewMappings: [{
             conditions: [{ 'Values': { max: 1 } }],
             categorical: {
@@ -45,48 +111,43 @@ module powerbi.visuals {
                 includeEmptyGroups: true,
             }
         }],
-        objects: {
-            general: {
-                properties: {
-                    selected: {
-                        type: { bool: true }
-                    },
-                    filter: {
-                        type: { filter: {} },
-                        rule: {
-                            output: {
-                                property: 'selected',
-                                selector: ['Values'],
-                            }
-                        }
-                    },
-                    formatString: {
-                        type: { formatting: { formatString: true } },
-                    },
-                }
-            }
-        },
+
         sorting: {
             default: {},
         },
         suppressDefaultTitle: true,
+        disableVisualDetails: true,
     };
 
-    export var slicerProps = {
-        selectedPropertyIdentifier: <DataViewObjectPropertyIdentifier>{
-            objectName: 'general',
-            propertyName: 'selected'
+    // TODO: Generate these from above, defining twice just introduces potential for error
+    export const slicerProps = {
+        general: {
+            outlineColor: <DataViewObjectPropertyIdentifier>{ objectName: 'general', propertyName: 'outlineColor' },
+            outlineWeight: <DataViewObjectPropertyIdentifier>{ objectName: 'general', propertyName: 'outlineWeight' },
+            orientation: <DataViewObjectPropertyIdentifier>{ objectName: 'general', propertyName: 'orientation' },
+            count: <DataViewObjectPropertyIdentifier>{ objectName: 'general', propertyName: 'count' },
         },
-
-        filterPropertyIdentifier: <DataViewObjectPropertyIdentifier> {
-            objectName: 'general',
-            propertyName: 'filter'
+        selection: {
+            selectAllCheckboxEnabled: <DataViewObjectPropertyIdentifier>{ objectName: 'selection', propertyName: 'selectAllCheckboxEnabled' },
+            singleSelect: <DataViewObjectPropertyIdentifier>{ objectName: 'selection', propertyName: 'singleSelect' }
         },
-
-        formatString: <DataViewObjectPropertyIdentifier> {
-            objectName: 'general',
-            propertyName: 'formatString'
+        header: {
+            show: <DataViewObjectPropertyIdentifier>{ objectName: 'header', propertyName: 'show' },
+            fontColor: <DataViewObjectPropertyIdentifier>{ objectName: 'header', propertyName: 'fontColor' },
+            background: <DataViewObjectPropertyIdentifier>{ objectName: 'header', propertyName: 'background' },
+            outline: <DataViewObjectPropertyIdentifier>{ objectName: 'header', propertyName: 'outline' },
+            textSize: <DataViewObjectPropertyIdentifier>{ objectName: 'header', propertyName: 'textSize' },
         },
+        items: {
+            fontColor: <DataViewObjectPropertyIdentifier>{ objectName: 'items', propertyName: 'fontColor' },
+            background: <DataViewObjectPropertyIdentifier>{ objectName: 'items', propertyName: 'background' },
+            outline: <DataViewObjectPropertyIdentifier>{ objectName: 'items', propertyName: 'outline' },
+            textSize: <DataViewObjectPropertyIdentifier>{ objectName: 'items', propertyName: 'textSize' },
+        },
+        selectedPropertyIdentifier: <DataViewObjectPropertyIdentifier>{ objectName: 'general', propertyName: 'selected' },
+        filterPropertyIdentifier: <DataViewObjectPropertyIdentifier> { objectName: 'general', propertyName: 'filter' },
+        formatString: <DataViewObjectPropertyIdentifier> { objectName: 'general', propertyName: 'formatString' },
+        defaultValue: <DataViewObjectPropertyIdentifier>{ objectName: 'general', propertyName: 'defaultValue' },
     };
 
 }

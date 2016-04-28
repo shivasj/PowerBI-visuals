@@ -24,153 +24,121 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
-
 module powerbitests {
     import DataViewTransform = powerbi.data.DataViewTransform;
     import Map = powerbi.visuals.Map;
-    import DataLabelUtils = powerbi.visuals.dataLabelUtils;
-    import MapSeriesInfo = powerbi.visuals.MapSeriesInfo;
     import ValueType = powerbi.ValueType;
     import PrimitiveType = powerbi.PrimitiveType;
-    import SQExprShortSerializer = powerbi.data.SQExprShortSerializer;
     import LegendPosition = powerbi.visuals.LegendPosition;
     import ILegend = powerbi.visuals.ILegend;
+    import dataLabelUtils = powerbi.visuals.dataLabelUtils;
+    import PixelConverter = jsCommon.PixelConverter;
+    import MapShapeDataPointRenderer = powerbi.visuals.MapShapeDataPointRenderer;
+    import ColorHelper = powerbi.visuals.ColorHelper;
+    import DataView = powerbi.DataView;
+    import SelectionIdBuilder = powerbi.visuals.SelectionIdBuilder;
+    import IGeoTaggingAnalyzerService = powerbi.IGeoTaggingAnalyzerService;
+    import MapData = powerbi.visuals.MapData;
 
     powerbitests.mocks.setLocale();
 
-    describe("Map",() => {
-        var element: JQuery;
-        var mockGeotaggingAnalyzerService;
+    describe("Map", () => {
+        let element: JQuery;
+        let mockGeotaggingAnalyzerService;
+
+        var viewport = {
+            height: 800,
+            width: 500,
+        };
 
         beforeEach(() => {
             mockGeotaggingAnalyzerService = powerbi.createGeoTaggingAnalyzerService((stringId: string) => mocks.getLocalizedString(stringId));
-            element = powerbitests.helpers.testDom('800', '500');
+            element = powerbitests.helpers.testDom(viewport.height.toString(), viewport.width.toString());
         });
 
-        it('Map registered capabilities',() => {
-            expect(powerbi.visuals.visualPluginFactory.create().getPlugin('map').capabilities).toBe(powerbi.visuals.mapCapabilities);
+        describe('capabilities', () => {
+
+            it('Map registered capabilities', () => {
+                expect(powerbi.visuals.visualPluginFactory.create().getPlugin('map').capabilities).toBe(powerbi.visuals.mapCapabilities);
+            });
+
+            it('Capabilities should include dataViewMappings', () => {
+                expect(powerbi.visuals.mapCapabilities.dataViewMappings).toBeDefined();
+            });
+
+            it('Capabilities should include dataRoles', () => {
+                expect(powerbi.visuals.mapCapabilities.dataRoles).toBeDefined();
+            });
+
+            it('Capabilities should not suppressDefaultTitle', () => {
+                expect(powerbi.visuals.mapCapabilities.suppressDefaultTitle).toBeUndefined();
+            });
+
+            it('Capabilities DataRole preferredTypes', () => {
+                //Map's Category, X and Y fieldWells have preferences for geographic locations, longitude and latitude respectively
+                expect(powerbi.visuals.mapCapabilities.dataRoles.map(r => !!r.preferredTypes)).toEqual([
+                    true,
+                    false,
+                    true,
+                    true,
+                    false,
+                    false,
+                ]);
+
+                expect(powerbi.visuals.mapCapabilities.dataRoles[0].preferredTypes.map(ValueType.fromDescriptor)).toEqual([
+                    ValueType.fromExtendedType(powerbi.ExtendedType.Address),
+                    ValueType.fromExtendedType(powerbi.ExtendedType.City),
+                    ValueType.fromExtendedType(powerbi.ExtendedType.Continent),
+                    ValueType.fromExtendedType(powerbi.ExtendedType.Country),
+                    ValueType.fromExtendedType(powerbi.ExtendedType.County),
+                    ValueType.fromExtendedType(powerbi.ExtendedType.Place),
+                    ValueType.fromExtendedType(powerbi.ExtendedType.PostalCode_Text),
+                    ValueType.fromExtendedType(powerbi.ExtendedType.Region),
+                    ValueType.fromExtendedType(powerbi.ExtendedType.StateOrProvince)
+                ]);
+
+                expect(powerbi.visuals.mapCapabilities.dataRoles[2].preferredTypes.map(ValueType.fromDescriptor)).toEqual([
+                    ValueType.fromPrimitiveTypeAndCategory(PrimitiveType.Double, "Longitude")
+                ]);
+
+                expect(powerbi.visuals.mapCapabilities.dataRoles[3].preferredTypes.map(ValueType.fromDescriptor)).toEqual([
+                    ValueType.fromPrimitiveTypeAndCategory(PrimitiveType.Double, "Latitude")
+                ]);
+            });
+
+            it('FormatString property should match calculated', () => {
+                expect(powerbi.data.DataViewObjectDescriptors.findFormatString(powerbi.visuals.mapCapabilities.objects)).toEqual(powerbi.visuals.mapProps.general.formatString);
+            });
         });
 
-        it('Capabilities should include dataViewMappings',() => {
-            expect(powerbi.visuals.mapCapabilities.dataViewMappings).toBeDefined();
-        });
+        it('getMeasureIndexOfRole', () => {
+            let dataView = new MapDataBuilder().build(true, true);
+            let grouped = dataView.categorical.values.grouped();
 
-        it('Capabilities should include dataRoles',() => {
-            expect(powerbi.visuals.mapCapabilities.dataRoles).toBeDefined();
-        });
-
-        it('Capabilities should not suppressDefaultTitle',() => {
-            expect(powerbi.visuals.mapCapabilities.suppressDefaultTitle).toBeUndefined();
-        });
-
-        it('Capabilities DataRole preferredTypes',() => {
-            //Map's Category, X and Y fieldWells have preferences for geographic locations, longitude and latitude respectively
-            expect(powerbi.visuals.mapCapabilities.dataRoles.map(r => !!r.preferredTypes)).toEqual([
-                true,
-                false,
-                true,
-                true,
-                false,
-                false,
-            ]);
-
-            expect(powerbi.visuals.mapCapabilities.dataRoles[0].preferredTypes.map(ValueType.fromDescriptor)).toEqual([
-                ValueType.fromExtendedType(powerbi.ExtendedType.Address),
-                ValueType.fromExtendedType(powerbi.ExtendedType.City),
-                ValueType.fromExtendedType(powerbi.ExtendedType.Continent),
-                ValueType.fromExtendedType(powerbi.ExtendedType.Country),
-                ValueType.fromExtendedType(powerbi.ExtendedType.County),
-                ValueType.fromExtendedType(powerbi.ExtendedType.Place),
-                ValueType.fromExtendedType(powerbi.ExtendedType.PostalCode_Text),
-                ValueType.fromExtendedType(powerbi.ExtendedType.Region),
-                ValueType.fromExtendedType(powerbi.ExtendedType.StateOrProvince)
-            ]);
-
-            expect(powerbi.visuals.mapCapabilities.dataRoles[2].preferredTypes.map(ValueType.fromDescriptor)).toEqual([
-                ValueType.fromPrimitiveTypeAndCategory(PrimitiveType.Double, "Longitude")
-            ]);
-
-            expect(powerbi.visuals.mapCapabilities.dataRoles[3].preferredTypes.map(ValueType.fromDescriptor)).toEqual([
-                ValueType.fromPrimitiveTypeAndCategory(PrimitiveType.Double, "Latitude")
-            ]);
-        });
-
-        it('FormatString property should match calculated',() => {
-            expect(powerbi.data.DataViewObjectDescriptors.findFormatString(powerbi.visuals.mapCapabilities.objects)).toEqual(powerbi.visuals.mapProps.general.formatString);
-        });
-
-        it('Map.getMeasureIndexOfRole',() => {
-            var dataViewMetadata: powerbi.DataViewMetadata = {
-                columns: [
-                    { displayName: 'col1', queryName: 'col1' },
-                    { displayName: 'col2', queryName: 'col2', isMeasure: true, roles: { "Size": true } },
-                    { displayName: 'col3', queryName: 'col3', isMeasure: true, roles: { "X": true } }
-                ]
-            };
-            var dataView: powerbi.DataView = {
-                metadata: dataViewMetadata,
-                categorical: {
-                    categories: [{
-                        source: dataViewMetadata.columns[0],
-                        values: ['Montana', 'California', 'Arizona']
-                    }],
-                    values: DataViewTransform.createValueColumns([{
-                        source: dataViewMetadata.columns[1],
-                        values: [-100, 200, 700],
-                        subtotal: 800
-                    }, {
-                            source: dataViewMetadata.columns[2],
-                            values: [1, 2, 3],
-                            subtotal: 6
-                        }])
-                }
-            };
-            var grouped = dataView.categorical.values.grouped();
-
-            var result = powerbi.visuals.DataRoleHelper.getMeasureIndexOfRole(grouped, "InvalidRoleName");
+            let result = powerbi.data.DataRoleHelper.getMeasureIndexOfRole(grouped, "InvalidRoleName");
             expect(result).toBe(-1);
 
-            result = powerbi.visuals.DataRoleHelper.getMeasureIndexOfRole(grouped, "Size");
+            result = powerbi.data.DataRoleHelper.getMeasureIndexOfRole(grouped, "Size");
             expect(result).toBe(0);
 
-            result = powerbi.visuals.DataRoleHelper.getMeasureIndexOfRole(grouped, "X");
+            result = powerbi.data.DataRoleHelper.getMeasureIndexOfRole(grouped, "X");
             expect(result).toBe(1);
         });
 
-        it('Map.calculateGroupSizes',() => {
-            var dataViewMetadata: powerbi.DataViewMetadata = {
-                columns: [
-                    { displayName: 'col1', queryName: 'col1' },
-                    { displayName: 'col2', queryName: 'col2', isMeasure: true }
-                ]
-            };
-            var dataView: powerbi.DataView = {
-                metadata: dataViewMetadata,
-                categorical: {
-                    categories: [{
-                        source: dataViewMetadata.columns[0],
-                        values: ['Montana', 'California', 'Arizona']
-                    }],
-                    values: DataViewTransform.createValueColumns([{
-                        source: dataViewMetadata.columns[1],
-                        values: [-100, 200, 700],
-                        subtotal: 1000
-                    }])
-                }
-            };
+        it('calculateGroupSizes', () => {
+            let dataView = new MapDataBuilder().build(true, false);
             var grouped = dataView.categorical.values.grouped();
 
-            var groupSizeTotals = [];
-            var range = null;
-            var sizeIndex = 0;
-            var result = Map.calculateGroupSizes(dataView.categorical, grouped, groupSizeTotals, sizeIndex, range);
-            expect(result.min).toBe(-100);
-            expect(result.max).toBe(700);
+            let groupSizeTotals = [];
+            let range = null;
+            let sizeIndex = 0;
+            let result = Map.calculateGroupSizes(dataView.categorical, grouped, groupSizeTotals, sizeIndex, range);
+            expect(result.min).toBe(100);
+            expect(result.max).toBe(300);
             expect(groupSizeTotals.length).toBe(3);
-            expect(groupSizeTotals[0]).toBe(-100);
+            expect(groupSizeTotals[0]).toBe(100);
             expect(groupSizeTotals[1]).toBe(200);
-            expect(groupSizeTotals[2]).toBe(700);
+            expect(groupSizeTotals[2]).toBe(300);
 
             groupSizeTotals = [];
             sizeIndex = -1;
@@ -182,1256 +150,1706 @@ module powerbitests {
             expect(groupSizeTotals[2]).toBe(null);
         });
 
-        it('Map.createMapDataPoint',() => {
-            var colors = powerbi.visuals.visualStyles.create().colorPalette.dataColors;
-            var group = "Arizona";
-            var value = 100;
-            var mapSeriesInfo: MapSeriesInfo = {
-                sizeValuesForGroup: [{
-                    value: 100,
-                    index: 0,
-                    fill: "#112233",
-                    stroke: "#223344",
-                    seriesId: mocks.dataViewScopeIdentity("Sales"),
-                }],
-                latitude: null,
-                longitude: null,
-
-            };
-            var radius = 3;
-
-            // No seriesInfo means the result is null
-            var result = Map.createMapDataPoint(group, value, null, radius, colors, null);
-            expect(result).toBe(null);
-
-            result = Map.createMapDataPoint(group, value, mapSeriesInfo, radius, colors, mocks.dataViewScopeIdentity("Arizona"));
-            expect(result.seriesInfo).toBe(mapSeriesInfo);
-            expect(result.radius).toBe(radius);
-            expect(result.location).toBe(null);
-            expect(result.cachedLocation).toBe(result.location);
-            expect(result.geocodingQuery).toBe(group);
-            expect(result.categoryValue).toBe(group);
-
-            // No group, latitude, or longitude shouldn't render
-            group = null;
-            result = Map.createMapDataPoint(group, value, mapSeriesInfo, radius, colors, null);
-            expect(result).toBe(null);
-
-        });
-
-        it('Map.calculateSeriesInfo',() => {
-            var dataViewMetadata: powerbi.DataViewMetadata = {
-                columns: [
-                    { displayName: 'col1', queryName: 'col1' },
-                    { displayName: 'col2', queryName: 'col2', isMeasure: true }
-                ]
-            };
-            var dataView: powerbi.DataView = {
-                metadata: dataViewMetadata,
-                categorical: {
-                    categories: [{
-                        source: dataViewMetadata.columns[0],
-                        values: ['Montana', 'California', 'Arizona']
-                    }],
-                    values: DataViewTransform.createValueColumns([{
-                        source: dataViewMetadata.columns[1],
-                        values: [-100, 200, 700],
-                        subtotal: 800
-                    }])
-                }
-            };
-
-            var groupIndex: number = 0;
-            var sizeIndex = 0;
-            var latIndex = -1;
-            var longIndex = -1;
-            var colors = powerbi.visuals.visualStyles.create().colorPalette.dataColors;
-            var result = Map.calculateSeriesInfo(dataView.categorical.values.grouped(), groupIndex, sizeIndex, latIndex, longIndex, colors);
-            expect(result.sizeValuesForGroup.length).toBe(1);
-            expect(result.sizeValuesForGroup[0].value).toBe(-100);
-            expect(result.sizeValuesForGroup[0].index).toBe(0);
-            expect(result.latitude).toBe(null);
-            expect(result.longitude).toBe(null);
-        });
-
-        function getDataViewMultiSeries(firstGroupName: string = 'Canada', secondGroupName: string = 'United States'): powerbi.DataView {
-            var dataViewMetadata: powerbi.DataViewMetadata = {
-                columns: [
-                    {
-                        displayName: '',
-                        format: '0',
-                    }, {
-                        displayName: '',
-                    }, {
-                        displayName: '',
-                        format: '#,0.00',
-                        isMeasure: true,
-                        groupName: firstGroupName,
-                    }, {
-                        displayName: '',
-                        format: '#,0',
-                        isMeasure: true,
-                        groupName: firstGroupName,
-                    }, {
-                        displayName: '',
-                        format: '#,0.00',
-                        isMeasure: true,
-                        groupName: secondGroupName,
-                    }, {
-                        displayName: '',
-                        format: '#,0',
-                        isMeasure: true,
-                        groupName: secondGroupName,
-                    }, {
-                        displayName: '',
-                        format: '#,0.00',
-                        isMeasure: true,
-                    }, {
-                        displayName: '',
-                        format: '#,0',
-                        isMeasure: true,
-                    }
-                ]
-            };
-
-            var colP1Ref = powerbi.data.SQExprBuilder.fieldDef({ schema: 's', entity: 't', column: 'p1' });
-            var colP2Ref = powerbi.data.SQExprBuilder.fieldDef({ schema: 's', entity: 't', column: 'p2' });
-
-            var seriesValues = [null, firstGroupName, secondGroupName];
-            var seriesIdentities = seriesValues.map(v => mocks.dataViewScopeIdentity(v));
-
-            var dataViewValueColumns: powerbi.DataViewValueColumn[] = [
-                {
-                    source: dataViewMetadata.columns[2],
-                    values: [150, 177, 157],
-                    identity: seriesIdentities[1],
-                }, {
-                    source: dataViewMetadata.columns[3],
-                    values: [30, 25, 28],
-                    identity: seriesIdentities[1],
-                }, {
-                    source: dataViewMetadata.columns[4],
-                    values: [100, 149, 144],
-                    identity: seriesIdentities[2],
-                }, {
-                    source: dataViewMetadata.columns[5],
-                    values: [300, 250, 280],
-                    identity: seriesIdentities[2],
-                }
-            ];
-
-            var dataView: powerbi.DataView = {
-                metadata: dataViewMetadata,
-                categorical: {
-                    categories: [{
-                        source: dataViewMetadata.columns[0],
-                        values: [2012, 2011, 2010],
-                        identity: [seriesIdentities[0]],
-                        identityFields: [
-                            colP1Ref
-                        ]
-                    }],
-                    values: DataViewTransform.createValueColumns(dataViewValueColumns, [colP2Ref])
-                },
-            };
-
-            dataView.categorical.values.source = dataViewMetadata.columns[1];
-
-            return dataView;
-        }
-
-        it('Map.calculateSeriesInfo multi-series',() => {
-            var dataView: powerbi.DataView = getDataViewMultiSeries();
-
-            var groupIndex: number = 0;
-            var sizeIndex = 0;
-            var latIndex = -1;
-            var longIndex = -1;
-            var colors = powerbi.visuals.visualStyles.create().colorPalette.dataColors;
-            var categoryColumnRef = dataView.categorical.values.identityFields;
-            var result = Map.calculateSeriesInfo(dataView.categorical.values.grouped(), groupIndex, sizeIndex, longIndex, latIndex, colors, undefined, undefined, categoryColumnRef);
-            expect(result.sizeValuesForGroup.length).toBe(2);
-            expect(result.sizeValuesForGroup[0].value).toBe(150);
-            expect(result.sizeValuesForGroup[0].index).toBe(0);
-            expect(result.sizeValuesForGroup[0].fill).not.toBeNull();
-            expect(result.sizeValuesForGroup[0].stroke).not.toBeNull();
-
-            expect(result.sizeValuesForGroup[1].value).toBe(100);
-            expect(result.sizeValuesForGroup[1].index).toBe(1);
-            expect(result.sizeValuesForGroup[1].fill).not.toBeNull();
-            expect(result.sizeValuesForGroup[1].stroke).not.toBeNull();
-
-            expect(result.sizeValuesForGroup[1].fill).not.toBe(result.sizeValuesForGroup[0].fill);
-
-            expect(result.latitude).toBe(null);
-            expect(result.longitude).toBe(null);
-        });
-
-        it('Map.calculateSeriesInfo with lat long and no size', () => {
-            var dataViewMetadata: powerbi.DataViewMetadata = {
-                columns: [
-                    { displayName: 'col1', queryName: 'col1' },
-                    { displayName: 'col2', queryName: 'col2', isMeasure: true },
-                    { displayName: 'col3', queryName: 'col3', isMeasure: true }
-                ]
-            };
-            var dataView: powerbi.DataView = {
-                metadata: dataViewMetadata,
-                categorical: {
-                    categories: [{
-                        source: dataViewMetadata.columns[0],
-                        values: ['Montana', 'California', 'Arizona']
-                    }],
-                    values: DataViewTransform.createValueColumns([{
-                        source: dataViewMetadata.columns[1],
-                        values: [46.87, 37.81, 34.68],
-                        subtotal: 72.49
-                    }, {
-                        source: dataViewMetadata.columns[2],
-                        values: [-114, -122.46, -111.76],
-                        subtotal: -348.22
-                    }])
-                }
-            };
-
-            var groupIndex: number = 0;
-            var sizeIndex = -1;
-            var latIndex = 0;
-            var longIndex = 1;
-            var colors = powerbi.visuals.visualStyles.create().colorPalette.dataColors;
-            var result = Map.calculateSeriesInfo(dataView.categorical.values.grouped(), groupIndex, sizeIndex, longIndex, latIndex, colors);
-            expect(result.sizeValuesForGroup.length).toBe(1);
-            expect(result.sizeValuesForGroup[0].value).toBe(null);
-            expect(result.sizeValuesForGroup[0].index).toBe(0);
-            expect(result.latitude).toBe(46.87);
-            expect(result.longitude).toBe(-114);
-        });
-
-        it('Map.calculateSeriesLegend colors from palette with dynamic series',() => {
-            var dataViewMetadata: powerbi.DataViewMetadata = {
-                columns: [
-                    { displayName: 'col1', queryName: 'col1' },
-                    { displayName: 'col2', queryName: 'col2' },
-                    { displayName: 'col3', queryName: 'col3', isMeasure: true, groupName: 'a' },
-                    { displayName: 'col3', queryName: 'col3', isMeasure: true, groupName: 'b' },
-                ]
-            };
-            var col3Ref = powerbi.data.SQExprBuilder.fieldDef({ schema: 's', entity: 'e', column: 'col3' });
-            var seriesIdentities = [
-                mocks.dataViewScopeIdentityWithEquality(col3Ref, 'a'),
-                mocks.dataViewScopeIdentityWithEquality(col3Ref, 'b')
-            ];
-            var dataView: powerbi.DataView = {
-                metadata: dataViewMetadata,
-                categorical: {
-                    categories: [{
-                        source: dataViewMetadata.columns[0],
-                        values: ['Montana', 'California', 'Arizona'],
-                    }],
-                    values: DataViewTransform.createValueColumns([{
-                        source: dataViewMetadata.columns[2],
-                        values: [-100, 200, 700],
-                        identity: seriesIdentities[0],
-                    }, {
-                            source: dataViewMetadata.columns[3],
-                            values: [200, 400, 500],
-                            identity: seriesIdentities[1],
-                        }],
-                        [col3Ref])
-                }
-            };
-
-            var groupIndex: number = 0;
-            var sizeIndex = 0;
-            var colors = powerbi.visuals.visualStyles.create().colorPalette.dataColors;
-
-            var series1Color = colors.getColorScaleByKey(SQExprShortSerializer.serialize(col3Ref)).getColor('a');
-            var series2Color = colors.getColorScaleByKey(SQExprShortSerializer.serialize(col3Ref)).getColor('b');
-
-            var result = Map.calculateSeriesLegend(dataView.categorical.values.grouped(), groupIndex, sizeIndex, colors, undefined, [col3Ref]);
-
-            expect(result.length).toBe(2);
-            expect(result[0].color).toBe(series1Color.value);
-            expect(result[1].color).toBe(series2Color.value);
-        });
-
-        it('Map.calculateSeriesLegend colors from palette with static series',() => {
-            var dataViewMetadata: powerbi.DataViewMetadata = {
-                columns: [
-                    { displayName: 'col1', queryName: 'col1' },
-                    { displayName: 'col2', queryName: 'col2', isMeasure: true },
-                    { displayName: 'col3', queryName: 'col3', isMeasure: true },
-                ]
-            };
-            var col1Ref = powerbi.data.SQExprBuilder.fieldDef({ schema: 's', entity: 'e', column: 'col1' });
-            var seriesIdentities = [
-                mocks.dataViewScopeIdentity('col2'),
-                mocks.dataViewScopeIdentity('col3'),
-            ];
-            var dataView: powerbi.DataView = {
-                metadata: dataViewMetadata,
-                categorical: {
-                    categories: [{
-                        source: dataViewMetadata.columns[0],
-                        values: ['Montana', 'California', 'Arizona'],
-                        identityFields: [col1Ref],
-                    }],
-                    values: DataViewTransform.createValueColumns([{
-                        source: dataViewMetadata.columns[1],
-                        values: [-100, 200, 700],
-                        identity: seriesIdentities[0],
-                    }, {
-                            source: dataViewMetadata.columns[2],
-                            values: [200, 400, 500],
-                            identity: seriesIdentities[1],
-                        }])
-                }
-            };
-
-            var groupIndex: number = 0;
-            var sizeIndex = 0;
-            var colors = powerbi.visuals.visualStyles.create().colorPalette.dataColors;
-
-            var series1Color = colors.getColorScaleByKey(SQExprShortSerializer.serialize(col1Ref)).getColor('col2').value;
-            var series2Color = colors.getColorScaleByKey(SQExprShortSerializer.serialize(col1Ref)).getColor('col3').value;
-
-            var result = Map.calculateSeriesLegend(dataView.categorical.values.grouped(), groupIndex, sizeIndex, colors, undefined, [col1Ref]);
-
-            expect(result.length).toBe(2);
-            expect(result[0].color).toBe(series1Color);
-            expect(result[1].color).toBe(series2Color);
-        });
-
-        // TODO: verify this works when 4906998 is fixed
-        //it('Map.calculateSeriesInfo same field category & series',() => {
-        //    var dataViewMetadata: powerbi.DataViewMetadata = {
-        //        columns: [
-        //            { displayName: 'col1', roles: { 'Category': true, 'Series': true } },
-        //            { displayName: 'col2', isMeasure: true, queryName: 'selectCol2' },
-        //            { displayName: 'lat', isMeasure: true, queryName: 'selectLat' },
-        //            { displayName: 'long', isMeasure: true, queryName: 'selectLong' },
-        //        ]
-        //    };
-        //    var dataView: powerbi.DataView = powerbi.data.DataViewSelfCrossJoin.apply({
-        //        metadata: dataViewMetadata,
-        //        categorical: {
-        //            categories: [{
-        //                source: dataViewMetadata.columns[0],
-        //                values: ['Montana', 'California', 'Arizona'],
-        //                identity: [mocks.dataViewScopeIdentity('M'), mocks.dataViewScopeIdentity('C'), mocks.dataViewScopeIdentity('A')]
-        //            }],
-        //            values: DataViewTransform.createValueColumns([
-        //                {
-        //                    source: dataViewMetadata.columns[1],
-        //                    values: [-100, 200, 700],
-        //                }, {
-        //                    source: dataViewMetadata.columns[2],
-        //                    values: [49, 54, 101],
-        //                }, {
-        //                    source: dataViewMetadata.columns[3],
-        //                    values: [0, 40, 20],
-        //                }
-        //            ])
-        //        }
-        //    });
-        //    var groupedValues = dataView.categorical.values.grouped();
-
-        //    var sizeIndex = 0;
-        //    var latIndex = 1;
-        //    var longIndex = 2;
-        //    var colors = powerbi.visuals.visualStyles.create().colorPalette.dataColors;
-        //    var result0 = Map.calculateSeriesInfo(groupedValues, 0, sizeIndex, longIndex, latIndex, colors);
-        //    expect(result0.sizeValuesForGroup.length).toBe(1);
-        //    expect(result0.sizeValuesForGroup[0].value).toBe(-100);
-        //    expect(result0.sizeValuesForGroup[0].index).toBe(0);
-        //    expect(result0.sizeValuesForGroup[0].fill).not.toBeNull();
-        //    expect(result0.sizeValuesForGroup[0].stroke).not.toBeNull();
-        //    expect(result0.latitude).toBe(49);
-        //    expect(result0.longitude).toBe(0);
-
-        //    var result1 = Map.calculateSeriesInfo(groupedValues, 1, sizeIndex, longIndex, latIndex, colors);
-        //    expect(result1.sizeValuesForGroup.length).toBe(1);
-        //    expect(result1.latitude).toBe(54);
-        //    expect(result1.longitude).toBe(40);
-
-        //    var result2 = Map.calculateSeriesInfo(groupedValues, 2, sizeIndex, longIndex, latIndex, colors);
-        //    expect(result2.sizeValuesForGroup.length).toBe(1);
-        //    expect(result2.latitude).toBe(101);
-        //    expect(result2.longitude).toBe(20);
-
-        //    expect(result0.sizeValuesForGroup[0].fill).not.toBe(result1.sizeValuesForGroup[0].fill);
-        //    expect(result1.sizeValuesForGroup[0].fill).not.toBe(result2.sizeValuesForGroup[0].fill);
-        //    expect(result0.sizeValuesForGroup[0].fill).not.toBe(result2.sizeValuesForGroup[0].fill);
-        //});
-
-        it('Map.calculateSeriesLegend',() => {
-            var dataViewMetadata: powerbi.DataViewMetadata = {
-                columns: [
-                    { displayName: 'col1', queryName: 'col1' },
-                    { displayName: 'col2', queryName: 'col2', isMeasure: true }
-                ]
-            };
-            var dataView: powerbi.DataView = {
-                metadata: dataViewMetadata,
-                categorical: {
-                    categories: [{
-                        source: dataViewMetadata.columns[0],
-                        values: ['Montana', 'California', 'Arizona'],
-                        objects: [
-                            { dataPoint: { fill: { solid: { color: "#FF0000" } } } },
-                            { dataPoint: { fill: { solid: { color: "#00FF00" } } } },
-                            { dataPoint: { fill: { solid: { color: "#0000FF" } } } }
-                        ]
-                    }],
-                    values: DataViewTransform.createValueColumns([{
-                        source: dataViewMetadata.columns[1],
-                        values: [-100, 200, 700],
-                        subtotal: 800
-                    }])
-                }
-            };
-
-            var groupIndex: number = 0;
-            var sizeIndex = 0;
-            var colors = powerbi.visuals.visualStyles.create().colorPalette.dataColors;
-            var result = Map.calculateSeriesLegend(dataView.categorical.values.grouped(), groupIndex, sizeIndex, colors);
-            expect(result.length).toBe(1);
-        });
-
-        it('Map.calculateSeriesLegend default color',() => {
-            var dataViewMetadata: powerbi.DataViewMetadata = {
-                columns: [
-                    { displayName: 'col1', queryName: 'col1' },
-                    { displayName: 'col2', queryName: 'col2', isMeasure: true }
-                ]
-            };
-            var dataView: powerbi.DataView = {
-                metadata: dataViewMetadata,
-                categorical: {
-                    categories: [{
-                        source: dataViewMetadata.columns[0],
-                        values: ['Montana', 'California', 'Arizona']
-                    }],
-                    values: DataViewTransform.createValueColumns([{
-                        source: dataViewMetadata.columns[1],
-                        values: [-100, 200, 700],
-                        subtotal: 800
-                    }])
-                }
-            };
-
-            var groupIndex: number = 0;
-            var sizeIndex = 0;
-            var colors = powerbi.visuals.visualStyles.create().colorPalette.dataColors;
-            var hexDefaultColorRed = "#FF0000";
-            var result = Map.calculateSeriesLegend(dataView.categorical.values.grouped(), groupIndex, sizeIndex, colors, hexDefaultColorRed);
-            expect(result.length).toBe(1);
-            expect(result[0].color).toBe(hexDefaultColorRed);
-        });
-
-        it('Map.calculateSeriesLegend multi-series',() => {
-            var dataView: powerbi.DataView = getDataViewMultiSeries();
-
-            var groupIndex: number = 0;
-            var sizeIndex = 0;
-            var colors = powerbi.visuals.visualStyles.create().colorPalette.dataColors;
-            var result = Map.calculateSeriesLegend(dataView.categorical.values.grouped(), groupIndex, sizeIndex, colors);
-            expect(result.length).toBe(2);
-        });
-
-        it('Map.calculateSeriesLegend null legend',() => {
-            var dataView: powerbi.DataView = getDataViewMultiSeries(null);
-
-            var groupIndex: number = 0,
-                sizeIndex = 0;
-            var colors = powerbi.visuals.visualStyles.create().colorPalette.dataColors;
-            var result = Map.calculateSeriesLegend(dataView.categorical.values.grouped(), groupIndex, sizeIndex, colors);
-            expect(result[0].label).toBe(powerbi.visuals.valueFormatter.format(null));
-        });
-
-        it('Map.calculateRadius',() => {
+        it('calculateRadius', () => {
             var range: powerbi.visuals.SimpleRange = { min: -100, max: 100 };
 
             // Null should be the minimum size
-            var diff = 0;
-            var result = Map.calculateRadius(range, 0, null);
+            let diff = 0;
+            let result = Map.calculateRadius(range, null);
             expect(result).toBe(6);
 
             // Min
             diff = range.max - range.min;
-            result = Map.calculateRadius(range, diff, -100);
+            result = Map.calculateRadius(range, -100);
             expect(result).toBe(6);
 
             // Middle of zero
-            result = Map.calculateRadius(range, diff, 0);
+            result = Map.calculateRadius(range, 0);
             expect(result).toBe(14 / 2 + 6);
 
             // Max
-            result = Map.calculateRadius(range, diff, 100);
+            result = Map.calculateRadius(range, 100);
             expect(result).toBe(20);
 
             // No scale (div by zero or no range scenario
-            result = Map.calculateRadius({ min: 100, max: 100 }, 0, 100);
+            result = Map.calculateRadius({ min: 100, max: 100 }, 100);
             expect(result).toBe(6);
         });
 
-        it('Map.getGeocodingCategory',() => {
-            var dataViewMetadata: powerbi.DataViewMetadata = {
-                columns: [
-                    { displayName: 'col1', queryName: 'col1', roles: { "StateOrProvince": true } },
-                    { displayName: 'col2', queryName: 'col2', isMeasure: true, roles: { "Size": true } }
-                ]
-            };
-            var dataView: powerbi.DataView = {
-                metadata: dataViewMetadata,
-                categorical: {
-                    categories: [{
-                        source: dataViewMetadata.columns[0],
-                        values: ['Montana', 'California', 'Arizona']
-                    }],
-                    values: DataViewTransform.createValueColumns([{
-                        source: dataViewMetadata.columns[1],
-                        values: [-100, 200, 700],
-                        subtotal: 1000
-                    }])
-                }
-            };
-            var result = Map.getGeocodingCategory(dataView.categorical, mockGeotaggingAnalyzerService);
-            expect(result).toBe("StateOrProvince");
+        describe('getGeocodingCategory', () => {
+            it('from role', () => {
+                let dataBuilder = new MapDataBuilder();
+                dataBuilder.categoryColumn.displayName = 'foo';
+                dataBuilder.categoryColumn.roles = { Country: true };
+                let dataView = dataBuilder.build(true, false);
+
+                var result = Map.getGeocodingCategory(dataView.categorical, mockGeotaggingAnalyzerService);
+                expect(result).toBe("Country");
+            });
+
+            it('from column name', () => {
+                let dataBuilder = new MapDataBuilder();
+                dataBuilder.categoryColumn.displayName = 'country';
+                let dataView = dataBuilder.build(true, false);
+
+                var result = Map.getGeocodingCategory(dataView.categorical, mockGeotaggingAnalyzerService);
+                expect(result).toBe("Country");
+            });
+
+            it('from value type', () => {
+                let dataBuilder = new MapDataBuilder();
+                dataBuilder.categoryColumn.type = ValueType.fromDescriptor({ geography: { country: true } });
+                let dataView = dataBuilder.build(true, false);
+
+                var result = Map.getGeocodingCategory(dataView.categorical, mockGeotaggingAnalyzerService);
+                expect(result).toBe("Country");
+            });
         });
 
-        it('Map.getGeocodingCategoryDataCategory',() => {
-            var dataViewMetadata: powerbi.DataViewMetadata = {
-                columns: [
-                    { displayName: 'col1', queryName: 'col1', type: ValueType.fromDescriptor({ geography: { stateOrProvince: true } }) },
-                    { displayName: 'col2', queryName: 'col2', isMeasure: true, roles: { "Size": true } }
-                ]
-            };
-            var dataView: powerbi.DataView = {
-                metadata: dataViewMetadata,
-                categorical: {
-                    categories: [{
-                        source: dataViewMetadata.columns[0],
-                        values: ['Montana', 'California', 'Arizona']
-                    }],
-                    values: DataViewTransform.createValueColumns([{
-                        source: dataViewMetadata.columns[1],
-                        values: [-100, 200, 700],
-                        subtotal: 1000
-                    }])
-                }
-            };
-            var result = Map.getGeocodingCategory(dataView.categorical, mockGeotaggingAnalyzerService);
-            expect(result).toBe("StateOrProvince");
+        describe('hasSizeField', () => {
+            it('with no measure columns', () => {
+                let dataBuilder = new MapDataBuilder();
+                let dataView = dataBuilder.build(false, false);
+                expect(Map.hasSizeField(dataView.categorical.values, 0)).toBe(false);
+            });
+
+            it('with meaure column with "Size" role', () => {
+                let dataBuilder = new MapDataBuilder();
+                let dataView = dataBuilder.build(true, false);
+                expect(Map.hasSizeField(dataView.categorical.values, 0)).toBe(true);
+            });
+
+            it('with measure column, but no "Size" role', () => {
+                let dataBuilder = new MapDataBuilder();
+                dataBuilder.sizeColumn.roles = undefined;
+                let dataView = dataBuilder.build(true, false);
+                expect(Map.hasSizeField(dataView.categorical.values, 0)).toBe(true);
+            });
+
+            it('with multiple measure columns, no "Size" role, none numeric', () => {
+                let dataBuilder = new MapDataBuilder();
+                dataBuilder.sizeColumn.roles = undefined;
+                dataBuilder.sizeColumn.type = ValueType.fromPrimitiveTypeAndCategory(PrimitiveType.Text);
+                dataBuilder.latitudeColumn.type = ValueType.fromPrimitiveTypeAndCategory(PrimitiveType.Text);
+                dataBuilder.longitudeColumn.type = ValueType.fromPrimitiveTypeAndCategory(PrimitiveType.Text);
+                let dataView = dataBuilder.build(true, true);
+                expect(Map.hasSizeField(dataView.categorical.values, 0)).toBe(false);
+            });
         });
 
-        /* Disable due to way tests run in GCI */
-        /*
-        it('Map Geocode With Size',() => {
+        describe('legend', () => {
+            it('is explicitly hidden', () => {
+                var dataView: powerbi.DataView = {
+                    metadata: {
+                        columns: [],
+                        objects: {
+                            legend: {
+                                show: false
+                            }
+                        }
+                    }
+                };
+
+                expect(Map.isLegendHidden(dataView)).toBe(true);
+            });
+
+            it('is explicitly shown', () => {
+                var dataView: powerbi.DataView = {
+                    metadata: {
+                        columns: [],
+                        objects: {
+                            legend: {
+                                show: true
+                            }
+                        }
+                    }
+                };
+
+                expect(Map.isLegendHidden(dataView)).toBe(false);
+            });
+
+            it('is implicitly hidden', () => {
+                var dataView: powerbi.DataView = {
+                    metadata: {
+                        columns: [],
+                    }
+                };
+
+                expect(Map.isLegendHidden(dataView)).toBe(false);
+            });
+
+            it('position is bottom', () => {
+                var dataView: powerbi.DataView = {
+                    metadata: {
+                        columns: [],
+                        objects: {
+                            legend: {
+                                position: 'Bottom'
+                            }
+                        }
+                    }
+                };
+
+                expect(Map.legendPosition(dataView)).toBe(LegendPosition.Bottom);
+            });
+
+            it('enumerateLegend', () => {
+                let dataView: powerbi.DataView = {
+                    metadata: {
+                        columns: [],
+                        objects: {
+                            legend: {
+                                show: true
+                            }
+                        }
+                    }
+                };
+
+                let legend: ILegend = {
+                    changeOrientation: () => { },
+                    drawLegend: () => { },
+                    getMargins: () => <powerbi.IViewport>{
+                        width: 0,
+                        height: 0
+                    },
+                    getOrientation: () => LegendPosition.Top,
+                    isVisible: () => true,
+                    reset: () => { },
+                };
+
+                let enumerationBuilder = new powerbi.visuals.ObjectEnumerationBuilder();
+                Map.enumerateLegend(enumerationBuilder, dataView, legend, "");
+                let objects = enumerationBuilder.complete();
+
+                expect(objects.instances.length).toBe(1);
+                let firstObject = objects.instances[0];
+                expect(firstObject.objectName).toBe('legend');
+                expect(firstObject.selector).toBeNull();
+
+                let properties = firstObject.properties;
+                expect(properties).toBeDefined();
+                expect(properties['show']).toBe(true);
+                expect(properties['position']).toBe('Top');
+            });
+        });
+
+        describe('shouldEnumerateDataPoints', () => {
+            describe('filled map', () => {
+                it('no series, with size role', () => {
+                    let dataView = new MapDataBuilder().build(true, false);
+                    expect(Map.shouldEnumerateDataPoints(dataView, /*usesSizeForGradient*/ true)).toBe(false);
+                });
+
+                it('no series, without size role', () => {
+                    let dataView = new MapDataBuilder().build(false, false);
+                    expect(Map.shouldEnumerateDataPoints(dataView, /*usesSizeForGradient*/ true)).toBe(true);
+                });
+
+                it('with series', () => {
+                    let dataView = new MapDataBuilder().buildWithSeries(true, false);
+                    expect(Map.shouldEnumerateDataPoints(dataView, /*usesSizeForGradient*/ true)).toBe(true);
+                });
+            });
+
+            describe('bubble map', () => {
+                it('no series, with gradient role', () => {
+                    let dataView = new MapDataBuilder().build(false, false, true);
+                    expect(Map.shouldEnumerateDataPoints(dataView, /*usesSizeForGradient*/ false)).toBe(false);
+                });
+
+                it('no series, without gradient role', () => {
+                    let dataView = new MapDataBuilder().build(false, false, false);
+                    expect(Map.shouldEnumerateDataPoints(dataView, /*usesSizeForGradient*/ false)).toBe(true);
+                });
+
+                it('with series', () => {
+                    let dataView = new MapDataBuilder().buildWithSeries(false, false);
+                    expect(Map.shouldEnumerateDataPoints(dataView, /*usesSizeForGradient*/ false)).toBe(true);
+                });
+            });
+        });
+
+        describe('Regression test for Defect 6414910: should Enumerate Category Labels', () => {
+            it('filled Map with filled map feature switch on', () => {
+                expect(Map.shouldEnumerateCategoryLabels(/*enableGeoShaping*/ true, /*filledMapDataLabelsEnabled*/ true)).toBe(true);
+            });
+
+            it('filled Map with filled map feature switch off', () => {
+                expect(Map.shouldEnumerateCategoryLabels(/*enableGeoShaping*/ true, /*filledMapDataLabelsEnabled*/ false)).toBe(false);
+            });
+
+            it('Bubble Map with filled map feature switch on', () => {
+                expect(Map.shouldEnumerateCategoryLabels(/*enableGeoShaping*/ false, /*filledMapDataLabelsEnabled*/ true)).toBe(true);
+            });
+
+            it('Bubble Map with filled map feature switch off', () => {
+                expect(Map.shouldEnumerateCategoryLabels(/*enableGeoShaping*/ false, /*filledMapDataLabelsEnabled*/ false)).toBe(true);
+            });
+        });
+
+        it("enumerateDataPoints with dynamic series", () => {
+            let dataBuilder = new MapDataBuilder();
+            let dataView = dataBuilder.buildWithSeries(true, false);
+
+            let colors = powerbi.visuals.visualStyles.create().colorPalette.dataColors;
+            let fillProp = <powerbi.DataViewObjectPropertyIdentifier>{ objectName: "dataPoint", propertyName: "fill" };
+            let colorHelper = new ColorHelper(colors, fillProp);
+
+            let enumerationBuilder = new powerbi.visuals.ObjectEnumerationBuilder();
+            var legendDataPoints = Map.createLegendData(dataView, colorHelper).dataPoints;
+            Map.enumerateDataPoints(enumerationBuilder, legendDataPoints, colors, true, null, false, []);
+            let enumeratedDataPoints = enumerationBuilder.complete();
+
+            expect(enumeratedDataPoints.instances.length).toBe(legendDataPoints.length);
             
-            v = powerbi.visuals.VisualFactory.getPlugin('map').create();
-            v.init({
-                element: element,
-                host: mocks.createHostService(),
-                style: powerbi.visuals.visualStyles.create(),
-                viewport: {
-                    height: element.height(),
-                    width: element.width()
+            // ensure first object is 'fill' and not 'defaultColor'
+            expect(enumeratedDataPoints.instances[0]['properties']['fill']).toBeDefined();
+        });
+
+        it('enumerateDataPoints correctly handles hasDynamicSeries=true', () => {
+            let dataBuilder = new MapDataBuilder();
+            let dataView = dataBuilder.buildWithSeries(true, false);
+            let visualBuilder = new MapVisualBuilder();
+            let visual = visualBuilder.build(false, true);
+
+            visual.onDataChanged({ dataViews: [dataView] });
+
+            let result = visual.enumerateObjectInstances({
+                objectName: 'legend',
+            });
+            expect((<powerbi.VisualObjectInstanceEnumerationObject>result).instances.length).toBe(1);
+        });
+
+        it('enumerateDataPoints correctly handles hasDynamicSeries=false', () => {
+            let dataBuilder = new MapDataBuilder();
+            let dataView = dataBuilder.build(true, false);
+            let visualBuilder = new MapVisualBuilder();
+            let visual = visualBuilder.build(false, true);
+
+            visual.onDataChanged({ dataViews: [dataView] });
+
+            let result = visual.enumerateObjectInstances({
+                objectName: 'legend',
+            });
+            expect(result).toBeUndefined();
+        });
+    });
+
+    describe("Map Converter", () => {
+        describe("Simple category", () => {
+            let colorHelper: ColorHelper;
+            let dataBuilder: MapDataBuilder;
+            let dataView: DataView;
+            let geoTaggingAnalyzerService: IGeoTaggingAnalyzerService;
+            let data: MapData;
+            let categoryCount: number;
+            const colors = [
+                { value: "#000000" },
+                { value: "#000001" },
+                { value: "#000002" },
+                { value: "#000003" }
+            ];
+            const fills = [
+                'rgba(0,0,0,0.6)',
+                'rgba(0,0,1,0.6)',
+                'rgba(0,0,2,0.6)',
+                'rgba(0,0,3,0.6)',
+            ];
+            
+            beforeEach(() => {
+                dataBuilder = new MapDataBuilder();
+                dataView = dataBuilder.build(false, false);
+                let fillProp = <powerbi.DataViewObjectPropertyIdentifier>{ objectName: "dataPoint", propertyName: "fill" };
+                let palette = new powerbi.visuals.DataColorPalette(colors);
+                colorHelper = new ColorHelper(palette, fillProp);
+                geoTaggingAnalyzerService = powerbi.createGeoTaggingAnalyzerService(mocks.getLocalizedString);
+                data = Map.converter(dataView, colorHelper, geoTaggingAnalyzerService, false);
+                categoryCount = data.dataPoints.length;
+            });
+
+            it("Data point count", () => {
+                expect(data.dataPoints.length).toBe(categoryCount);
+            });
+
+            it("Geocoding category", () => {
+                expect(data.geocodingCategory).toBe('StateOrProvince');
+            });
+
+            it("Category value", () => {
+                for (let categoryIndex = 0; categoryIndex < categoryCount; categoryIndex++) {
+                    let dataPoint = data.dataPoints[categoryIndex];
+                    expect(dataPoint.categoryValue).toBe(dataBuilder.categoryValues[categoryIndex]);
                 }
             });
 
-            v.onDataChanged([dataView]);
+            it("Geocode query", () => {
+                for (let categoryIndex = 0; categoryIndex < categoryCount; categoryIndex++) {
+                    let dataPoint = data.dataPoints[categoryIndex];
+                    expect(dataPoint.geocodingQuery).toBe(dataBuilder.categoryValues[categoryIndex]);
+                }
+            });
+
+            it("SubDataPoint count", () => {
+                for (let categoryIndex = 0; categoryIndex < categoryCount; categoryIndex++) {
+                    let dataPoint = data.dataPoints[categoryIndex];
+                    expect(dataPoint.subDataPoints.length).toBe(1);
+                }
+            });
+
+            it("SubDataPoint identity", () => {
+                for (let categoryIndex = 0; categoryIndex < categoryCount; categoryIndex++) {
+                    let dataPoint = data.dataPoints[categoryIndex];
+                    let expectedId = new SelectionIdBuilder().withCategory(dataView.categorical.categories[0], categoryIndex).createSelectionId();
+                    expect(dataPoint.subDataPoints[0].identity).toEqual(expectedId);
+                }
+            });
+
+            it("SubDataPoint fill", () => {
+                for (let categoryIndex = 0; categoryIndex < categoryCount; categoryIndex++) {
+                    let dataPoint = data.dataPoints[categoryIndex];
+                    expect(dataPoint.subDataPoints[0].fill).toEqual(fills[0]);
+                }
+            });
+
+            it("SubDataPoint tooltipInfo", () => {
+                for (let categoryIndex = 0; categoryIndex < categoryCount; categoryIndex++) {
+                    let dataPoint = data.dataPoints[categoryIndex];
+                    expect(dataPoint.subDataPoints[0].tooltipInfo).toEqual([
+                        {
+                            displayName: dataBuilder.categoryColumn.displayName, value: dataBuilder.categoryValues[categoryIndex],
+                        },
+                    ]);
+                }
+            });
+        });
+
+        describe("Simple category with measures", () => {
+            let colorHelper: ColorHelper;
+            let dataBuilder: MapDataBuilder;
+            let dataView: DataView;
+            let geoTaggingAnalyzerService: IGeoTaggingAnalyzerService;
+            let data: MapData;
+            let categoryCount: number;
+
+            beforeEach(() => {
+                dataBuilder = new MapDataBuilder();
+                dataView = dataBuilder.build(true, true, true);
+                let fillProp = <powerbi.DataViewObjectPropertyIdentifier>{ objectName: "dataPoint", propertyName: "fill" };
+                let palette = new powerbi.visuals.DataColorPalette();
+                colorHelper = new ColorHelper(palette, fillProp);
+                geoTaggingAnalyzerService = powerbi.createGeoTaggingAnalyzerService(mocks.getLocalizedString);
+                data = Map.converter(dataView, colorHelper, geoTaggingAnalyzerService, false);
+                categoryCount = data.dataPoints.length;
+            });
             
-            // Only validation at this point is no exceptions are thrown
-        });
-        */
+            it("Size value", () => {
+                for (let categoryIndex = 0; categoryIndex < categoryCount; categoryIndex++) {
+                    let dataPoint = data.dataPoints[categoryIndex];
+                    expect(dataPoint.value).toBe(dataBuilder.getSizeValue(categoryIndex));
+                }
+            });
 
-        it('Map.hasSizeField',() => {
-            var dataViewMetadataOneColumn: powerbi.DataViewMetadata = {
-                columns: [
-                    { displayName: 'col1', queryName: 'col1', roles: { 'Category': true } }
-                ]
-            };
-            var dataViewMetadataTwoColumnsWithRoles: powerbi.DataViewMetadata = {
-                columns: [
-                    { displayName: 'col1', queryName: 'col1', roles: { 'Category': true } },
-                    { displayName: 'col2', queryName: 'col2', roles: { 'Size': true } }
-                ]
-            };
-            var dataViewMetadataTwoColumnsWithoutRoles: powerbi.DataViewMetadata = {
-                columns: [
-                    { displayName: 'col1', queryName: 'col1', type: ValueType.fromDescriptor({ text: true }) },
-                    { displayName: 'col2', queryName: 'col2', type: ValueType.fromDescriptor({ numeric: true }) }
-                ]
-            };
-            var dataViewMetadataThreeColumns: powerbi.DataViewMetadata = {
-                columns: [
-                    { displayName: 'col1', queryName: 'col1', roles: { 'Category': true } },
-                    { displayName: 'col2', queryName: 'col2', roles: { 'Y': true } },
-                    { displayName: 'col3', queryName: 'col3', roles: { 'X': true } }
-                ]
-            };
+            it("Latitude value", () => {
+                for (let categoryIndex = 0; categoryIndex < categoryCount; categoryIndex++) {
+                    let dataPoint = data.dataPoints[categoryIndex];
+                    expect(dataPoint.location.latitude).toBe(dataBuilder.getLatValue(categoryIndex));
+                }
+            });
 
-            var dataViewOneColumn: powerbi.DataView = {
-                metadata: dataViewMetadataOneColumn,
-                categorical: {
-                    categories: [{
-                        source: dataViewMetadataOneColumn.columns[0],
-                        values: ['98052', '98004', '98034', '12345', '67890']
-                    }]
+            it("Longitude value", () => {
+                for (let categoryIndex = 0; categoryIndex < categoryCount; categoryIndex++) {
+                    let dataPoint = data.dataPoints[categoryIndex];
+                    expect(dataPoint.location.longitude).toBe(dataBuilder.getLongValue(categoryIndex));
                 }
-            };
-            var dataViewTwoColumnsWithRoles: powerbi.DataView = {
-                metadata: dataViewMetadataTwoColumnsWithRoles,
-                categorical: {
-                    categories: [{
-                        source: dataViewMetadataTwoColumnsWithRoles.columns[0],
-                        values: ['San Diego', 'San Francisco', 'Seattle']
-                    }],
-                    values: DataViewTransform.createValueColumns([
+            });
+
+            it("SubDataPoint tooltipInfo", () => {
+                for (let categoryIndex = 0; categoryIndex < categoryCount; categoryIndex++) {
+                    let dataPoint = data.dataPoints[categoryIndex];
+                    expect(dataPoint.subDataPoints[0].tooltipInfo).toEqual([
                         {
-                            source: dataViewMetadataTwoColumnsWithRoles.columns[1],
-                            values: [3, 4, 5],
-                            subtotal: 12
-                        }
-                    ])
-                }
-            };
-            var dataViewTwoColumnsWithoutRoles: powerbi.DataView = {
-                metadata: dataViewMetadataTwoColumnsWithoutRoles,
-                categorical: {
-                    categories: [{
-                        source: dataViewMetadataTwoColumnsWithoutRoles.columns[0],
-                        values: ['San Diego', 'San Francisco', 'Seattle']
-                    }],
-                    values: DataViewTransform.createValueColumns([
-                        {
-                            source: dataViewMetadataTwoColumnsWithoutRoles.columns[1],
-                            values: [3, 4, 5],
-                            subtotal: 12
-                        }
-                    ])
-                }
-            };
-            var dataViewThreeColumns: powerbi.DataView = {
-                metadata: dataViewMetadataThreeColumns,
-                categorical: {
-                    categories: [{
-                        source: dataViewMetadataThreeColumns.columns[0],
-                        values: ['San Diego', 'San Francisco', 'Seattle']
-                    }],
-                    values: DataViewTransform.createValueColumns([
-                        {
-                            source: dataViewMetadataThreeColumns.columns[1],
-                            values: [32.715691, 37.777119, 47.603569],
-                            subtotal: 39.36545966666666
+                            displayName: dataBuilder.categoryColumn.displayName, value: dataBuilder.categoryValues[categoryIndex],
                         },
                         {
-                            source: dataViewMetadataThreeColumns.columns[2],
-                            values: [-117.16172, -122.41964, -122.329453],
-                            subtotal: -120.63693766666667
-                        }
-                    ])
-                }
-            };
-
-            var actual = Map.hasSizeField(dataViewOneColumn.categorical.values, 0);
-            expect(actual).toBe(false);
-            actual = Map.hasSizeField(dataViewTwoColumnsWithRoles.categorical.values, 0);
-            expect(actual).toBe(true);
-            actual = Map.hasSizeField(dataViewTwoColumnsWithoutRoles.categorical.values, 0);
-            expect(actual).toBe(true);
-            actual = Map.hasSizeField(dataViewThreeColumns.categorical.values, 0);
-            expect(actual).toBe(false);
-        });
-
-        it('Map.tooltipInfo single series',() => {
-            var dataViewMetadata: powerbi.DataViewMetadata = {
-                columns: [
-                    { displayName: 'col1', queryName: 'col1' },
-                    { displayName: 'col2', queryName: 'col2', isMeasure: true }
-                ]
-            };
-            var dataView: powerbi.DataView = {
-                metadata: dataViewMetadata,
-                categorical: {
-                    categories: [{
-                        source: dataViewMetadata.columns[0],
-                        values: ['Montana', 'California', 'Arizona']
-                    }],
-                    values: DataViewTransform.createValueColumns([{
-                        source: dataViewMetadata.columns[1],
-                        values: [-100, 200, 700],
-                        subtotal: 800
-                    }])
-                }
-            };
-
-            var groupIndex: number = 0;
-            var sizeIndex = 0;
-            var latIndex = -1;
-            var longIndex = -1;
-            var categoryValue = dataView.categorical.categories[0].values[0];
-            var colors = powerbi.visuals.visualStyles.create().colorPalette.dataColors;
-            var seriesInfo = Map.calculateSeriesInfo(dataView.categorical.values.grouped(), groupIndex, sizeIndex, longIndex, latIndex, colors);
-            var value = seriesInfo.sizeValuesForGroup[0].value;
-            var tooltipInfo: powerbi.visuals.TooltipDataItem[] = powerbi.visuals.TooltipBuilder.createTooltipInfo(powerbi.visuals.mapProps.general.formatString, dataView.categorical.categories, categoryValue, dataView.categorical.values, value, null, 0);
-            var tooltipInfoTestData: powerbi.visuals.TooltipDataItem[] = [{ displayName: "col1", value: "Montana" }, { displayName: "col2", value: "-100" }];
-            expect(tooltipInfo).toEqual(tooltipInfoTestData);
-        });
-
-        it('Map.tooltipInfo multi series',() => {
-            var dataView: powerbi.DataView =
-                powerbi.data.DataViewTransform.apply({
-                    prototype: getDataViewMultiSeries(),
-                    colorAllocatorFactory: powerbi.visuals.createColorAllocatorFactory(),
-                    dataViewMappings: powerbi.visuals.mapCapabilities.dataViewMappings,
-                    objectDescriptors: powerbi.visuals.mapCapabilities.objects,
-                    transforms: {
-                        selects: [
-                            {queryName: 'select0'},
-                            {queryName: 'select1'},
-                            {queryName: 'select2'},
-                            {queryName: 'select3'}
-                        ]
-                    }
-                })[0];
-
-            var groupIndex: number = 0;
-            var sizeIndex = 0;
-            var latIndex = -1;
-            var longIndex = -1;
-            var categoryValue = dataView.categorical.categories[0].values[0];
-            var colors = powerbi.visuals.visualStyles.create().colorPalette.dataColors;
-            var seriesInfo = Map.calculateSeriesInfo(dataView.categorical.values.grouped(), groupIndex, sizeIndex, longIndex, latIndex, colors);
-            var value = seriesInfo.sizeValuesForGroup[0].value;
-            var tooltipInfo: powerbi.visuals.TooltipDataItem[] = powerbi.visuals.TooltipBuilder.createTooltipInfo(powerbi.visuals.mapProps.general.formatString, dataView.categorical.categories, categoryValue, dataView.categorical.values, value, null, 0);
-            var tooltipInfoTestData: powerbi.visuals.TooltipDataItem[] = [{ displayName: '', value: '2012' }, { displayName: '', value: 'Canada' }, { displayName: '', value: '150.00' }];
-            expect(tooltipInfo).toEqual(tooltipInfoTestData);
-        });
-
-        it('Map.createMapDataLabel bubble',() => {
-
-            var mockDatalabelSettings: powerbi.visuals.PointDataLabelsSettings = {
-                show: true,
-                displayUnits: null,
-                position: powerbi.visuals.PointLabelPosition.Above,
-                precision: 2,
-                labelColor: "#000000",
-                overrideDefaultColor: false,
-                formatterOptions: null,
-            };
-
-            var mockBubbleData: powerbi.visuals.MapBubble[] = [{
-                x: 50,
-                y: 50,
-                radius: 10,
-                fill: "#000000",
-                stroke: "2",
-                strokeWidth: 2,
-                selected: true,
-                identity: null,
-                labeltext: "Test Label",
-            }];
-
-            var mockLayout: powerbi.visuals.ILabelLayout = DataLabelUtils.getMapLabelLayout(mockDatalabelSettings);
-
-            var mockBubbleGraphicsContext: D3.Selection = d3.select('body')
-                .append('svg')
-                .style("position", "absolute")
-                .append("g")
-                .classed("mapBubbles", true);
-
-            var mockViewPort = {
-                height: 150,
-                width: 300
-            };
-            var result = DataLabelUtils.drawDefaultLabelsForDataPointChart(mockBubbleData, mockBubbleGraphicsContext, mockLayout, mockViewPort);
-
-            //Should render
-            expect(result).toBeDefined();
-            expect(result[0][0]).toBeDefined();
-            //Data input length
-            expect(result.data.length).toBe(2);
-            //Color setting properly
-            expect(result[0][0].__data__.fill).toBe(mockDatalabelSettings.labelColor);
-            //text
-            expect(result[0][0].__data__.labeltext).toBe(powerbi.visuals.dataLabelUtils.getLabelFormattedText('Test Label'));
-        });
-
-        it('Map.createMapDataLabel slice',() => {
-
-            var mockDatalabelSettings: powerbi.visuals.PointDataLabelsSettings = {
-                show: true,
-                displayUnits: null,
-                position: powerbi.visuals.PointLabelPosition.Above,
-                precision: 2,
-                labelColor: "#000000",
-                overrideDefaultColor: false,
-                formatterOptions: null,
-            };
-
-            var mockSliceData: powerbi.visuals.MapSlice[] = [{
-                x: 50,
-                y: 50,
-                radius: 10,
-                fill: "#000000",
-                stroke: "2",
-                strokeWidth: 2,
-                selected: true,
-                identity: null,
-                labeltext: 'Test Label',
-                value: 0,
-            }];
-
-            var mockLayout: powerbi.visuals.ILabelLayout = DataLabelUtils.getMapLabelLayout(mockDatalabelSettings);
-
-            var mockBubbleGraphicsContext: D3.Selection = d3.select('body')
-                .append('svg')
-                .style("position", "absolute")
-                .append("g")
-                .classed("mapBubbles", true);
-
-            var viewPort = {
-                height: element.height(),
-                width: element.width()
-            };
-            var result = DataLabelUtils.drawDefaultLabelsForDataPointChart(mockSliceData, mockBubbleGraphicsContext, mockLayout, viewPort);
-
-            //Should render
-            expect(result).toBeDefined();
-            expect(result[0][0]).toBeDefined();
-            //Data input length
-            expect(result.data.length).toBe(2);
-            //Color setting properly
-            expect(result[0][0].__data__.fill).toBe(mockDatalabelSettings.labelColor);
-            //text
-            expect(result[0][0].__data__.labeltext).toBe(powerbi.visuals.dataLabelUtils.getLabelFormattedText('Test Label'));
-        });
-
-        it('Map.createMapDataLabel hide bubble',() => {
-
-            var mockDatalabelSettings: powerbi.visuals.PointDataLabelsSettings = {
-                show: true,
-                displayUnits: null,
-                position: powerbi.visuals.PointLabelPosition.Above,
-                precision: 2,
-                labelColor: "#000000",
-                overrideDefaultColor: false,
-                formatterOptions: null,
-            };
-
-            var mockBubbleData: powerbi.visuals.MapBubble[] = [{
-                x: 50,
-                y: 50,
-                radius: 10,
-                fill: "#000000",
-                stroke: "2",
-                strokeWidth: 2,
-                selected: true,
-                identity: null,
-                labeltext: "Test Label",
-            }];
-
-            var mockLayout: powerbi.visuals.ILabelLayout = DataLabelUtils.getMapLabelLayout(mockDatalabelSettings);
-
-            var mockBubbleGraphicsContext: D3.Selection = d3.select('body')
-                .append('svg')
-                .style("position", "absolute")
-                .append("g")
-                .classed("mapBubbles1", true);
-
-            var mockViewPort = {
-                height: 150,
-                width: 300
-            };
-            var result = DataLabelUtils.drawDefaultLabelsForDataPointChart(mockBubbleData, mockBubbleGraphicsContext, mockLayout, mockViewPort);
-
-            // Simulate the clean function of dataLabelUtils when 'show' is set to false
-            DataLabelUtils.cleanDataLabels(mockBubbleGraphicsContext);
-
-            expect(result).toBeDefined();
-            expect($('.mapBubbles1 text').length).toBe(0);
-
-        });
-
-        it('Map.createMapDataLabel hide slice',() => {
-
-            var mockDatalabelSettings: powerbi.visuals.PointDataLabelsSettings = {
-                show: true,
-                displayUnits: null,
-                position: powerbi.visuals.PointLabelPosition.Above,
-                precision: 2,
-                labelColor: "#000000",
-                overrideDefaultColor: false,
-                formatterOptions: null,
-            };
-
-            var mockSliceData: powerbi.visuals.MapSlice[] = [{
-                x: 50,
-                y: 50,
-                radius: 10,
-                fill: "#000000",
-                stroke: "2",
-                strokeWidth: 2,
-                selected: true,
-                identity: null,
-                labeltext: "Test Label",
-                value: 0,
-            }];
-
-            var mockLayout: powerbi.visuals.ILabelLayout = DataLabelUtils.getMapLabelLayout(mockDatalabelSettings);
-
-            var mockBubbleGraphicsContext: D3.Selection = d3.select('body')
-                .append('svg')
-                .style("position", "absolute")
-                .append("g")
-                .classed("mapSlice1", true);
-
-            var mockViewPort = {
-                height: 150,
-                width: 300
-            };
-            var result = DataLabelUtils.drawDefaultLabelsForDataPointChart(mockSliceData, mockBubbleGraphicsContext, mockLayout, mockViewPort);
-
-            // Simulate the clean function of dataLabelUtils when 'show' is set to false
-            DataLabelUtils.cleanDataLabels(mockBubbleGraphicsContext);
-
-            expect(result).toBeDefined();
-            expect($('.mapSlice1 text').length).toBe(0);
-        });
-
-        it('Map.tooltipInfo no series, no values',() => {
-            var dataViewMetadata: powerbi.DataViewMetadata = {
-                columns: [
-                    { displayName: 'col1' },
-                ]
-            };
-            var dataView: powerbi.DataView = {
-                metadata: dataViewMetadata,
-                categorical: {
-                    categories: [{
-                        source: dataViewMetadata.columns[0],
-                        values: ['Montana', 'California', 'Arizona']
-                    }],
-                }
-            };
-
-            var groupIndex: number = 0;
-            var sizeIndex = 0;
-            var latIndex = -1;
-            var longIndex = -1;
-            var categoryValue = dataView.categorical.categories[0].values[0];
-            var colors = powerbi.visuals.visualStyles.create().colorPalette.dataColors;
-            var seriesInfo = Map.calculateSeriesInfo(undefined, groupIndex, sizeIndex, latIndex, longIndex, colors);
-            var value = seriesInfo.sizeValuesForGroup[0].value;
-            var tooltipInfo: powerbi.visuals.TooltipDataItem[] = powerbi.visuals.TooltipBuilder.createTooltipInfo(powerbi.visuals.mapProps.general.formatString, dataView.categorical.categories, categoryValue, dataView.categorical.values, value, null, 0);
-            var tooltipInfoTestData: powerbi.visuals.TooltipDataItem[] = [{ displayName: "col1", value: "Montana" }];
-            expect(tooltipInfo).toEqual(tooltipInfoTestData);
-        });
-
-        it('Map shows warning with no Location set',() => {
-            var dataView: powerbi.DataView = {
-                metadata: {
-                    columns: [{ displayName: 'NotLocation', roles: { 'NotCategory': true, }, }],
-                }
-            };
-
-            var warnings = Map.showLocationMissingWarningIfNecessary(dataView);
-            expect(warnings[0]).not.toBeNull();
-        });
-
-        it('Map shows warning with no columns set',() => {
-            var dataView: powerbi.DataView = {
-                metadata: {
-                    columns: [],
-                }
-            };
-
-            var warnings = Map.showLocationMissingWarningIfNecessary(dataView);
-            expect(warnings[0]).not.toBeNull();
-        });
-
-        it('Map does not show warning with location set',() => {
-            var dataView: powerbi.DataView = {
-                metadata: {
-                    columns: [{ displayName: 'Location', queryName: 'Location', roles: { 'Category': true, }, }],
-                }
-            };
-
-            var warnings = Map.showLocationMissingWarningIfNecessary(dataView);
-            expect(warnings.length).toEqual(0);
-        });
-
-        it('Map legend is hidden:show false',() => {
-            var dataView: powerbi.DataView = {
-                metadata: {
-                    columns: [],
-                    objects: {
-                        legend: {
-                            show: false
-                        }
-                    }
-                }
-            };
-
-            expect(Map.isLegendHidden(dataView)).toBe(true);
-        });
-
-        it('Map legend is hidden:show true',() => {
-            var dataView: powerbi.DataView = {
-                metadata: {
-                    columns: [],
-                    objects: {
-                        legend: {
-                            show: true
-                        }
-                    }
-                }
-            };
-
-            expect(Map.isLegendHidden(dataView)).toBe(false);
-        });
-
-        it('Map legend is hidden:no legend object',() => {
-            var dataView: powerbi.DataView = {
-                metadata: {
-                    columns: [],
-                    objects: {
-                    }
-                }
-            };
-
-            expect(Map.isLegendHidden(dataView)).toBe(false);
-        });
-
-        it('Map legend is hidden:no objects',() => {
-            var dataView: powerbi.DataView = {
-                metadata: {
-                    columns: [],
-                }
-            };
-
-            expect(Map.isLegendHidden(dataView)).toBe(false);
-        });
-
-        it('Map legend is bottom',() => {
-            var dataView: powerbi.DataView = {
-                metadata: {
-                    columns: [],
-                    objects: {
-                        legend: {
-                            position: 'Bottom'
-                        }
-                    }
-                }
-            };
-
-            expect(Map.legendPosition(dataView)).toBe(LegendPosition.Bottom);
-        });
-
-        it('Map enumerateLegend',() => {
-            var dataView: powerbi.DataView = {
-                metadata: {
-                    columns: [],
-                    objects: {
-                        legend: {
-                            show: true
-                        }
-                    }
-                }
-            };
-
-            var legend: ILegend = {
-                changeOrientation: () => { },
-                drawLegend: () => { },
-                getMargins: () => <powerbi.IViewport>{
-                    width: 0,
-                    height: 0
-                },
-                getOrientation: () => LegendPosition.Top,
-                isVisible: () => true,
-                reset: () => { },
-            };
-
-            var objects = Map.enumerateLegend(dataView, legend, "");
-            expect(objects.length).toBe(1);
-            var firstObject = objects[0];
-            expect(firstObject.objectName).toBe('legend');
-            expect(firstObject.selector).toBeNull();
-            expect(firstObject.properties).toBeDefined();
-            var properties = firstObject.properties;
-            expect(properties['show']).toBe(true);
-            expect(properties['position']).toBe('Top');
-        });
-
-        it('Map.calculateSeriesInfo - Gradient color',() => {
-            var dataViewMetadata: powerbi.DataViewMetadata = {
-                columns: [
-                    { displayName: 'col1', queryName: 'col1' },
-                    { displayName: 'col2', queryName: 'col2', isMeasure: true },
-                    { displayName: 'col3', queryName: 'col3', isMeasure: true, roles: { 'Gradient': true } }
-                ]
-            };
-            var dataView: powerbi.DataView = {
-                metadata: dataViewMetadata,
-                categorical: {
-                    categories: [{
-                        source: dataViewMetadata.columns[0],
-                        values: ['Montana', 'California', 'Arizona']
-                    }],
-                    values: DataViewTransform.createValueColumns([
-                        {
-                            source: dataViewMetadata.columns[1],
-                            values: [-100, 200, 700],
+                            displayName: dataBuilder.latitudeColumn.displayName, value: dataBuilder.getLatValue(categoryIndex).toString(),
                         },
                         {
-                            source: dataViewMetadata.columns[2],
-                            values: [75, 50, 0],
-                        }])
-                }
-            };
-
-            var sizeIndex = 0;
-            var latIndex = -1;
-            var longIndex = -1;
-            var colors = powerbi.visuals.visualStyles.create().colorPalette.dataColors;
-            var objectDefinitions: powerbi.DataViewObjects[] = [
-                { dataPoint: { fill: { solid: { color: "#d9f2fb" } } } },
-                { dataPoint: { fill: { solid: { color: "#b1eab7" } } } }
-            ];
-            var result = Map.calculateSeriesInfo(dataView.categorical.values.grouped(), 0, sizeIndex, longIndex, latIndex, colors, null, objectDefinitions);
-            expect(result.sizeValuesForGroup[0].fill).toBe('rgba(217,242,251,0.6)');
-
-            result = Map.calculateSeriesInfo(dataView.categorical.values.grouped(), 1, sizeIndex, longIndex, latIndex, colors, null, objectDefinitions);
-            expect(result.sizeValuesForGroup[0].fill).toBe('rgba(177,234,183,0.6)');
-        });
-
-        it('Map.shouldEnumerateDataPoints filledMap',() => {
-            var dataViewMetadata: powerbi.DataViewMetadata = {
-                columns: [
-                    { displayName: 'col1', queryName: 'col1' },
-                    { displayName: 'col2', queryName: 'col2', isMeasure: true, roles: { "Size": true } },
-                ]
-            };
-            var dataView: powerbi.DataView = {
-                metadata: dataViewMetadata
-            };
-            expect(Map.shouldEnumerateDataPoints(dataView, /*usesSizeForGradient*/ true)).toBe(false);
-        });
-
-        it('Map.shouldEnumerateDataPoints filledMap series overrides size',() => {
-            var dataViewMetadata: powerbi.DataViewMetadata = {
-                columns: [
-                    { displayName: 'col1', queryName: 'col1', roles: { 'Series': true } },
-                    { displayName: 'col2', queryName: 'col2', isMeasure: true, roles: { "Size": true } },
-                ]
-            };
-            var dataView: powerbi.DataView = {
-                metadata: dataViewMetadata
-            };
-            expect(Map.shouldEnumerateDataPoints(dataView, /*usesSizeForGradient*/ true)).toBe(true);
-        });
-
-        it('Map.shouldEnumerateDataPoints filledMap',() => {
-            var dataViewMetadata: powerbi.DataViewMetadata = {
-                columns: [
-                    { displayName: 'col1', queryName: 'col1' },
-                ]
-            };
-            var dataView: powerbi.DataView = {
-                metadata: dataViewMetadata
-            };
-            expect(Map.shouldEnumerateDataPoints(dataView, /*usesSizeForGradient*/ true)).toBe(true);
-        });
-
-        it('Map.shouldEnumerateDataPoints Map',() => {
-            var dataViewMetadata: powerbi.DataViewMetadata = {
-                columns: [
-                    { displayName: 'col1' },
-                    { displayName: 'col2', isMeasure: true, roles: { "Gradient": true } },
-                ]
-            };
-            var dataView: powerbi.DataView = {
-                metadata: dataViewMetadata
-            };
-            expect(Map.shouldEnumerateDataPoints(dataView, /*usesSizeForGradient*/ false)).toBe(false);
-        });
-
-        it('Map.shouldEnumerateDataPoints Map',() => {
-            var dataViewMetadata: powerbi.DataViewMetadata = {
-                columns: [
-                    { displayName: 'col1', queryName: 'col1' },
-                ]
-            };
-            var dataView: powerbi.DataView = {
-                metadata: dataViewMetadata
-            };
-            expect(Map.shouldEnumerateDataPoints(dataView, /*usesSizeForGradient*/ false)).toBe(true);
-        });
-
-        it("Map: enumerate data points with dynamic series",() => {            
-
-            var dataViewMetadata: powerbi.DataViewMetadata = {
-                columns: [
-                    { displayName: 'col1', queryName: 'col1' },
-                    { displayName: 'col2', queryName: 'col2', type: ValueType.fromDescriptor({ text: true })},
-                    { displayName: 'col3', queryName: 'col3', isMeasure: true, groupName: 'a', type: ValueType.fromDescriptor({ text: true }) },
-                    { displayName: 'col3', queryName: 'col3', isMeasure: true, groupName: 'b' },
-                ]
-            };            
-
-            var categoryColumn: powerbi.DataViewMetadataColumn = { displayName: 'year', queryName: 'selectYear', type: ValueType.fromPrimitiveTypeAndCategory(PrimitiveType.Text) };
-            var measureColumn: powerbi.DataViewMetadataColumn = { displayName: 'sales', queryName: 'selectSales', isMeasure: true, type: ValueType.fromPrimitiveTypeAndCategory(PrimitiveType.Integer), objects: { general: { formatString: '$0' } } };
-            var measureColumnDynamic1: powerbi.DataViewMetadataColumn = { displayName: 'sales', queryName: 'selectSales', isMeasure: true, type: ValueType.fromPrimitiveTypeAndCategory(PrimitiveType.Integer), objects: { general: { formatString: '$0' } }, groupName: 'A' };
-            var measureColumnDynamic2: powerbi.DataViewMetadataColumn = { displayName: 'sales', queryName: 'selectSales', isMeasure: true, type: ValueType.fromPrimitiveTypeAndCategory(PrimitiveType.Integer), objects: { general: { formatString: '$0' } }, groupName: 'B' };
-            var measureColumnDynamic1RefExpr = powerbi.data.SQExprBuilder.fieldDef({ schema: 's', entity: 'e', column: 'sales' });
-
-            var categoryIdentities = [
-                mocks.dataViewScopeIdentity("2011"),
-                mocks.dataViewScopeIdentity("2012"),
-            ];
-
-            var col3Ref = powerbi.data.SQExprBuilder.fieldDef({ schema: 's', entity: 'e', column: 'col2' });
-            var seriesIdentities = [
-                mocks.dataViewScopeIdentityWithEquality(col3Ref, "A"),
-                mocks.dataViewScopeIdentityWithEquality(col3Ref, "B"),
-            ];
-
-            var dataView: powerbi.DataView = {
-                metadata: dataViewMetadata,
-                categorical: {
-                    categories: [{
-                        source: categoryColumn,
-                        values: [2011, 2012],
-                        identity: categoryIdentities,
-                    }],
-                    values: DataViewTransform.createValueColumns([
+                            displayName: dataBuilder.longitudeColumn.displayName, value: dataBuilder.getLongValue(categoryIndex).toString(),
+                        },
                         {
-                            source: measureColumnDynamic1,
-                            values: [100, 200],
-                            identity: seriesIdentities[0],
-                        }, {
-                            source: measureColumnDynamic2,
-                            values: [62, 55],
-                            identity: seriesIdentities[1],
-                        }],
-                        [measureColumnDynamic1RefExpr])
+                            displayName: dataBuilder.sizeColumn.displayName, value: powerbi.visuals.valueFormatter.format(dataBuilder.getSizeValue(categoryIndex), ',0.00'),
+                        },
+                        {
+                            displayName: dataBuilder.gradientColumn.displayName, value: dataBuilder.getGradientValue(categoryIndex).toString(),
+                        },
+                    ]);
                 }
-            };
+            });
+        });
+        
+        describe("Simple category with null measures", () => {
+            let colorHelper: ColorHelper;
+            let dataBuilder: MapDataBuilder;
+            let dataView: DataView;
+            let geoTaggingAnalyzerService: IGeoTaggingAnalyzerService;
+            let data: MapData;
+            let categoryCount: number;
 
-            dataView.categorical.values.source = measureColumn;                      
+            beforeEach(() => {
+                dataBuilder = new MapDataBuilder();
+                dataView = dataBuilder.withNullLatLong().build(true, true);
+                let fillProp = <powerbi.DataViewObjectPropertyIdentifier>{ objectName: "dataPoint", propertyName: "fill" };
+                let palette = new powerbi.visuals.DataColorPalette();
+                colorHelper = new ColorHelper(palette, fillProp);
+                geoTaggingAnalyzerService = powerbi.createGeoTaggingAnalyzerService(mocks.getLocalizedString);
+                data = Map.converter(dataView, colorHelper, geoTaggingAnalyzerService, false);
+                categoryCount = data.dataPoints.length;
+            });
 
-            var groupIndex: number = 0;
-            var sizeIndex = 0;
-            var colors = powerbi.visuals.visualStyles.create().colorPalette.dataColors;
+            it("Size value", () => {
+                for (let categoryIndex = 0; categoryIndex < categoryCount; categoryIndex++) {
+                    let dataPoint = data.dataPoints[categoryIndex];
+                    expect(dataPoint.value).toBe(dataBuilder.getSizeValue(categoryIndex));
+                }
+            });
 
-            var legendDataPoints = Map.calculateSeriesLegend(dataView.categorical.values.grouped(), groupIndex, sizeIndex, colors, undefined, [col3Ref]);            
-            var enumeratedDataPoints = Map.enumerateDataPoints(legendDataPoints, colors, true, null, false, []);
+            it("Latitude value", () => {
+                for (let categoryIndex = 0; categoryIndex < categoryCount; categoryIndex++) {
+                    let dataPoint = data.dataPoints[categoryIndex];
+                    if (categoryIndex === 1) {
+                        expect(dataPoint.location).toBeUndefined();
+                    }
+                    else {
+                        expect(dataPoint.location.latitude).toBe(dataBuilder.getLatValue(categoryIndex));
+                    }
+                }
+            });
 
-            expect(enumeratedDataPoints.length).toBe(legendDataPoints.length);
-            // ensure first object is 'fill' and not 'defaultColor'
-            expect(enumeratedDataPoints[0]['properties']['fill']).toBeDefined();
+            it("Longitude value", () => {
+                for (let categoryIndex = 0; categoryIndex < categoryCount; categoryIndex++) {
+                    let dataPoint = data.dataPoints[categoryIndex];
+                    if (categoryIndex === 1) {
+                        expect(dataPoint.location).toBeUndefined();
+                    }
+                    else {
+                        expect(dataPoint.location.longitude).toBe(dataBuilder.getLongValue(categoryIndex));
+                    }
+                }
+            });
+
+            it("SubDataPoint tooltipInfo", () => {
+                for (let categoryIndex = 0; categoryIndex < categoryCount; categoryIndex++) {
+                    let dataPoint = data.dataPoints[categoryIndex];
+                    if (categoryIndex === 1) {
+                        expect(dataPoint.subDataPoints[0].tooltipInfo).toEqual([
+                            {
+                                displayName: dataBuilder.categoryColumn.displayName, value: dataBuilder.categoryValues[categoryIndex],
+                            },
+                            {
+                                displayName: dataBuilder.latitudeColumn.displayName, value: '(Blank)',
+                            },
+                            {
+                                displayName: dataBuilder.longitudeColumn.displayName, value: '(Blank)',
+                            },
+                            {
+                                displayName: dataBuilder.sizeColumn.displayName, value: powerbi.visuals.valueFormatter.format(dataBuilder.getSizeValue(categoryIndex), ',0.00'),
+                            },
+                        ]);
+                    }
+                    else {
+                        expect(dataPoint.subDataPoints[0].tooltipInfo).toEqual([
+                            {
+                                displayName: dataBuilder.categoryColumn.displayName, value: dataBuilder.categoryValues[categoryIndex],
+                            },
+                            {
+                                displayName: dataBuilder.latitudeColumn.displayName, value: dataBuilder.getLatValue(categoryIndex).toString(),
+                            },
+                            {
+                                displayName: dataBuilder.longitudeColumn.displayName, value: dataBuilder.getLongValue(categoryIndex).toString(),
+                            },
+                            {
+                                displayName: dataBuilder.sizeColumn.displayName, value: powerbi.visuals.valueFormatter.format(dataBuilder.getSizeValue(categoryIndex), ',0.00'),
+                            },
+                        ]);
+                    }
+                }
+            });
+        });
+
+        describe("Simple category with 0 values (bubble)", () => {
+            let colorHelper: ColorHelper;
+            let dataBuilder: MapDataBuilder;
+            let dataView: DataView;
+            let geoTaggingAnalyzerService: IGeoTaggingAnalyzerService;
+            let data: MapData;
+            let categoryCount: number;
+
+            beforeEach(() => {
+                dataBuilder = new MapDataBuilder();
+                dataView = dataBuilder.withZeroValue().build(true, false);
+                let fillProp = <powerbi.DataViewObjectPropertyIdentifier>{ objectName: "dataPoint", propertyName: "fill" };
+                let palette = new powerbi.visuals.DataColorPalette();
+                colorHelper = new ColorHelper(palette, fillProp);
+                geoTaggingAnalyzerService = powerbi.createGeoTaggingAnalyzerService(mocks.getLocalizedString);
+                data = Map.converter(dataView, colorHelper, geoTaggingAnalyzerService, false);
+                categoryCount = data.dataPoints.length;
+            });
+
+            it("Size value", () => {
+                expect(data.dataPoints[0].value).toBe(dataBuilder.getSizeValue(0));
+                // The category index === 1 is skipped due to being a bubble map value with a size of 0
+                expect(data.dataPoints[1].value).toBe(dataBuilder.getSizeValue(2));
+            });
+
+            it("SubDataPoint tooltipInfo", () => {
+                expect(data.dataPoints[0].subDataPoints[0].tooltipInfo).toEqual([
+                    {
+                        displayName: dataBuilder.categoryColumn.displayName, value: dataBuilder.categoryValues[0],
+                    },
+                    {
+                        displayName: dataBuilder.sizeColumn.displayName, value: powerbi.visuals.valueFormatter.format(dataBuilder.getSizeValue(0), ',0.00'),
+                    },
+                ]);
+                // The category index === 1 is skipped due to being a bubble map value with a size of 0
+                expect(data.dataPoints[1].subDataPoints[0].tooltipInfo).toEqual([
+                    {
+                        displayName: dataBuilder.categoryColumn.displayName, value: dataBuilder.categoryValues[2],
+                    },
+                    {
+                        displayName: dataBuilder.sizeColumn.displayName, value: powerbi.visuals.valueFormatter.format(dataBuilder.getSizeValue(2), ',0.00'),
+                    },
+                ]);
+            });
+        });
+
+        describe("Simple category with 0 values (filled)", () => {
+            let colorHelper: ColorHelper;
+            let dataBuilder: MapDataBuilder;
+            let dataView: DataView;
+            let geoTaggingAnalyzerService: IGeoTaggingAnalyzerService;
+            let data: MapData;
+            let categoryCount: number;
+
+            beforeEach(() => {
+                dataBuilder = new MapDataBuilder();
+                dataView = dataBuilder.withZeroValue().build(true, false);
+                let fillProp = <powerbi.DataViewObjectPropertyIdentifier>{ objectName: "dataPoint", propertyName: "fill" };
+                let palette = new powerbi.visuals.DataColorPalette();
+                colorHelper = new ColorHelper(palette, fillProp);
+                geoTaggingAnalyzerService = powerbi.createGeoTaggingAnalyzerService(mocks.getLocalizedString);
+                data = Map.converter(dataView, colorHelper, geoTaggingAnalyzerService, true);
+                categoryCount = data.dataPoints.length;
+            });
+
+            it("Size value", () => {
+                for (let categoryIndex = 0; categoryIndex < categoryCount; categoryIndex++) {
+                    let dataPoint = data.dataPoints[categoryIndex];
+                    expect(dataPoint.value).toBe(dataBuilder.getSizeValue(categoryIndex));
+                }
+            });
+
+            it("SubDataPoint tooltipInfo", () => {
+                for (let categoryIndex = 0; categoryIndex < categoryCount; categoryIndex++) {
+                    let dataPoint = data.dataPoints[categoryIndex];
+                    expect(dataPoint.subDataPoints[0].tooltipInfo).toEqual([
+                        {
+                            displayName: dataBuilder.categoryColumn.displayName, value: dataBuilder.categoryValues[categoryIndex],
+                        },
+                        {
+                            displayName: dataBuilder.sizeColumn.displayName, value: powerbi.visuals.valueFormatter.format(dataBuilder.getSizeValue(categoryIndex), ',0.00'),
+                        },
+                    ]);
+                }
+            });
+        });
+
+        describe("Category and series with measures", () => {
+            let colorHelper: ColorHelper;
+            let dataBuilder: MapDataBuilder;
+            let dataView: DataView;
+            let geoTaggingAnalyzerService: IGeoTaggingAnalyzerService;
+            let data: MapData;
+            let categoryCount: number;
+            let seriesCount: number;
+            const colors = [
+                { value: "#000000" },
+                { value: "#000001" },
+                { value: "#000002" },
+                { value: "#000003" }
+            ];
+            const fills = [
+                'rgba(0,0,0,0.6)',
+                'rgba(0,0,1,0.6)',
+                'rgba(0,0,2,0.6)',
+                'rgba(0,0,3,0.6)',
+            ];
+
+            beforeEach(() => {
+                dataBuilder = new MapDataBuilder();
+                dataView = dataBuilder.buildWithSeries(true, true);
+                let fillProp = <powerbi.DataViewObjectPropertyIdentifier>{ objectName: "dataPoint", propertyName: "fill" };
+                let palette = new powerbi.visuals.DataColorPalette(colors);
+                colorHelper = new ColorHelper(palette, fillProp);
+                geoTaggingAnalyzerService = powerbi.createGeoTaggingAnalyzerService(mocks.getLocalizedString);
+                data = Map.converter(dataView, colorHelper, geoTaggingAnalyzerService, false);
+                categoryCount = data.dataPoints.length;
+                seriesCount = data.dataPoints[0].subDataPoints.length;
+            });
+
+            it("Size value", () => {
+                for (let categoryIndex = 0; categoryIndex < categoryCount; categoryIndex++) {
+                    let dataPoint = data.dataPoints[categoryIndex];
+                    for (let seriesIndex = 0; seriesIndex < seriesCount; seriesIndex++) {
+                        expect(dataPoint.subDataPoints[seriesIndex].value).toBe(dataBuilder.getSizeValue(categoryIndex, seriesIndex));
+                    }
+                }
+            });
+
+            it("Fill value", () => {
+                for (let categoryIndex = 0; categoryIndex < categoryCount; categoryIndex++) {
+                    let dataPoint = data.dataPoints[categoryIndex];
+                    for (let seriesIndex = 0; seriesIndex < seriesCount; seriesIndex++) {
+                        expect(dataPoint.subDataPoints[seriesIndex].fill).toBe(fills[seriesIndex]);
+                    }
+                }
+            });
+
+            it("SubDataPoint tooltipInfo", () => {
+                for (let categoryIndex = 0; categoryIndex < categoryCount; categoryIndex++) {
+                    for (let seriesIndex = 0; seriesIndex < seriesCount; seriesIndex++) {
+                        let dataPoint = data.dataPoints[categoryIndex];
+                        expect(dataPoint.subDataPoints[seriesIndex].tooltipInfo).toEqual([
+                            {
+                                displayName: dataBuilder.categoryColumn.displayName, value: dataBuilder.categoryValues[categoryIndex],
+                            },
+                            {
+                                displayName: dataBuilder.seriesColumn.displayName, value: dataBuilder.seriesValues[seriesIndex],
+                            },
+                            {
+                                displayName: dataBuilder.latitudeColumn.displayName, value: dataBuilder.getLatValue(categoryIndex, seriesIndex).toString(),
+                            },
+                            {
+                                displayName: dataBuilder.longitudeColumn.displayName, value: dataBuilder.getLongValue(categoryIndex, seriesIndex).toString(),
+                            },
+                            {
+                                displayName: dataBuilder.sizeColumn.displayName, value: powerbi.visuals.valueFormatter.format(dataBuilder.getSizeValue(categoryIndex, seriesIndex), ',0.00'),
+                            },
+                        ]);
+                    }
+                }
+            });
+
+            it("Null series name doesn't throw exception", () => {
+                dataView = dataBuilder.withNullSeriesName().buildWithSeries(true, true);
+                data = Map.converter(dataView, colorHelper, geoTaggingAnalyzerService, false);
+                let legendData = Map.createLegendData(dataView, colorHelper);
+                expect(data).toBeTruthy(); // Simple checks to expect this not to fail
+                expect(legendData).toBeTruthy();
+            });
+        });
+
+        describe("Category and category as series with measures", () => {
+            let colorHelper: ColorHelper;
+            let dataBuilder: MapDataBuilder;
+            let dataView: DataView;
+            let geoTaggingAnalyzerService: IGeoTaggingAnalyzerService;
+            let data: MapData;
+            let categoryCount: number;
+            let seriesCount: number;
+            const colors = [
+                { value: "#000000" },
+                { value: "#000001" },
+                { value: "#000002" },
+                { value: "#000003" }
+            ];
+            const fills = [
+                'rgba(0,0,0,0.6)',
+                'rgba(0,0,1,0.6)',
+                'rgba(0,0,2,0.6)',
+                'rgba(0,0,3,0.6)',
+            ];
+
+            beforeEach(() => {
+                dataBuilder = new MapDataBuilder();
+                dataView = dataBuilder.withCategoriesAsSeries().buildWithSeries(true, true);
+                let fillProp = <powerbi.DataViewObjectPropertyIdentifier>{ objectName: "dataPoint", propertyName: "fill" };
+                let palette = new powerbi.visuals.DataColorPalette(colors);
+                colorHelper = new ColorHelper(palette, fillProp);
+                geoTaggingAnalyzerService = powerbi.createGeoTaggingAnalyzerService(mocks.getLocalizedString);
+                data = Map.converter(dataView, colorHelper, geoTaggingAnalyzerService, false);
+                categoryCount = data.dataPoints.length;
+                seriesCount = data.dataPoints[0].subDataPoints.length;
+            });
+
+            it("Category and series count", () => {
+                expect(categoryCount).toBe(3);
+                expect(seriesCount).toBe(1);
+            });
+
+            it("Size value", () => {
+                for (let categoryIndex = 0; categoryIndex < categoryCount; categoryIndex++) {
+                    let dataPoint = data.dataPoints[categoryIndex];
+                    expect(dataPoint.value).toBe(dataBuilder.getSizeValue(categoryIndex, categoryIndex));
+                    expect(dataPoint.subDataPoints[0].value).toBe(dataBuilder.getSizeValue(categoryIndex, categoryIndex));
+                }
+            });
+
+            it("Fill value", () => {
+                for (let categoryIndex = 0; categoryIndex < categoryCount; categoryIndex++) {
+                    let dataPoint = data.dataPoints[categoryIndex];
+                    expect(dataPoint.subDataPoints[0].fill).toBe(fills[categoryIndex]);
+                }
+            });
+
+            it("Latitude value", () => {
+                for (let categoryIndex = 0; categoryIndex < categoryCount; categoryIndex++) {
+                    let dataPoint = data.dataPoints[categoryIndex];
+                    expect(dataPoint.location.latitude).toBe(dataBuilder.getLatValue(categoryIndex, categoryIndex));
+                }
+            });
+
+            it("Longitude value", () => {
+                for (let categoryIndex = 0; categoryIndex < categoryCount; categoryIndex++) {
+                    let dataPoint = data.dataPoints[categoryIndex];
+                    expect(dataPoint.location.longitude).toBe(dataBuilder.getLongValue(categoryIndex, categoryIndex));
+                }
+            });
+
+            it("SubDataPoint tooltipInfo", () => {
+                for (let categoryIndex = 0; categoryIndex < categoryCount; categoryIndex++) {
+                    let dataPoint = data.dataPoints[categoryIndex];
+                    expect(dataPoint.subDataPoints[0].tooltipInfo).toEqual([
+                        {
+                            displayName: dataBuilder.categoryColumn.displayName, value: dataBuilder.categoryValues[categoryIndex],
+                        },
+                        {
+                            displayName: dataBuilder.seriesSameAsCategoryColumn.displayName, value: dataBuilder.categoryValues[categoryIndex],
+                        },
+                        {
+                            displayName: dataBuilder.latitudeColumn.displayName, value: dataBuilder.getLatValue(categoryIndex, categoryIndex).toString(),
+                        },
+                        {
+                            displayName: dataBuilder.longitudeColumn.displayName, value: dataBuilder.getLongValue(categoryIndex, categoryIndex).toString(),
+                        },
+                        {
+                            displayName: dataBuilder.sizeColumn.displayName, value: powerbi.visuals.valueFormatter.format(dataBuilder.getSizeValue(categoryIndex, categoryIndex), ',0.00'),
+                        },
+                    ]);
+                }
+            });
+        });
+
+        describe("Category and series with no measures", () => {
+            let colorHelper: ColorHelper;
+            let dataBuilder: MapDataBuilder;
+            let dataView: DataView;
+            let geoTaggingAnalyzerService: IGeoTaggingAnalyzerService;
+            let data: MapData;
+            let categoryCount: number;
+            let seriesCount: number;
+            const colors = [
+                { value: "#000000" },
+                { value: "#000001" },
+                { value: "#000002" },
+                { value: "#000003" }
+            ];
+            const fills = [
+                'rgba(0,0,0,0.6)',
+                'rgba(0,0,1,0.6)',
+                'rgba(0,0,2,0.6)',
+                'rgba(0,0,3,0.6)',
+            ];
+
+            beforeEach(() => {
+                dataBuilder = new MapDataBuilder();
+                dataView = dataBuilder.buildWithSeries(false, false);
+                let fillProp = <powerbi.DataViewObjectPropertyIdentifier>{ objectName: "dataPoint", propertyName: "fill" };
+                let palette = new powerbi.visuals.DataColorPalette(colors);
+                colorHelper = new ColorHelper(palette, fillProp);
+                geoTaggingAnalyzerService = powerbi.createGeoTaggingAnalyzerService(mocks.getLocalizedString);
+                data = Map.converter(dataView, colorHelper, geoTaggingAnalyzerService, false);
+                categoryCount = data.dataPoints.length;
+                seriesCount = data.dataPoints[0].subDataPoints.length;
+            });
+
+            it("Size value", () => {
+                for (let categoryIndex = 0; categoryIndex < categoryCount; categoryIndex++) {
+                    let dataPoint = data.dataPoints[categoryIndex];
+                    for (let seriesIndex = 0; seriesIndex < seriesCount; seriesIndex++) {
+                        expect(dataPoint.subDataPoints[seriesIndex].value).toBeUndefined();
+                    }
+                }
+            });
+
+            it("Fill value", () => {
+                for (let categoryIndex = 0; categoryIndex < categoryCount; categoryIndex++) {
+                    let dataPoint = data.dataPoints[categoryIndex];
+                    for (let seriesIndex = 0; seriesIndex < seriesCount; seriesIndex++) {
+                        expect(dataPoint.subDataPoints[seriesIndex].fill).toBe(fills[seriesIndex]);
+                    }
+                }
+            });
+
+            it("SubDataPoint tooltipInfo", () => {
+                for (let categoryIndex = 0; categoryIndex < categoryCount; categoryIndex++) {
+                    for (let seriesIndex = 0; seriesIndex < seriesCount; seriesIndex++) {
+                        let dataPoint = data.dataPoints[categoryIndex];
+                        expect(dataPoint.subDataPoints[seriesIndex].tooltipInfo).toEqual([
+                            {
+                                displayName: dataBuilder.categoryColumn.displayName, value: dataBuilder.categoryValues[categoryIndex],
+                            },
+                            {
+                                displayName: dataBuilder.seriesColumn.displayName, value: dataBuilder.seriesValues[seriesIndex],
+                            },
+                        ]);
+                    }
+                }
+            });
+
+            it("Null series name doesn't throw exception", () => {
+                dataView = dataBuilder.withNullSeriesName().buildWithSeries(true, true);
+                data = Map.converter(dataView, colorHelper, geoTaggingAnalyzerService, false);
+                let legendData = Map.createLegendData(dataView, colorHelper);
+                expect(data).toBeTruthy(); // Simple checks to expect this not to fail
+                expect(legendData).toBeTruthy();
+            });
+        });
+
+        describe("Category and category as series with no measures", () => {
+            let colorHelper: ColorHelper;
+            let dataBuilder: MapDataBuilder;
+            let dataView: DataView;
+            let geoTaggingAnalyzerService: IGeoTaggingAnalyzerService;
+            let data: MapData;
+            let categoryCount: number;
+            const colors = [
+                { value: "#000000" },
+                { value: "#000001" },
+                { value: "#000002" },
+                { value: "#000003" }
+            ];
+            const fills = [
+                'rgba(0,0,0,0.6)',
+                'rgba(0,0,1,0.6)',
+                'rgba(0,0,2,0.6)',
+                'rgba(0,0,3,0.6)',
+            ];
+
+            beforeEach(() => {
+                dataBuilder = new MapDataBuilder();
+                dataView = dataBuilder.withCategoriesAsSeries().buildWithCategoryAsSeries(false, false);
+                let fillProp = <powerbi.DataViewObjectPropertyIdentifier>{ objectName: "dataPoint", propertyName: "fill" };
+                let palette = new powerbi.visuals.DataColorPalette(colors);
+                colorHelper = new ColorHelper(palette, fillProp);
+                geoTaggingAnalyzerService = powerbi.createGeoTaggingAnalyzerService(mocks.getLocalizedString);
+                data = Map.converter(dataView, colorHelper, geoTaggingAnalyzerService, false);
+                categoryCount = data.dataPoints.length;
+            });
+
+            it("Category and series count", () => {
+                expect(categoryCount).toBe(3);
+            });
+
+            it("Fill value", () => {
+                for (let categoryIndex = 0; categoryIndex < categoryCount; categoryIndex++) {
+                    let dataPoint = data.dataPoints[categoryIndex];
+                    expect(dataPoint.subDataPoints[0].fill).toBe(fills[categoryIndex]);
+                }
+            });
+
+            it("SubDataPoint tooltipInfo", () => {
+                for (let categoryIndex = 0; categoryIndex < categoryCount; categoryIndex++) {
+                    let dataPoint = data.dataPoints[categoryIndex];
+                    expect(dataPoint.subDataPoints[0].tooltipInfo).toEqual([
+                        {
+                            displayName: dataBuilder.categoryColumn.displayName, value: dataBuilder.categoryValues[categoryIndex],
+                        },
+                    ]);
+                }
+            });
         });
     });
+
+    describe("Bubble Map DOM Tests", () => {
+        let visualBuilder: MapVisualBuilder;
+        let v: powerbi.IVisual;
+
+        beforeEach(() => {
+            visualBuilder = new MapVisualBuilder();
+            v = visualBuilder.build(false);
+        });
+
+        it("should create map chart element", (done) => {
+            let dataView = new MapDataBuilder().build(false, false);
+            v.onDataChanged({ dataViews: [dataView] });
+
+            setTimeout(() => {
+                expect($('.mapControl')).toBeInDOM();
+
+                done();
+            }, DefaultWaitForRender);
+        });
+
+        it("should have bubble for each category", (done) => {
+            let dataBuilder = new MapDataBuilder();
+            let dataView = dataBuilder.build(false, false);
+            v.onDataChanged({ dataViews: [dataView] });
+
+            setTimeout(() => {
+                let bubbles = getBubbles();
+                expect(bubbles.length).toBe(dataBuilder.categoryValues.length);
+
+                done();
+            }, DefaultWaitForRender);
+        });
+
+        it("should draw category labels when enabled", (done) => {
+            let dataView = new MapDataBuilder().withCategoryLabels().withShortCategoryNames().build(false, false);
+
+            v.onDataChanged({ dataViews: [dataView] });
+
+            setTimeout(() => {
+                expect($(".labelGraphicsContext")).toBeInDOM();
+                expect($(".labelGraphicsContext .label").length).toBe(3);
+                expect($(".labelGraphicsContext .label").first().css('font-size')).toBe(PixelConverter.fromPoint(dataLabelUtils.DefaultFontSizeInPt));
+
+                done();
+            }, DefaultWaitForRender);
+        });
+
+        it("should draw category labels with different font size", (done) => {
+            let dataView = new MapDataBuilder().withCategoryLabels(null, null, null, 18).withShortCategoryNames().build(false, false);
+
+            v.onDataChanged({ dataViews: [dataView] });
+
+            setTimeout(() => {
+                expect($(".labelGraphicsContext")).toBeInDOM();
+                expect($(".labelGraphicsContext .label").length).toBe(3);
+                expect($(".labelGraphicsContext .label").first().css('font-size')).toBe(PixelConverter.fromPoint(18));
+
+                done();
+            }, DefaultWaitForRender);
+        });
+
+        it('legend colors should be in order', (done) => {
+            let visualBuilder = new MapVisualBuilder();
+            let v = visualBuilder.build(false);
+            let dataBuilder = new MapDataBuilder();
+            let dataView = dataBuilder.buildWithSeries(true, false);
+            v.onDataChanged({ dataViews: [dataView] });
+
+            let seriesExpr = powerbi.data.SQExprShortSerializer.serializeArray(<powerbi.data.SQExpr[]>dataView.categorical.values.identityFields);
+            let scale = visualBuilder.style.colorPalette.dataColors.getColorScaleByKey(seriesExpr);
+            let colors = _.map(scale.getDomain(), (k) => scale.getColor(k));
+
+            setTimeout(() => {
+                let legendItems = getLegendItems();
+
+                expect(legendItems.length).toBe(dataBuilder.seriesValues.length);
+
+                for (let i = 0; i < legendItems.length; i++) {
+                    let legendItem = legendItems.eq(i);
+                    let legendColor = getLegendColor(legendItem);
+                    let color = jsCommon.Color.parseColorString(legendColor);
+                    let expectedColor = jsCommon.Color.parseColorString(colors[i].value);
+                    expect(color).toEqual(expectedColor);
+                }
+
+                done();
+            }, DefaultWaitForRender);
+        });
+
+        function getBubbles(): JQuery {
+            return $('.mapControl circle.bubble');
+        }
+
+        function getLegendItems(): JQuery {
+            return $('.legend .legendItem');
+        }
+
+        function getLegendColor(legendItem: JQuery): string {
+            return legendItem.children('.legendIcon').css('fill');
+        }
+    });
+
+    describe("Filled Map DOM Tests", () => {
+        let visualBuilder: MapVisualBuilder;
+        let v: powerbi.IVisual;
+
+        beforeEach(() => {
+            visualBuilder = new MapVisualBuilder();
+            v = visualBuilder.build(true);
+        });
+
+        it("should create map chart element", (done) => {
+            let dataView = new MapDataBuilder().build(false, false);
+            v.onDataChanged({ dataViews: [dataView] });
+
+            setTimeout(() => {
+                expect($('.mapControl')).toBeInDOM();
+
+                done();
+            }, DefaultWaitForRender);
+        });
+
+        it("Should draw category labels when enabled, plus stems", function (done) {
+            var dataView = new MapDataBuilder().withCategoryLabels().withShortCategoryNames().build(false, false);
+            v.onDataChanged({ dataViews: [dataView] });
+            setTimeout(function () {
+
+                expect($(".labelGraphicsContext")).toBeInDOM();
+                expect($(".labelGraphicsContext .label").length).toBe(3);
+                expect($(".labelGraphicsContext .label").first().css('font-size')).toBe(PixelConverter.fromPoint(dataLabelUtils.DefaultFontSizeInPt));
+
+                expect($(".leader-lines")).toBeInDOM();
+                expect($(".leader-lines .line-label").length).toBe(3);
+
+                done();
+            }, powerbitests.DefaultWaitForRender);
+        });
+        
+        it("Selecting the main shape of a location by polygon area", function () {
+
+            let smallAreaShape: powerbi.IGeocodeBoundaryPolygon = {
+                nativeBing: '', //contents aren't used.
+                absoluteString: "",
+                absolute: convertStringToFloatArray("651.42857 598.07649 360.71069 399.14985 232.41705 700.51064 331.77076 362.54979 5.5147103 333.66089 357.63656 323.71624 284.29287 " +
+                    "4.5011369 402.56243 336.31585 683.48959 167.91896 404.46235 382.93639"),
+                geographic: new Float64Array(3),
+                absoluteBounds: {
+                    left: 10,
+                    top: 10,
+                    width: 100,
+                    height: 100,
+                },
+            };
+
+            let largeAreaShape: powerbi.IGeocodeBoundaryPolygon = {
+                nativeBing: '', //contents aren't used.
+                absoluteString: "",
+                absolute: convertStringToFloatArray("445.71429 812.36222 243.25675 885.30681 111.31949 715.29937 232.23533 537.2844 438.90267 597.27253"),
+                geographic: new Float64Array(3),
+                absoluteBounds: {
+                    left: 10,
+                    top: 10,
+                    width: 30,
+                    height: 30,
+                }
+            };
+
+            let indexOfLargestShape: number = MapShapeDataPointRenderer.getIndexOfLargestShape([smallAreaShape, largeAreaShape]);
+            expect(indexOfLargestShape).toBe(1);
+        });
+
+        it("should have path for each category", (done) => {
+            let dataBuilder = new MapDataBuilder();
+            let dataView = dataBuilder.build(false, false);
+            v.onDataChanged({ dataViews: [dataView] });
+
+            setTimeout(() => {
+                let shapes = getShapes();
+                expect(shapes.length).toBe(dataBuilder.categoryValues.length);
+
+                done();
+            }, DefaultWaitForRender);
+        });
+
+        it("should raise warning with address data", (done) => {
+            let warningSpy = jasmine.createSpy('setWarnings');
+            visualBuilder.host.setWarnings = warningSpy;
+            let dataBuilder = new MapDataBuilder();
+            let dataView = dataBuilder.withAddresses().build(false, false);
+            v.onDataChanged({ dataViews: [dataView] });
+
+            setTimeout(() => {
+                expect(warningSpy).toHaveBeenCalledWith([new powerbi.visuals.FilledMapWithoutValidGeotagCategoryWarning()]);
+
+                done();
+            }, DefaultWaitForRender);
+        });
+
+        it("should gracefully handle null data", (done) => {
+            let dataBuilder = new MapDataBuilder();
+            let dataView = dataBuilder.withNullValue().build(true, false);
+            v.onDataChanged({ dataViews: [dataView] });
+
+            setTimeout(() => {
+                let shapes = getShapes();
+                expect(shapes.length).toBe(dataBuilder.categoryValues.length - 1);
+
+                done();
+            }, DefaultWaitForRender);
+        });
+
+        function getShapes(): JQuery {
+            return $('.mapControl polygon.shape');
+        }
+    });
+
+    describe("label data point creation", () => {
+        let v: powerbi.IVisual;
+
+        beforeEach(() => {
+            v = new MapVisualBuilder().build(false);
+        });
+
+        it("Label data points have correct text", () => {
+            let dataView = new MapDataBuilder().withCategoryLabels().build(false, false);
+            v.onDataChanged({ dataViews: [dataView] });
+
+            let labelDataPoints = callCreateLabelDataPoints(v);
+            expect(labelDataPoints[0].text).toEqual("Montana");
+            expect(labelDataPoints[1].text).toEqual("California");
+            expect(labelDataPoints[2].text).toEqual("Arizona");
+        });
+
+        it("Label data points have correct default fill", () => {
+            let dataView = new MapDataBuilder().withCategoryLabels().build(false, false);
+            v.onDataChanged({ dataViews: [dataView] });
+
+            let labelDataPoints = callCreateLabelDataPoints(v);
+            helpers.assertColorsMatch(labelDataPoints[0].outsideFill, powerbi.visuals.NewDataLabelUtils.defaultInsideLabelColor);
+            helpers.assertColorsMatch(labelDataPoints[1].outsideFill, powerbi.visuals.NewDataLabelUtils.defaultInsideLabelColor);
+            helpers.assertColorsMatch(labelDataPoints[2].outsideFill, powerbi.visuals.NewDataLabelUtils.defaultInsideLabelColor);
+            helpers.assertColorsMatch(labelDataPoints[0].insideFill, powerbi.visuals.NewDataLabelUtils.defaultInsideLabelColor);
+            helpers.assertColorsMatch(labelDataPoints[1].insideFill, powerbi.visuals.NewDataLabelUtils.defaultInsideLabelColor);
+            helpers.assertColorsMatch(labelDataPoints[2].insideFill, powerbi.visuals.NewDataLabelUtils.defaultInsideLabelColor);
+        });
+
+        it("Label data points have correct fill", () => {
+            let labelColor = "#007700";
+            let dataView = new MapDataBuilder().withCategoryLabels(labelColor).build(false, false);
+            v.onDataChanged({ dataViews: [dataView] });
+
+            let labelDataPoints = callCreateLabelDataPoints(v);
+            helpers.assertColorsMatch(labelDataPoints[0].outsideFill, labelColor);
+            helpers.assertColorsMatch(labelDataPoints[1].outsideFill, labelColor);
+            helpers.assertColorsMatch(labelDataPoints[2].outsideFill, labelColor);
+            helpers.assertColorsMatch(labelDataPoints[0].insideFill, powerbi.visuals.NewDataLabelUtils.defaultInsideLabelColor);
+            helpers.assertColorsMatch(labelDataPoints[1].insideFill, powerbi.visuals.NewDataLabelUtils.defaultInsideLabelColor);
+            helpers.assertColorsMatch(labelDataPoints[2].insideFill, powerbi.visuals.NewDataLabelUtils.defaultInsideLabelColor);
+        });
+    });
+
+    describe("Filled Map label data point creation", () => {
+        let v: powerbi.IVisual;
+
+        beforeEach(() => {
+            v = new MapVisualBuilder().build(true);
+        });
+
+        it("Label data points have correct text", () => {
+            let dataView = new MapDataBuilder().withCategoryLabels().build(false, false);
+            v.onDataChanged({ dataViews: [dataView] });
+
+            let labelDataPoints = callCreateLabelDataPoints(v);
+            expect(labelDataPoints[0].text).toEqual("Montana");
+            expect(labelDataPoints[1].text).toEqual("California");
+            expect(labelDataPoints[2].text).toEqual("Arizona");
+        });
+
+        it("Label data points have correct default fill", () => {
+            let dataView = new MapDataBuilder().withCategoryLabels().build(false, false);
+            v.onDataChanged({ dataViews: [dataView] });
+
+            let labelDataPoints = callCreateLabelDataPoints(v);
+            helpers.assertColorsMatch(labelDataPoints[0].outsideFill, powerbi.visuals.NewDataLabelUtils.defaultInsideLabelColor);
+            helpers.assertColorsMatch(labelDataPoints[1].outsideFill, powerbi.visuals.NewDataLabelUtils.defaultInsideLabelColor);
+            helpers.assertColorsMatch(labelDataPoints[2].outsideFill, powerbi.visuals.NewDataLabelUtils.defaultInsideLabelColor);
+            helpers.assertColorsMatch(labelDataPoints[0].insideFill, powerbi.visuals.NewDataLabelUtils.defaultInsideLabelColor);
+            helpers.assertColorsMatch(labelDataPoints[1].insideFill, powerbi.visuals.NewDataLabelUtils.defaultInsideLabelColor);
+            helpers.assertColorsMatch(labelDataPoints[2].insideFill, powerbi.visuals.NewDataLabelUtils.defaultInsideLabelColor);
+        });
+
+        it("Label data points have correct fill", () => {
+            let labelColor = "#ffffff";
+            let dataView = new MapDataBuilder().withCategoryLabels(labelColor).build(false, false);
+            v.onDataChanged({ dataViews: [dataView] });
+
+            let labelDataPoints = callCreateLabelDataPoints(v);
+            helpers.assertColorsMatch(labelDataPoints[0].outsideFill, labelColor);
+            helpers.assertColorsMatch(labelDataPoints[1].outsideFill, labelColor);
+            helpers.assertColorsMatch(labelDataPoints[2].outsideFill, labelColor);
+            helpers.assertColorsMatch(labelDataPoints[0].insideFill, powerbi.visuals.NewDataLabelUtils.defaultInsideLabelColor);
+            helpers.assertColorsMatch(labelDataPoints[1].insideFill, powerbi.visuals.NewDataLabelUtils.defaultInsideLabelColor);
+            helpers.assertColorsMatch(labelDataPoints[2].insideFill, powerbi.visuals.NewDataLabelUtils.defaultInsideLabelColor);
+        });
+    });
+
+    function callCreateLabelDataPoints(v: powerbi.IVisual): powerbi.LabelDataPoint[] {
+        let map = <any>v;
+        return map.dataPointRenderer.createLabelDataPoints();
+    }
+
+    function convertStringToFloatArray(path: string): Float64Array {
+        let stringArray = path.split(" ");
+        let f64s = new Float64Array(stringArray.length);
+
+        for (let i: number = 0; i < stringArray.length; i++) {
+            f64s[i] = parseFloat(stringArray[i]);
+        }
+        return f64s;
+    }
+
+    class MapDataBuilder {
+        public categoryColumn: powerbi.DataViewMetadataColumn = { displayName: 'state', queryName: 'state', roles: { Category: true }, type: ValueType.fromPrimitiveTypeAndCategory(PrimitiveType.Text) };
+        public categoryAsSeriesColumn: powerbi.DataViewMetadataColumn = { displayName: 'state', queryName: 'state', roles: { Category: true, Series: true, }, type: ValueType.fromPrimitiveTypeAndCategory(PrimitiveType.Text) };
+        public categoryValues = ['Montana', 'California', 'Arizona'];
+        public shortCategoryValues = ['MT', 'CA', 'AZ'];
+        public categoryColumnExpr: powerbi.data.SQExpr = powerbi.data.SQExprBuilder.fieldDef({ schema: 's', entity: 'e', column: 'state' });
+        public addressCategoryColumn: powerbi.DataViewMetadataColumn = { displayName: 'address', queryName: 'address', roles: { Category: true }, type: ValueType.fromPrimitiveTypeAndCategory(PrimitiveType.Text) };
+        public addressCategoryValues = ['Some address', 'Some different address', 'Another different address'];
+        public addressColumnExpr: powerbi.data.SQExpr = powerbi.data.SQExprBuilder.fieldDef({ schema: 's', entity: 'e', column: 'address' });
+
+        public seriesColumn: powerbi.DataViewMetadataColumn = { displayName: 'region', queryName: 'region', roles: { Series: true }, type: ValueType.fromPrimitiveTypeAndCategory(PrimitiveType.Text) };
+        public seriesSameAsCategoryColumn: powerbi.DataViewMetadataColumn = { displayName: 'state', queryName: 'state', roles: { Series: true }, type: ValueType.fromPrimitiveTypeAndCategory(PrimitiveType.Text) };
+        public seriesColumnExpr: powerbi.data.SQExpr = powerbi.data.SQExprBuilder.fieldDef({ schema: 's', entity: 'e', column: 'region' });;
+
+        public sizeColumn: powerbi.DataViewMetadataColumn = { displayName: 'size', queryName: 'size', isMeasure: true, format: '#,0.00', roles: { Size: true }, type: ValueType.fromPrimitiveTypeAndCategory(PrimitiveType.Double) };
+        public longitudeColumn: powerbi.DataViewMetadataColumn = { displayName: 'longitude', queryName: 'longitude', isMeasure: true, roles: { X: true }, type: ValueType.fromPrimitiveTypeAndCategory(PrimitiveType.Double) };
+        public latitudeColumn: powerbi.DataViewMetadataColumn = { displayName: 'latitude', queryName: 'latitude', isMeasure: true, roles: { Y: true }, type: ValueType.fromPrimitiveTypeAndCategory(PrimitiveType.Double) };
+        public gradientColumn: powerbi.DataViewMetadataColumn = { displayName: 'gradient', queryName: 'gradient', isMeasure: true, roles: { Gradient: true }, type: ValueType.fromPrimitiveTypeAndCategory(PrimitiveType.Double) };
+
+        public seriesValues = ['A', 'B', 'C', 'D'];
+
+        public objects: powerbi.DataViewObjects;
+        public categoryObjects: powerbi.DataViewObjects[];
+
+        private suppressCategories = false;
+
+        private sizeValues: SeriesValues[] = [
+            {
+                values: [100, 200, 300],
+                subtotal: 600,
+            }, {
+                values: [10, 20, 30],
+                subtotal: 60,
+            }, {
+                values: [1000, 2000, 3000],
+                subtotal: 6000,
+            }, {
+                values: [1, 2, 3],
+                subtotal: 6,
+            }
+        ];
+        private longitudeValues: SeriesValues[] = [
+            {
+                values: [46.87, 37.81, 34.68],
+                subtotal: 119.36
+            }, {
+                values: [46.87, 37.81, 34.68],
+                subtotal: 119.36
+            }, {
+                values: [46.87, 37.81, 34.68],
+                subtotal: 119.36
+            }, {
+                values: [46.87, 37.81, 34.68],
+                subtotal: 119.36
+            }
+        ];
+        private latitudeValues: SeriesValues[] = [
+            {
+                values: [-114, -122.46, -111.76],
+                subtotal: -348.22
+            }, {
+                values: [-114, -122.46, -111.76],
+                subtotal: -348.22
+            }, {
+                values: [-114, -122.46, -111.76],
+                subtotal: -348.22
+            }, {
+                values: [-114, -122.46, -111.76],
+                subtotal: -348.22
+            }
+        ];
+        private gradientValues: SeriesValues[] = [
+            {
+                values: [75, 50, 0],
+                subtotal: 125,
+            }, {
+                values: [25, 10, 40],
+                subtotal: 75,
+            }, {
+                values: [50, 30, 20],
+                subtotal: 100,
+            }, {
+                values: [80, 20, 70],
+                subtotal: 170,
+            },
+        ];
+
+        public build(size: boolean, longLat: boolean, gradient: boolean = false): powerbi.DataView {
+            var dataViewMetadata: powerbi.DataViewMetadata = {
+                columns: [],
+            };
+            if (this.objects)
+                dataViewMetadata.objects = this.objects;
+
+            var valueDataArray: powerbi.DataViewValueColumn[] = [];
+            var categories: powerbi.DataViewCategoryColumn[] = this.buildCategories(dataViewMetadata);
+            if (size) {
+                dataViewMetadata.columns.push(this.sizeColumn);
+                valueDataArray.push({
+                    source: this.sizeColumn,
+                    values: this.sizeValues[0].values,
+                    subtotal: this.sizeValues[0].subtotal,
+                });
+            }
+            if (longLat) {
+                dataViewMetadata.columns.push(this.longitudeColumn);
+                dataViewMetadata.columns.push(this.latitudeColumn);
+                valueDataArray.push({
+                    source: this.longitudeColumn,
+                    values: this.longitudeValues[0].values,
+                    subtotal: this.longitudeValues[0].subtotal,
+                });
+                valueDataArray.push({
+                    source: this.latitudeColumn,
+                    values: this.latitudeValues[0].values,
+                    subtotal: this.latitudeValues[0].subtotal,
+                });
+            }
+            if (gradient) {
+                dataViewMetadata.columns.push(this.gradientColumn);
+                valueDataArray.push({
+                    source: this.gradientColumn,
+                    values: this.gradientValues[0].values,
+                    subtotal: this.gradientValues[0].subtotal,
+                });
+            }
+
+            return <powerbi.DataView> {
+                metadata: dataViewMetadata,
+                categorical: {
+                    categories: categories,
+                    values: DataViewTransform.createValueColumns(valueDataArray),
+                },
+            };
+        }
+
+        public buildWithSeries(size: boolean, longLat: boolean): powerbi.DataView {
+            var dataViewMetadata: powerbi.DataViewMetadata = {
+                columns: []
+            };
+            if (this.objects)
+                dataViewMetadata.objects = this.objects;
+
+            var valueDataArray: powerbi.DataViewValueColumn[] = [];
+            var categories: powerbi.DataViewCategoryColumn[] = this.buildCategories(dataViewMetadata);
+
+            dataViewMetadata.columns.push(this.seriesColumn);
+            let grouped: powerbi.DataViewValueColumnGroup[] = [];
+
+            for (let seriesIdx = 0; seriesIdx < this.seriesValues.length; seriesIdx++) {
+                let seriesValue = this.seriesValues[seriesIdx];
+                let seriesIdentity = mocks.dataViewScopeIdentityWithEquality(this.seriesColumnExpr, seriesValue);
+                let valuesForGrouped = [];
+
+                if (size) {
+                    let sizeColumn: powerbi.DataViewMetadataColumn = $.extend({}, this.sizeColumn);
+                    sizeColumn.groupName = seriesValue;
+
+                    dataViewMetadata.columns.push(sizeColumn);
+                    let sizeArray = {
+                        source: sizeColumn,
+                        values: this.sizeValues[seriesIdx].values,
+                        subtotal: this.sizeValues[seriesIdx].subtotal,
+                        identity: seriesIdentity,
+                    };
+                    valueDataArray.push(sizeArray);
+                    valuesForGrouped.push(sizeArray);
+                    
+                }
+                if (longLat) {
+                    let longitudeColumn: powerbi.DataViewMetadataColumn = $.extend({}, this.longitudeColumn);
+                    longitudeColumn.groupName = seriesValue;
+                    let latitudeColumn: powerbi.DataViewMetadataColumn = $.extend({}, this.latitudeColumn);
+                    latitudeColumn.groupName = seriesValue;
+
+                    dataViewMetadata.columns.push(longitudeColumn);
+                    dataViewMetadata.columns.push(latitudeColumn);
+                    let longArray = {
+                        source: longitudeColumn,
+                        values: this.longitudeValues[seriesIdx].values,
+                        subtotal: this.longitudeValues[seriesIdx].subtotal,
+                        identity: seriesIdentity,
+                    };
+                    valueDataArray.push(longArray);
+                    valuesForGrouped.push(longArray);
+                    let latArray = {
+                        source: latitudeColumn,
+                        values: this.latitudeValues[seriesIdx].values,
+                        subtotal: this.latitudeValues[seriesIdx].subtotal,
+                        identity: seriesIdentity,
+                    };
+                    valueDataArray.push(latArray);
+                    valuesForGrouped.push(latArray);
+                }
+                grouped.push({
+                    values: valuesForGrouped,
+                    identity: mocks.dataViewScopeIdentityWithEquality(this.seriesColumnExpr, seriesValue),
+                    name: seriesValue,
+                });
+            }
+
+            let values = DataViewTransform.createValueColumns(valueDataArray, [this.seriesColumnExpr], this.seriesColumn);
+            values.grouped = () => grouped;
+
+            return <powerbi.DataView> {
+                metadata: dataViewMetadata,
+                categorical: {
+                    categories: categories,
+                    values: values,
+                }
+            };
+        }
+
+        public buildWithCategoryAsSeries(size: boolean, longLat: boolean): powerbi.DataView {
+            var dataViewMetadata: powerbi.DataViewMetadata = {
+                columns: [],
+            };
+            if (this.objects)
+                dataViewMetadata.objects = this.objects;
+
+            var valueDataArray: powerbi.DataViewValueColumn[] = [];
+            var categories: powerbi.DataViewCategoryColumn[] = this.buildCategories(dataViewMetadata, true);
+            if (size) {
+                dataViewMetadata.columns.push(this.sizeColumn);
+                valueDataArray.push({
+                    source: this.sizeColumn,
+                    values: this.sizeValues[0].values,
+                    subtotal: this.sizeValues[0].subtotal,
+                });
+            }
+            if (longLat) {
+                dataViewMetadata.columns.push(this.longitudeColumn);
+                dataViewMetadata.columns.push(this.latitudeColumn);
+                valueDataArray.push({
+                    source: this.longitudeColumn,
+                    values: this.longitudeValues[0].values,
+                    subtotal: this.longitudeValues[0].subtotal,
+                });
+                valueDataArray.push({
+                    source: this.latitudeColumn,
+                    values: this.latitudeValues[0].values,
+                    subtotal: this.latitudeValues[0].subtotal,
+                });
+            }
+
+            return <powerbi.DataView>{
+                metadata: dataViewMetadata,
+                categorical: {
+                    categories: categories,
+                    values: DataViewTransform.createValueColumns(valueDataArray),
+                },
+            };
+        }
+
+        public getSizeValue(categoryIndex: number, seriesIndex: number = 0): number {
+            return this.sizeValues[seriesIndex].values[categoryIndex];
+        }
+
+        public getLatValue(categoryIndex: number, seriesIndex: number = 0): number {
+            return this.latitudeValues[seriesIndex].values[categoryIndex];
+        }
+
+        public getLongValue(categoryIndex: number, seriesIndex: number = 0): number {
+            return this.longitudeValues[seriesIndex].values[categoryIndex];
+        }
+
+        public getGradientValue(categoryIndex: number, seriesIndex: number = 0): number {
+            return this.gradientValues[seriesIndex].values[categoryIndex];
+        }
+
+        public withAddresses(): MapDataBuilder {
+            this.categoryValues = this.addressCategoryValues;
+            this.categoryColumn = this.addressCategoryColumn;
+            this.categoryColumnExpr = this.addressColumnExpr;
+            return this;
+        }
+
+        public withoutCategory(): MapDataBuilder {
+            this.suppressCategories = true;
+            return this;
+        }
+
+        public withNullCategory(): MapDataBuilder {
+            this.categoryValues[1] = null;
+            return this;
+        }
+
+        public withNullValue(): MapDataBuilder {
+            this.sizeValues[0].values[1] = null;
+            this.sizeValues[0].subtotal = 400;
+            return this;
+        }
+
+        public withZeroValue(): MapDataBuilder {
+            this.sizeValues[0].values[1] = 0;
+            this.sizeValues[0].subtotal = 400;
+            return this;
+        }
+
+        public withCategoryLabels(color?: string, labelDisplayUnits?: number, labelPrecision?: number, fontSize?: number): MapDataBuilder {
+            if (!this.objects) {
+                this.objects = {};
+            }
+            this.objects["categoryLabels"] = <powerbi.visuals.DataLabelObject> {
+                show: true,
+                color: { solid: { color: color } },
+                labelDisplayUnits: labelDisplayUnits,
+                labelPosition: undefined,
+                labelPrecision: labelPrecision,
+                fontSize: fontSize || dataLabelUtils.DefaultFontSizeInPt,
+            };
+            return this;
+        };
+
+        public withShortCategoryNames(): MapDataBuilder {
+            this.categoryValues = this.shortCategoryValues;
+            return this;
+        }
+
+        public withCategoriesAsSeries(): MapDataBuilder {
+            this.seriesColumn = this.seriesSameAsCategoryColumn;
+            this.seriesValues = this.categoryValues;
+            this.seriesColumnExpr = this.categoryColumnExpr;
+
+            // values should only be expressed on the diagonal
+            this.clearNonDiagonalValues(this.sizeValues);
+            this.clearNonDiagonalValues(this.latitudeValues);
+            this.clearNonDiagonalValues(this.longitudeValues);
+
+            return this;
+        }
+
+        public withNullSeriesName(): MapDataBuilder {
+            this.seriesValues[1] = null;
+            return this;
+        }
+
+        public withNullLatLong(): MapDataBuilder {
+            for (let i = 0, ilen = this.latitudeValues.length; i < ilen; i++) {
+                this.latitudeValues[i].values[1] = null;
+                this.longitudeValues[i].values[1] = null;
+            }
+            return this;
+        }
+
+        private clearNonDiagonalValues(array: SeriesValues[]): void {
+            for (let i = 0; i < array.length; i++) {
+                for (let j = 0; j < array[i].values.length; j++) {
+                    if (i !== j)
+                        array[i].values[j] = null;
+                }
+
+                array[i].subtotal = array[i].values[i];
+            }
+        }
+
+        private buildCategories(dataViewMetadata: powerbi.DataViewMetadata, createAsSeries: boolean = false): powerbi.DataViewCategoryColumn[] {
+            if (this.suppressCategories)
+                return;
+
+            let categoryColumn = createAsSeries ? this.categoryAsSeriesColumn : this.categoryColumn;
+
+            dataViewMetadata.columns.push(categoryColumn);
+
+            let categoryIdentities = this.categoryValues.map((v) => mocks.dataViewScopeIdentityWithEquality(this.categoryColumnExpr, v));
+            var categories: powerbi.DataViewCategoryColumn[] = [{
+                source: categoryColumn,
+                values: this.categoryValues,
+                identity: categoryIdentities,
+            }];
+
+            if (this.categoryObjects)
+                categories[0].objects = this.categoryObjects;
+
+            return categories;
+        }
+    }
+
+    interface SeriesValues {
+        values: number[];
+        subtotal: number;
+    }
+
+    class MapVisualBuilder {
+        private _style: powerbi.IVisualStyle;
+        public get style(): powerbi.IVisualStyle { return this._style; }
+
+        private _host: powerbi.IVisualHostServices;
+        public get host(): powerbi.IVisualHostServices { return this._host; }
+
+        private _svg: D3.Selection;
+        private _viewport: powerbi.IViewport;
+
+        private _element: JQuery;
+        public get element(): JQuery { return this._element; }
+
+        private _testGeocoder: powerbi.IGeocoder;
+        public get testGeocoder(): powerbi.IGeocoder { return this._testGeocoder; }
+
+        private _testMapControlFactory: powerbi.visuals.IMapControlFactory;
+        public get testMapControlFactory(): powerbi.visuals.IMapControlFactory { return this._testMapControlFactory; }
+
+        private _visual: Map;
+
+        constructor() {
+            this._style = powerbi.visuals.visualStyles.create();
+            this._host = mocks.createVisualHostServices();
+            this._svg = d3.select($('<svg/>').get(0));
+            this._viewport = {
+                height: 500,
+                width: 500,
+            };
+            this._element = powerbitests.helpers.testDom('500', '500');
+            this._testGeocoder = new mocks.MockGeocoder();
+            this._testMapControlFactory = {
+                createMapControl: (element, options) => {
+                    return <any>(new mocks.MockMapControl(this._element[0], 500, 500));
+                },
+                ensureMap: (locale: string, action: () => void) => {
+                    Microsoft.Maps = <any>mocks.MockMaps; // Hook the mock up to Microsoft.Maps for use in Map code
+                    action();
+                },
+            };
+        }
+
+        public build(filledMap: boolean, minerva: boolean = false): Map {
+            this._visual = new Map({ filledMap: filledMap, geocoder: this._testGeocoder, mapControlFactory: this._testMapControlFactory, filledMapDataLabelsEnabled: true });
+            this._visual.init(this.buildInitOptions());
+
+            return this._visual;
+        }
+
+        public buildInitOptions(): powerbi.VisualInitOptions {
+            let host = powerbi.Prototype.inherit(this._host, h => h.geocoder = () => this.testGeocoder);
+
+            return <powerbi.VisualInitOptions> {
+                element: this._element,
+                host: host,
+                style: this._style,
+                viewport: this._viewport,
+                interactivity: { isInteractiveLegend: false },
+                animation: { transitionImmediate: true },
+                svg: this._svg,
+            };
+        }
+
+        public withSize(width: number, height: number): MapVisualBuilder {
+            this._element = powerbitests.helpers.testDom(height.toString(), width.toString());
+            this._viewport = {
+                width: width,
+                height: height,
+            };
+
+            return this;
+        }
+    }
+}
+
+// Declaration of the Microsoft.Maps module with something inside it so it actually gets compiled
+module Microsoft.Maps {
+    export let mock;
 }

@@ -24,8 +24,6 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="_references.ts"/>
-
 module jsCommon {
     export interface IError extends Error {
         stack?: string;
@@ -107,15 +105,15 @@ module jsCommon {
     }
 
     /**
-    * getStackTrace - Captures the stack trace, if available.
-    * It optionally takes the number of frames to remove from the stack trace.
-    * By default, it removes the last frame to consider the calling type's
-    * constructor and the temporary error used to capture the stack trace (below).
-    * More levels can be requested as needed e..g. when an error is created
-    * from a helper method. <Min requirement: IE10, Chrome, Firefox, Opera>
-    */
+     * Captures the stack trace, if available.
+     * It optionally takes the number of frames to remove from the stack trace.
+     * By default, it removes the last frame to consider the calling type's
+     * constructor and the temporary error used to capture the stack trace (below).
+     * More levels can be requested as needed e..g. when an error is created
+     * from a helper method. <Min requirement: IE10, Chrome, Firefox, Opera>.
+     */
     export function getStackTrace(leadingFramesToRemove = 1): string {
-        var stackTrace: string,
+        let stackTrace: string,
             stackSegments: string[];
 
         try {

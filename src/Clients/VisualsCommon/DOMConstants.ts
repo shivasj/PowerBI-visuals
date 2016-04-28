@@ -24,13 +24,15 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="_references.ts"/>
-
 module jsCommon {
-    /** DOM constants */
+    /**
+     * DOM constants.
+     */
     export module DOMConstants {
 
-        /** Integer codes corresponding to individual keys on the keyboard */
+        /** 
+         * Integer codes corresponding to individual keys on the keyboard.
+         */
         export const escKeyCode = 27;
         export const enterKeyCode = 13;
         export const tabKeyCode = 9;
@@ -51,27 +53,37 @@ module jsCommon {
         export const cKeyCode = 67;
         export const sKeyCode = 83;
         export const vKeyCode = 86;
+        export const wKeyCode = 87;
         export const xKeyCode = 88;
         export const yKeyCode = 89;
         export const zKeyCode = 90;
 
-        /** DOM Elements */
+        /** 
+         * DOM Elements.
+         */
         export const DocumentBody = 'body';
         export const Anchor = 'a';
         export const EditableTextElements = ':text, textarea';
+        export const EditableNumericElements = '[type="number"]';
 
-        /** DOM Attributes and values */
+        /** 
+         * DOM Attributes and values.
+         */
         export const disabledAttributeOrValue = 'disabled';
         export const readonlyAttributeOrValue = 'readonly';
+        export const idAttribute = 'id';
         export const styleAttribute = 'style';
         export const hrefAttribute = 'href';
         export const targetAttribute = 'target';
         export const blankValue = '_blank';
+        export const selfValue = '_self';
         export const classAttribute = 'class';
         export const titleAttribute = 'title';
         export const srcAttribute = 'src';
 
-        /** DOM event names */
+        /**
+         * DOM event names.
+         */
         export const contextmenuEventName = 'contextmenu';
         export const blurEventName = 'blur';
         export const keyUpEventName = 'keyup';
@@ -89,6 +101,7 @@ module jsCommon {
         export const pasteEventName = 'paste';
         export const scrollEventName = 'scroll';
         export const dropEventName = 'drop';
+        export const focusEventName = 'focus';
         export const focusInEventName = 'focusin';
         export const focusOutEventName = 'focusout';
         export const selectEventName = 'select';
@@ -96,7 +109,9 @@ module jsCommon {
         export const loadEventName = 'load';
         export const beforeUnload = 'beforeunload';
         
-        /** Common DOM event combination names */
+        /**
+         * Common DOM event combination names.
+         */
         export const inputAndSelectEventNames = 'input, select';
     }
 }

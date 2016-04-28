@@ -24,249 +24,319 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="_references.ts"/>
-
 module powerbi.visuals.plugins {
     // This file registers the built-in visualizations
 
-    export var animatedNumber: IVisualPlugin = {
+    export const animatedNumber: IVisualPlugin = {
         name: 'animatedNumber',
-        capabilities: AnimatedNumber.capabilities,
+        capabilities: capabilities.animatedNumber,
         create: () => new AnimatedNumber()
     };
 
-    export var areaChart: IVisualPlugin = {
+    export let areaChart: IVisualPlugin = {
         name: 'areaChart',
         watermarkKey: 'area',
-        capabilities: lineChartCapabilities,
+        capabilities: capabilities.lineChart,
         create: () => new CartesianChart({ chartType: CartesianChartType.Area }),
         customizeQuery: LineChart.customizeQuery,
         getSortableRoles: (visualSortableOptions?: VisualSortableOptions) => ColumnChart.getSortableRoles(visualSortableOptions),
+        getAdditionalTelemetry: (dataView) => CartesianChart.getAdditionalTelemetry(dataView),
     };
 
-    export var barChart: IVisualPlugin = {
+    export let barChart: IVisualPlugin = {
         name: 'barChart',
         watermarkKey: 'bar',
-        capabilities: getColumnChartCapabilities(true),
+        capabilities: capabilities.barChart,
         create: () => new CartesianChart({ chartType: CartesianChartType.StackedBar }),
         customizeQuery: ColumnChart.customizeQuery,
         getSortableRoles: (visualSortableOptions?: VisualSortableOptions) => ColumnChart.getSortableRoles(visualSortableOptions),
+        getAdditionalTelemetry: (dataView) => CartesianChart.getAdditionalTelemetry(dataView),
     };
 
-    export var card: IVisualPlugin = {
+    export let basicShape: IVisualPlugin = {
+        name: 'basicShape',
+        capabilities: basicShapeCapabilities,
+        create: () => new BasicShapeVisual()
+    };
+
+    export let card: IVisualPlugin = {
         name: 'card',
         watermarkKey: 'card',
-        capabilities: Card.capabilities,
+        capabilities: capabilities.card,
         create: () => new Card()
     };
 
-    export var multiRowCard: IVisualPlugin = {
+    export let multiRowCard: IVisualPlugin = {
         name: 'multiRowCard',
         watermarkKey: 'multiRowCard',
-        capabilities: MultiRowCard.capabilities,
-        create: () => new MultiRowCard()
+        capabilities: capabilities.multiRowCard,
+        create: () => new MultiRowCard(),
+        getSortableRoles: (visualSortableOptions?: VisualSortableOptions) => MultiRowCard.getSortableRoles(visualSortableOptions),
     };
 
-    export var clusteredBarChart: IVisualPlugin = {
+    export let clusteredBarChart: IVisualPlugin = {
         name: 'clusteredBarChart',
         watermarkKey: 'clusteredBar',
-        capabilities: getColumnChartCapabilities(true),
+        capabilities: capabilities.clusteredBarChart,
         create: () => new CartesianChart({ chartType: CartesianChartType.ClusteredBar }),
         customizeQuery: ColumnChart.customizeQuery,
         getSortableRoles: (visualSortableOptions?: VisualSortableOptions) => ColumnChart.getSortableRoles(visualSortableOptions),
+        getAdditionalTelemetry: (dataView) => CartesianChart.getAdditionalTelemetry(dataView),
     };
 
-    export var clusteredColumnChart: IVisualPlugin = {
+    export let clusteredColumnChart: IVisualPlugin = {
         name: 'clusteredColumnChart',
         watermarkKey: 'clusteredColumn',
-        capabilities: getColumnChartCapabilities(),
+        capabilities: capabilities.clusteredColumnChart,
         create: () => new CartesianChart({ chartType: CartesianChartType.ClusteredColumn }),
         customizeQuery: ColumnChart.customizeQuery,
         getSortableRoles: (visualSortableOptions?: VisualSortableOptions) => ColumnChart.getSortableRoles(visualSortableOptions),
+        getAdditionalTelemetry: (dataView) => CartesianChart.getAdditionalTelemetry(dataView),
     };
 
-    export var columnChart: IVisualPlugin = {
+    export let columnChart: IVisualPlugin = {
         name: 'columnChart',
         watermarkKey: 'column',
-        capabilities: getColumnChartCapabilities(),
+        capabilities: capabilities.columnChart,
         create: () => new CartesianChart({ chartType: CartesianChartType.StackedColumn }),
         customizeQuery: ColumnChart.customizeQuery,
         getSortableRoles: (visualSortableOptions?: VisualSortableOptions) => ColumnChart.getSortableRoles(visualSortableOptions),
+        getAdditionalTelemetry: (dataView) => CartesianChart.getAdditionalTelemetry(dataView),
     };
 
-    export var comboChart: IVisualPlugin = {
+    export let comboChart: IVisualPlugin = {
         name: 'comboChart',
         watermarkKey: 'combo',
-        capabilities: ComboChart.capabilities,
-        create: () => new CartesianChart({ chartType: CartesianChartType.ComboChart })
+        capabilities: capabilities.comboChart,
+        customizeQuery: ComboChart.customizeQuery,
+        create: () => new CartesianChart({ chartType: CartesianChartType.ComboChart }),
+        getSortableRoles: (visualSortableOptions?: VisualSortableOptions) => ComboChart.getSortableRoles(visualSortableOptions),
+        getAdditionalTelemetry: (dataView) => CartesianChart.getAdditionalTelemetry(dataView),
     };
 
-    export var dataDotChart: IVisualPlugin = {
+    export let dataDotChart: IVisualPlugin = {
         name: 'dataDotChart',
-        capabilities: DataDotChart.capabilities,
-        create: () => new CartesianChart({ chartType: CartesianChartType.DataDot })
+        capabilities: capabilities.dataDotChart,
+        create: () => new CartesianChart({ chartType: CartesianChartType.DataDot }),
+        getAdditionalTelemetry: (dataView) => CartesianChart.getAdditionalTelemetry(dataView),
     };
 
-    export var dataDotClusteredColumnComboChart: IVisualPlugin = {
+    export let dataDotClusteredColumnComboChart: IVisualPlugin = {
         name: 'dataDotClusteredColumnComboChart',
         watermarkKey: 'combo',
-        capabilities: ComboChart.capabilities,
-        create: () => new CartesianChart({ chartType: CartesianChartType.DataDotClusteredColumnCombo })
+        capabilities: capabilities.dataDotClusteredColumnComboChart,
+        customizeQuery: ComboChart.customizeQuery,
+        create: () => new CartesianChart({ chartType: CartesianChartType.DataDotClusteredColumnCombo }),
+        getAdditionalTelemetry: (dataView) => CartesianChart.getAdditionalTelemetry(dataView),
     };
 
-    export var dataDotStackedColumnComboChart: IVisualPlugin = {
+    export let dataDotStackedColumnComboChart: IVisualPlugin = {
         name: 'dataDotStackedColumnComboChart',
         watermarkKey: 'combo',
-        capabilities: ComboChart.capabilities,
-        create: () => new CartesianChart({ chartType: CartesianChartType.DataDotStackedColumnCombo })
+        capabilities: capabilities.dataDotStackedColumnComboChart,
+        customizeQuery: ComboChart.customizeQuery,
+        create: () => new CartesianChart({ chartType: CartesianChartType.DataDotStackedColumnCombo }),
+        getAdditionalTelemetry: (dataView) => CartesianChart.getAdditionalTelemetry(dataView),
     };
 
-    export var donutChart: IVisualPlugin = {
+    export let donutChart: IVisualPlugin = {
         name: 'donutChart',
         watermarkKey: 'donut',
-        capabilities: donutChartCapabilities,
+        capabilities: capabilities.donutChart,
         create: () => new DonutChart()
     };
 
-    export var funnel: IVisualPlugin = {
+    export let funnel: IVisualPlugin = {
         name: 'funnel',
         watermarkKey: 'funnel',
-        capabilities: funnelChartCapabilities,
+        capabilities: capabilities.funnel,
         create: () => new FunnelChart()
     };
 
-    export var gauge: IVisualPlugin = {
+    export let gauge: IVisualPlugin = {
         name: 'gauge',
         watermarkKey: 'gauge',
-        capabilities: Gauge.capabilities,
+        capabilities: capabilities.gauge,
         create: () => new Gauge()
     };
 
-    export var hundredPercentStackedBarChart: IVisualPlugin = {
+    export let hundredPercentStackedBarChart: IVisualPlugin = {
         name: 'hundredPercentStackedBarChart',
         watermarkKey: '100stackedbar',
-        capabilities: getColumnChartCapabilities(true),
+        capabilities: capabilities.hundredPercentStackedBarChart,
         create: () => new CartesianChart({ chartType: CartesianChartType.HundredPercentStackedBar }),
         customizeQuery: ColumnChart.customizeQuery,
         getSortableRoles: (visualSortableOptions?: VisualSortableOptions) => ColumnChart.getSortableRoles(visualSortableOptions),
+        getAdditionalTelemetry: (dataView) => CartesianChart.getAdditionalTelemetry(dataView),
     };
 
-    export var hundredPercentStackedColumnChart: IVisualPlugin = {
+    export let hundredPercentStackedColumnChart: IVisualPlugin = {
         name: 'hundredPercentStackedColumnChart',
         watermarkKey: '100stackedcolumn',
-        capabilities: getColumnChartCapabilities(),
+        capabilities: capabilities.hundredPercentStackedColumnChart,
         create: () => new CartesianChart({ chartType: CartesianChartType.HundredPercentStackedColumn }),
         customizeQuery: ColumnChart.customizeQuery,
         getSortableRoles: (visualSortableOptions?: VisualSortableOptions) => ColumnChart.getSortableRoles(visualSortableOptions),
+        getAdditionalTelemetry: (dataView) => CartesianChart.getAdditionalTelemetry(dataView),
     };
 
-    export var image: IVisualPlugin = {
+    export let image: IVisualPlugin = {
         name: 'image',
-        capabilities: ImageVisual.capabilities,
+        capabilities: capabilities.image,
         create: () => new ImageVisual()
     };
 
-    export var lineChart: IVisualPlugin = {
+    export let lineChart: IVisualPlugin = {
         name: 'lineChart',
         watermarkKey: 'line',
-        capabilities: lineChartCapabilities,
+        capabilities: capabilities.lineChart,
         create: () => new CartesianChart({ chartType: CartesianChartType.Line }),
         customizeQuery: LineChart.customizeQuery,
         getSortableRoles: (visualSortableOptions?: VisualSortableOptions) => LineChart.getSortableRoles(visualSortableOptions),
+        getAdditionalTelemetry: (dataView) => CartesianChart.getAdditionalTelemetry(dataView),
     };
 
-    export var lineStackedColumnComboChart: IVisualPlugin = {
+    export let lineStackedColumnComboChart: IVisualPlugin = {
         name: 'lineStackedColumnComboChart',
         watermarkKey: 'combo',
-        capabilities: ComboChart.capabilities,
+        capabilities: capabilities.lineStackedColumnComboChart,
+        customizeQuery: ComboChart.customizeQuery,
         create: () => new CartesianChart({ chartType: CartesianChartType.LineStackedColumnCombo }),
-        getSortableRoles: (visualSortableOptions?: VisualSortableOptions) => ColumnChart.getSortableRoles(visualSortableOptions),
+        getSortableRoles: (visualSortableOptions?: VisualSortableOptions) => ComboChart.getSortableRoles(visualSortableOptions),
+        getAdditionalTelemetry: (dataView) => CartesianChart.getAdditionalTelemetry(dataView),
     };
 
-    export var lineClusteredColumnComboChart: IVisualPlugin = {
+    export let lineClusteredColumnComboChart: IVisualPlugin = {
         name: 'lineClusteredColumnComboChart',
         watermarkKey: 'combo',
-        capabilities: ComboChart.capabilities,
+        capabilities: capabilities.lineClusteredColumnComboChart,
+        customizeQuery: ComboChart.customizeQuery,
         create: () => new CartesianChart({ chartType: CartesianChartType.LineClusteredColumnCombo }),
-        getSortableRoles: (visualSortableOptions?: VisualSortableOptions) => ColumnChart.getSortableRoles(visualSortableOptions),
+        getSortableRoles: (visualSortableOptions?: VisualSortableOptions) => ComboChart.getSortableRoles(visualSortableOptions),
+        getAdditionalTelemetry: (dataView) => CartesianChart.getAdditionalTelemetry(dataView),
     };
 
-    export var map: IVisualPlugin = {
+    export let map: IVisualPlugin = {
         name: 'map',
         watermarkKey: 'map',
-        capabilities: mapCapabilities,
+        capabilities: capabilities.map,
         create: () => new Map({ filledMap: false })
     };
 
-    export var filledMap: IVisualPlugin = {
+    export let filledMap: IVisualPlugin = {
         name: 'filledMap',
         watermarkKey: 'filledMap',
-        capabilities: filledMapCapabilities,
+        capabilities: capabilities.filledMap,
         create: () => new Map({ filledMap: true })
     };
 
-    export var treemap: IVisualPlugin = {
+    export let treemap: IVisualPlugin = {
         name: 'treemap',
         watermarkKey: 'tree',
-        capabilities: treemapCapabilities,
+        capabilities: capabilities.treemap,
         create: () => new Treemap()
     };
 
-    export var pieChart: IVisualPlugin = {
+    export let pieChart: IVisualPlugin = {
         name: 'pieChart',
         watermarkKey: 'pie',
-        capabilities: donutChartCapabilities,
+        capabilities: capabilities.donutChart,
         create: () => new DonutChart({ sliceWidthRatio: 0 })
     };
 
-    export var scatterChart: IVisualPlugin = {
+    export let scatterChart: IVisualPlugin = {
         name: 'scatterChart',
         watermarkKey: 'scatterplot',
-        capabilities: scatterChartCapabilities,
-        create: () => new CartesianChart({ chartType: CartesianChartType.Scatter })
+        capabilities: capabilities.scatterChart,
+        create: () => new CartesianChart({ chartType: CartesianChartType.Scatter }),
+        getAdditionalTelemetry: (dataView: DataView) => ScatterChart.getAdditionalTelemetry(dataView),
     };
 
-    export var table: IVisualPlugin = {
+    export let stackedAreaChart: IVisualPlugin = {
+        name: 'stackedAreaChart',
+        watermarkKey: 'stackedarea',
+        capabilities: capabilities.lineChart,
+        create: () => new CartesianChart({ chartType: CartesianChartType.StackedArea }),
+        customizeQuery: LineChart.customizeQuery,
+        getSortableRoles: (visualSortableOptions?: VisualSortableOptions) => ColumnChart.getSortableRoles(visualSortableOptions),
+        getAdditionalTelemetry: (dataView) => CartesianChart.getAdditionalTelemetry(dataView),
+    };
+
+    export let table: IVisualPlugin = {
         name: 'table',
         watermarkKey: 'table',
-        capabilities: Table.capabilities,
+        capabilities: capabilities.table,
         create: () => new Table(),
         customizeQuery: Table.customizeQuery,
         getSortableRoles: (visualSortableOptions?: VisualSortableOptions) => Table.getSortableRoles(),
     };
 
-    export var matrix: IVisualPlugin = {
+    export let matrix: IVisualPlugin = {
         name: 'matrix',
         watermarkKey: 'matrix',
-        capabilities: Matrix.capabilities,
+        capabilities: capabilities.matrix,
         create: () => new Matrix(),
         customizeQuery: Matrix.customizeQuery,
         getSortableRoles: (visualSortableOptions?: VisualSortableOptions) => Matrix.getSortableRoles(),
     };
 
-    export var slicer: IVisualPlugin = {
+    export let slicer: IVisualPlugin = {
         name: 'slicer',
         watermarkKey: 'slicer',
-        capabilities: slicerCapabilities,
+        capabilities: capabilities.slicer,
         create: () => new Slicer()
     };
 
-    export var textbox: IVisualPlugin = {
+    export let textbox: IVisualPlugin = {
         name: 'textbox',
-        capabilities: RichTextbox.capabilities,
-        create: () => new RichTextbox()
+        capabilities: capabilities.textbox,
+        create: () => new Textbox()
     };
 
-    export var waterfallChart: IVisualPlugin = {
+    export let waterfallChart: IVisualPlugin = {
         name: 'waterfallChart',
         watermarkKey: 'waterfall',
-        capabilities: waterfallChartCapabilities,
-        create: () => new CartesianChart({ chartType: CartesianChartType.Waterfall })
+        capabilities: capabilities.waterfallChart,
+        create: () => new CartesianChart({ chartType: CartesianChartType.Waterfall }),
+        getAdditionalTelemetry: (dataView) => CartesianChart.getAdditionalTelemetry(dataView),
     };
 
-    export var cheerMeter: IVisualPlugin = {
+    export let cheerMeter: IVisualPlugin = {
         name: 'cheerMeter',
         capabilities: CheerMeter.capabilities,
         create: () => new CheerMeter()
+    };
+
+    export let consoleWriter: IVisualPlugin = {
+        name: 'consoleWriter',
+        capabilities: samples.consoleWriterCapabilities,
+        create: () => new samples.ConsoleWriter()
+    };
+
+    export let helloIVisual: IVisualPlugin = {
+        name: 'helloIVisual',
+        capabilities: samples.HelloIVisual.capabilities,
+        create: () => new samples.HelloIVisual()
+    };
+
+    export let owlGauge: IVisualPlugin = {
+        name: 'owlGauge',
+        watermarkKey: 'gauge',
+        capabilities: OwlGauge.capabilities,
+        create: () => new OwlGauge()
+    };
+
+    export let scriptVisual: IVisualPlugin = {
+        name: 'scriptVisual',
+        watermarkKey: 'scriptvisual',
+        capabilities: capabilities.scriptVisual,
+        create: () => new ScriptVisual({ canRefresh: false })
+    };
+
+    export let kpi: IVisualPlugin = {
+        name: 'kpi',
+        watermarkKey: 'kpi',
+        capabilities: capabilities.kpi,
+        create: () => new KPIStatusWithHistory()
     };
 }

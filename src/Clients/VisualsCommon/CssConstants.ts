@@ -24,12 +24,23 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="_references.ts"/>
-
 module jsCommon {
-
-    /** CSS constants */
+    /**
+     * CSS constants.
+     */
     export module CssConstants {
+        export interface ClassAndSelector {
+            class: string;
+            selector: string;
+        }
+
+        export function createClassAndSelector(className: string): ClassAndSelector {
+            return {
+                class: className,
+                selector: '.' + className,
+            };
+        }
+
         export const styleAttribute = 'style';
         export const pixelUnits = 'px';
 
@@ -48,10 +59,12 @@ module jsCommon {
         export const backgroundSizeProperty = 'background-size';
         export const backgroundImageProperty = 'background-image';
         export const textShadowProperty = 'text-shadow';
+        export const textAlignProperty = 'text-align';
         export const borderTopWidthProperty = 'border-top-width';
         export const borderBottomWidthProperty = 'border-bottom-width';
         export const borderLeftWidthProperty = 'border-left-width';
         export const borderRightWidthProperty = 'border-right-width';
+        export const fontSizeProperty = 'font-size';
         export const fontWeightProperty = 'font-weight';
         export const colorProperty = 'color';
         export const opacityProperty = 'opacity';
@@ -61,6 +74,10 @@ module jsCommon {
         export const maxWidthProperty = 'max-width';
         export const minWidthProperty = 'min-width';
         export const overflowProperty = 'overflow';
+        export const overflowXProperty = 'overflow-x';
+        export const overflowYProperty = 'overflow-y';
+        export const transformProperty = 'transform';
+        export const webkitTransformProperty = '-webkit-transform';
         export const cursorProperty = 'cursor';
         export const visibilityProperty = 'visibility';
 
@@ -77,6 +94,7 @@ module jsCommon {
         export const tableRowValue = 'table-row';
         export const coverValue = 'cover';
         export const pointerValue = 'pointer';
+        export const scrollValue = 'scroll';
     }
 
     export interface ExtendedCSSProperties extends CSSStyleDeclaration {

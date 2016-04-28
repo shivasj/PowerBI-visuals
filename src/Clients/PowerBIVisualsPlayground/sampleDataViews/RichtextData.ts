@@ -24,8 +24,6 @@
 *  THE SOFTWARE.
 */
 
-/// <reference path="../_references.ts"/>
-
 module powerbi.visuals.sampleDataViews {
 
     export class RichtextData extends SampleDataViews implements ISampleDataViewsMethods {
@@ -33,10 +31,10 @@ module powerbi.visuals.sampleDataViews {
         public name: string = "RichtextData";
         public displayName: string = "Richtext data";
 
-        public visuals: string[] = ['textbox',
-        ];
+        public visuals: string[] = ['textbox'];
 
-        private sampleData: string[] = ["Example Text",
+        private sampleData: string[] = [
+            "Example Text",
             "company's data",
             "Power BI",
             "visualization",
@@ -59,7 +57,7 @@ module powerbi.visuals.sampleDataViews {
 
         public getDataViews(): DataView[] {
             // 1 paragraphs, with formatting
-            var paragraphs: ParagraphContext[] = [
+            var paragraphs: Paragraph[] = [
                 {
                     horizontalTextAlignment: "center",
                     textRuns: [{
@@ -70,8 +68,9 @@ module powerbi.visuals.sampleDataViews {
 
             return this.buildParagraphsDataView(paragraphs);
         }
+
         
-        private buildParagraphsDataView(paragraphs: powerbi.visuals.ParagraphContext[]): powerbi.DataView[] {
+        private buildParagraphsDataView(paragraphs: Paragraph[]): powerbi.DataView[] {
             return [{ metadata: { columns: [], objects: { general: { paragraphs: paragraphs } } } }];
         }
 

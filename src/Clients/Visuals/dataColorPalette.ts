@@ -24,25 +24,13 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="_references.ts"/>
-
 module powerbi.visuals {
     import ArrayExtensions = jsCommon.ArrayExtensions;
 
     export class DataColorPalette implements IDataColorPalette {
         private scales: { [index: string]: IColorScale };
         private colors: IColorInfo[];
-
-        /**
-        * Colors used for sentiment visuals, e.g. KPI, Gauge. Since this is only a temporary implementation which will
-        * eventually be superseded by conditional formatting, we don't declare them as part of the theme and instead
-        * use a hardcoded color scheme here until conditional formatting is ready.
-        */
-        private sentimentColors: IColorInfo[] = [
-            { value: '#C0433A' }, // Red
-            { value: '#E8D62E' }, // Yellow
-            { value: '#79C75B' }, // Green
-        ];
+        private sentimentColors: IColorInfo[];
 
         // Hardcoded values for Color Picker.
         private basePickerColors: IColorInfo[] = [
@@ -61,14 +49,15 @@ module powerbi.visuals {
         /**
          * Creates a DataColorPalette using the given theme, or the default theme.
          */
-        constructor(colors?: IColorInfo[]) {
+        constructor(colors?: IColorInfo[], sentimentcolors?: IColorInfo[]) {
             // TODO: Default theme is currently hardcoded. Theme should eventually come from PV and be added as a parameter in the ctor. 
             this.colors = colors || ThemeManager.getDefaultTheme();
+            this.sentimentColors = sentimentcolors || ThemeManager.defaultSentimentColors;
             this.scales = {};
         }
 
         public getColorScaleByKey(key: string): IColorScale {
-            var scale = this.scales[key];
+            let scale = this.scales[key];
             if (scale === undefined) {
                 scale = this.createScale();
                 this.scales[key] = scale;
@@ -94,6 +83,10 @@ module powerbi.visuals {
             return this.basePickerColors;
         }
 
+        public getAllColors(): IColorInfo[] {
+            return this.colors;
+        }
+
         private createScale(): IColorScale {
             return D3ColorScale.createFromColors(this.colors);
         }
@@ -111,13 +104,17 @@ module powerbi.visuals {
         }
 
         public clearAndRotateScale(): void {
-            var offset = this.scale.domain().length;
-            var rotatedColors = ArrayExtensions.rotate(this.scale.range(), offset);
+            let offset = this.scale.domain().length;
+            let rotatedColors = ArrayExtensions.rotate(this.scale.range(), offset);
             this.scale = d3.scale.ordinal().range(rotatedColors);
         }
 
         public clone(): IColorScale {
             return new D3ColorScale(this.scale.copy());
+        }
+
+        public getDomain(): any[]{
+            return this.scale.domain();
         }
 
         public static createFromColors(colors: IColorInfo[]): D3ColorScale {
@@ -126,11 +123,11 @@ module powerbi.visuals {
     }
 
     // TODO: When theming support is added, this should be changed into a fully fledged service. For now though we will
-    // declare the Theme code as a private implementation detail inside the DataColorPalette so that the code stays hidden
-    // until it's ready for wider use.
     class ThemeManager {
         private static colorSectorCount = 12;
-
+      
+        // declare the Theme code as a private implementation detail inside the DataColorPalette so that the code stays hidden
+        // until it's ready for wider use.
         private static defaultBaseColors: IColorInfo[] = [
             // First loop
             { value: '#01B8AA' },
@@ -182,17 +179,23 @@ module powerbi.visuals {
         ];
 
         private static defaultTheme: IColorInfo[];
+        
+        public static defaultSentimentColors: IColorInfo[] = [
+            { value: '#C0433A' }, // Red
+            { value: '#E8D62E' }, // Yellow
+            { value: '#79C75B' }, // Green
+        ];
 
         public static getDefaultTheme(): IColorInfo[] {
             if (!ThemeManager.defaultTheme) {
                 // Extend the list of available colors by cycling the base colors
                 ThemeManager.defaultTheme = [];
-                var baseColors = ThemeManager.defaultBaseColors;
-                for (var i = 0; i < ThemeManager.colorSectorCount; ++i) {
-                    for (var j = 0, jlen = baseColors.length; j < jlen; ++j) {
+                let baseColors = ThemeManager.defaultBaseColors;
+                for (let i = 0; i < ThemeManager.colorSectorCount; ++i) {
+                    for (let j = 0, jlen = baseColors.length; j < jlen; ++j) {
                         ThemeManager.defaultTheme.push(
                             {
-                                value: jsCommon.color.rotate(baseColors[j].value, i / ThemeManager.colorSectorCount)
+                                value: jsCommon.Color.rotate(baseColors[j].value, i / ThemeManager.colorSectorCount)
                             });
                     }
                 }

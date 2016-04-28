@@ -24,19 +24,34 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
-
 module powerbi.visuals {
     /**
      * Contains functions/constants to aid in text manupilation. 
-    */
+     */
     export module TextUtil {
         
         /**
-         * remove breaking spaces from given string and replace by none breaking space (&nbsp)
-        */
+         * Remove breaking spaces from given string and replace by none breaking space (&nbsp).
+         */
         export function removeBreakingSpaces(str: string): string {
             return str.toString().replace(new RegExp(' ', 'g'), '&nbsp');
+        }
+
+        /**
+         * Remove ellipses from a given string
+         */
+        export function removeEllipses(str: string): string {
+            return str.replace(/…/g, '');
+        }
+
+        /**
+        * Replace every whitespace (0x20) with Non-Breaking Space (0xA0)
+         * @param {string} txt String to replace White spaces
+         * @returns Text after replcing white spaces
+         */
+        export function replaceSpaceWithNBSP(txt: string): string {
+            if (txt != null)
+                return txt.replace(/ /g, "\xA0");
         }
     }
 }

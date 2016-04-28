@@ -24,8 +24,6 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
-
 module jsCommon {
     export class TraceItem {
         public type: TraceType;
@@ -34,7 +32,9 @@ module jsCommon {
         public text: string;
         public timeStamp: Date;
 
-        /** DO NOT USE for backward compability only */
+        /** 
+         * Note: DO NOT USE for backward compability only.
+         */
         public _activityId: string;
 
         private static traceTypeStrings: string[] = [
@@ -56,7 +56,7 @@ module jsCommon {
         }
 
         public toString(): string {
-            var resultString: string = '';
+            let resultString: string = '';
 
             resultString += (StringExtensions.format(
                 '{0} ({1}): {2}',

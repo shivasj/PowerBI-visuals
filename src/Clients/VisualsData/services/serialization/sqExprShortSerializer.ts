@@ -24,8 +24,6 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../../_references.ts"/>
-
 module powerbi.data {
     /** Serializes SQExpr in a form optimized in-memory comparison, but not intended for storage on disk. */
     export module SQExprShortSerializer {
@@ -34,8 +32,8 @@ module powerbi.data {
         }
 
         export function serializeArray(exprs: SQExpr[]): string {
-            var str = '[';
-            for (var i = 0, len = exprs.length; i < len; i++) {
+            let str = '[';
+            for (let i = 0, len = exprs.length; i < len; i++) {
                 if (i > 0)
                     str += ',';
                 str += SQExprShortSerializer.serialize(exprs[i]);
@@ -83,6 +81,28 @@ module powerbi.data {
                 };
             }
 
+            public visitHierarchyLevel(expr: SQHierarchyLevelExpr): {} {
+                return {
+                    h: expr.arg.accept(this),
+                    l: expr.level,
+                };
+            }
+
+            public visitHierarchy(expr: SQHierarchyExpr): {} {
+                return {
+                    e: expr.arg.accept(this),
+                    h: expr.hierarchy,
+                };
+            }
+
+            public visitPropertyVariationSource(expr: SQPropertyVariationSourceExpr): {} {
+                return {
+                    e: expr.arg.accept(this),
+                    n: expr.name,
+                    p: expr.property,
+                };
+            }
+
             public visitAnd(expr: SQAndExpr): {} {
                 debug.assertValue(expr, 'expr');
 
@@ -99,7 +119,7 @@ module powerbi.data {
 
                 return {
                     comp: {
-                        k: expr.kind,
+                        k: expr.comparison,
                         l: expr.left.accept(this),
                         r: expr.right.accept(this),
                     }
@@ -113,6 +133,29 @@ module powerbi.data {
                     const: {
                         t: expr.type.primitiveType,
                         v: expr.value,
+                    }
+                };
+            }
+
+            public visitArithmetic(expr: SQArithmeticExpr): {} {
+                debug.assertValue(expr, 'expr');
+
+                return {
+                    arithmetic: {
+                        o: expr.operator,
+                        l: expr.left.accept(this),
+                        r: expr.right.accept(this)
+                    }
+                };
+            }
+
+            public visitScopedEval(expr: SQScopedEvalExpr): {} {
+                debug.assertValue(expr, 'expr');
+
+                return {
+                    scopedEval: {
+                        e: expr.expression.accept(this),
+                        s: serializeArray(expr.scope)
                     }
                 };
             }

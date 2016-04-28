@@ -24,16 +24,14 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
-
 module powerbi.visuals {
 
-    var BeautifiedFormat: { [x: string]: string } = {
+    const BeautifiedFormat: { [x: string]: string } = {
         '0.00 %;-0.00 %;0.00 %': 'Percentage',
         '0.0 %;-0.0 %;0.0 %': 'Percentage1',
     };
 
-    var defaultLocalizedStrings = {
+    const defaultLocalizedStrings = {
         'NullValue': '(Blank)',
         'BooleanTrue': 'True',
         'BooleanFalse': 'False',
@@ -42,6 +40,8 @@ module powerbi.visuals {
         'NegativeInfinityValue': '-Infinity',
         'Restatement_Comma': '{0}, {1}',
         'Restatement_CompoundAnd': '{0} and {1}',
+        'DisplayUnitSystem_EAuto_Title': 'Auto',
+        'DisplayUnitSystem_E0_Title': 'None',
         'DisplayUnitSystem_E3_LabelFormat': '{0}K',
         'DisplayUnitSystem_E3_Title': 'Thousands',
         'DisplayUnitSystem_E6_LabelFormat': '{0}M',
@@ -52,8 +52,13 @@ module powerbi.visuals {
         'DisplayUnitSystem_E12_Title': 'Trillions',
         'Percentage': '#,0.##%',
         'Percentage1': '#,0.#%',
+        'RichTextbox_Link_DefaultText': 'Link',
         'TableTotalLabel': 'Total',
         'Tooltip_HighlightedValueDisplayName': 'Highlighted',
+        'Funnel_PercentOfFirst': 'Percent of first',	
+        'Funnel_PercentOfPrevious': 'Percent of previous',
+        'Funnel_PercentOfFirst_Highlight': 'Percent of first (highlight)',
+        'Funnel_PercentOfPrevious_Highlight': 'Percent of previous (highlight)',
         // Geotagging strings
         'GeotaggingString_Continent': 'continent',
         'GeotaggingString_Continents': 'continents',
@@ -92,7 +97,8 @@ module powerbi.visuals {
         'GeotaggingString_Territories': 'territories',
         'Waterfall_IncreaseLabel': 'Increase',
         'Waterfall_DecreaseLabel': 'Decrease',
-        'Waterfall_TotalLabel': 'Total'
+        'Waterfall_TotalLabel': 'Total',
+        'Slicer_SelectAll': 'Select All',
     };
 
     export class DefaultVisualHostServices implements IVisualHostServices {
@@ -101,8 +107,12 @@ module powerbi.visuals {
             visuals.valueFormatter.setLocaleOptions(DefaultVisualHostServices.createLocaleOptions());
             visuals.TooltipManager.setLocalizedStrings(DefaultVisualHostServices.createTooltipLocaleOptions());
         }
-
-        // Public for testability
+        
+        /**
+         * Create locale options.
+         * 
+         * Note: Public for testability.
+         */
         public static createLocaleOptions(): visuals.ValueFormatterLocalizationOptions {
            return {
                 null: defaultLocalizedStrings['NullValue'],
@@ -133,28 +143,45 @@ module powerbi.visuals {
         public onDragStart(): void { }
         public canSelect(): boolean { return false; }
         public onSelect(): void { }
+        public onContextMenu(): void { }
         public loadMoreData(): void { }
-        public persistProperties(changes: VisualObjectInstance[]): void { }
+        public persistProperties(changes: VisualObjectInstance[] | VisualObjectInstancesToPersist): void { }
         public onCustomSort(args: CustomSortEventArgs) { }
         public getViewMode(): powerbi.ViewMode { return ViewMode.View; }
         public setWarnings(warnings: IVisualWarning[]): void { }
         public setToolbar($toolbar: JQuery): void { }
+        public shouldRetainSelection(): boolean { return false; }
+        public geocoder(): IGeocoder { return services.createGeocoder(); }
+        public geolocation(): IGeolocation { return services.createGeolocation(); }
+        public promiseFactory(): IPromiseFactory { return createJQueryPromiseFactory(); }
+        public analyzeFilter(options: FilterAnalyzerOptions): AnalyzedFilter {
+            return {
+                isNotFilter: false,
+                selectedIdentities: [],
+                filter: undefined,
+                defaultValue: undefined,
+            };
+        }
+        public getIdentityDisplayNames(dentities: DataViewScopeIdentity[]): DisplayNameIdentityPair[] { return; }        
+        public setIdentityDisplayNames(displayNamesIdentityPairs: DisplayNameIdentityPair[]): void { }
 
         private static beautify(format: string): string {
-            var key = BeautifiedFormat[format];
+            let key = BeautifiedFormat[format];
             if (key)
                 return defaultLocalizedStrings[key] || format;
             return format;
         }
 
         private static describeUnit(exponent: number): DisplayUnitSystemNames {
-            var title: string = defaultLocalizedStrings["DisplayUnitSystem_E" + exponent + "_Title"];
-            var format: string = defaultLocalizedStrings["DisplayUnitSystem_E" + exponent + "_LabelFormat"];
+            let exponentLookup = (exponent === -1) ? 'Auto' : exponent.toString();
+
+            let title: string = defaultLocalizedStrings["DisplayUnitSystem_E" + exponentLookup + "_Title"];
+            let format: string = (exponent <= 0) ? '{0}' : defaultLocalizedStrings["DisplayUnitSystem_E" + exponentLookup + "_LabelFormat"];
 
             if (title || format)
                 return { title: title, format: format };
         }
     }
 
-    export var defaultVisualHostServices: IVisualHostServices = new DefaultVisualHostServices();
+    export const defaultVisualHostServices: IVisualHostServices = new DefaultVisualHostServices();
 } 

@@ -24,8 +24,6 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="_references.ts"/>
-
 module powerbi.visuals.sampleData {
 
     import sampleDataViews = powerbi.visuals.sampleDataViews;
@@ -33,15 +31,29 @@ module powerbi.visuals.sampleData {
     export class SampleData {
 
         private static data = [
+            new sampleDataViews.CarLogosData(),
+            new sampleDataViews.DistrictSalesData(),
             new sampleDataViews.FileStorageData(),
             new sampleDataViews.ImageData(),
+            new sampleDataViews.ProfitLossData(),
             new sampleDataViews.RichtextData(),
             new sampleDataViews.SalesByCountryData(),
             new sampleDataViews.SalesByDayOfWeekData(),
+            new sampleDataViews.ServicesByUsers(),
+            new sampleDataViews.SimpleAreaRangeData(),
+            new sampleDataViews.SimpleFunnelData(),
             new sampleDataViews.SimpleGaugeData(),
             new sampleDataViews.SimpleMatrixData(),
             new sampleDataViews.SimpleTableData(),
-            new sampleDataViews.TeamScoreData()
+            new sampleDataViews.TeamScoreData(),
+            new sampleDataViews.SimpleTreeData(),
+            new sampleDataViews.ProductSalesByDate(),
+            new sampleDataViews.SimpleDotPlotData(),
+            new sampleDataViews.SimpleTimelineData(),
+            new sampleDataViews.SimpleHistogramData(),
+            new sampleDataViews.SimpleDataByCountries(),
+            new sampleDataViews.SimpleCountriesData(),
+            new sampleDataViews.BulletChartData()
         ];
 
         /**
@@ -49,7 +61,7 @@ module powerbi.visuals.sampleData {
          */
         public static getSamplesByPluginName(pluginName: string) {
 
-            var samples = this.data.filter((item) => item.hasPlugin(pluginName));
+            let samples = this.data.filter((item) => item.hasPlugin(pluginName));
 
             if (samples.length > 0) {
                 return samples;
@@ -63,7 +75,6 @@ module powerbi.visuals.sampleData {
          */
         public static getDataViewsBySampleName(sampleName: string) {
             return this.data.filter((item) => (item.getName() === sampleName))[0];
-        }
- 
+        } 
     }     
 }

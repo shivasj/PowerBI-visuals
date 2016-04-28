@@ -24,10 +24,8 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
-
 module powerbi {
-    export var CategoryTypes = {
+    export const CategoryTypes = {
         Address: "Address",
         City: "City",
         Continent: "Continent",
@@ -45,13 +43,14 @@ module powerbi {
         isGeographic(fieldRefName: string): boolean;
         isGeocodable(fieldRefName: string): boolean;
         getFieldType(fieldName: string): string;
+        isGeoshapable(fieldRefName: string): boolean;
     }
 
     export function createGeoTaggingAnalyzerService(getLocalized: (string) => string): IGeoTaggingAnalyzerService {
         return new GeoTaggingAnalyzerService(getLocalized);
     }
 
-    var EnglishBackup = {
+    const EnglishBackup = {
         GeotaggingString_Continent: "continent",
         GeotaggingString_Continents: "continents",
         GeotaggingString_Country: "country",
@@ -88,7 +87,7 @@ module powerbi {
         GeotaggingString_Territory: "territory",
         GeotaggingString_Territories: "territories",
         GeotaggingString_VRMBackCompat_CountryRegion: "CountryRegion",
-        GeotaggingString_VRMBackCompat_StateOrProvince: "StateOrProvince"
+        GeotaggingString_VRMBackCompat_StateOrProvince: "StateOrProvince",
     };
 
     export class GeoTaggingAnalyzerService implements IGeoTaggingAnalyzerService {
@@ -190,6 +189,25 @@ module powerbi {
                 this.isTerritory(fieldRefName);
         }
 
+        public isGeoshapable(fieldRefName: string): boolean {
+            return this.isCity(fieldRefName) ||
+                this.isCountry(fieldRefName) ||
+                this.isCounty(fieldRefName) ||
+                this.isStateOrProvince(fieldRefName) ||
+                this.isPostalCode(fieldRefName) ||
+                this.isTerritory(fieldRefName) ||
+                this.isGeoshapableEnglish(fieldRefName);
+        }
+
+        private isGeoshapableEnglish(fieldRefName: string): boolean {
+            return this.isEnglishCity(fieldRefName) ||
+                this.isEnglishCountry(fieldRefName) ||
+                this.isEnglishCounty(fieldRefName) ||
+                this.isEnglishStateOrProvince(fieldRefName) ||
+                this.isEnglishPostalCode(fieldRefName) ||
+                this.isEnglishTerritory(fieldRefName);
+        }
+
         private isAddress(fieldRefName: string): boolean {
             return GeoTaggingAnalyzerService.hasMatches(fieldRefName, [
                 this.GeotaggingString_Address,
@@ -250,7 +268,7 @@ module powerbi {
         }
 
         private isPostalCode(fieldRefName: string): boolean {
-            var result =
+            let result =
                 (GeoTaggingAnalyzerService.hasMatches(fieldRefName, [
                     this.GeotaggingString_Post,
                     this.GeotaggingString_Zip])
@@ -264,12 +282,13 @@ module powerbi {
 
             //Check again for strings without whitespace
             if (!result) {
-                var whiteSpaceRegexPattern = new RegExp('\s');
-                result = GeoTaggingAnalyzerService.hasMatches(fieldRefName, [
-                    this.GeotaggingString_PostalCode.replace(whiteSpaceRegexPattern, ''),
-                    this.GeotaggingString_PostalCodes.replace(whiteSpaceRegexPattern, ''),
-                    this.GeotaggingString_ZipCode.replace(whiteSpaceRegexPattern, ''),
-                    this.GeotaggingString_ZipCodes.replace(whiteSpaceRegexPattern, '')
+                let whiteSpaceRegex = /\s+/;
+                let fieldNameWithoutWhitespace = fieldRefName.replace(whiteSpaceRegex, "");
+                result = GeoTaggingAnalyzerService.hasMatches(fieldNameWithoutWhitespace, [
+                    this.GeotaggingString_PostalCode.replace(whiteSpaceRegex, ''),
+                    this.GeotaggingString_PostalCodes.replace(whiteSpaceRegex, ''),
+                    this.GeotaggingString_ZipCode.replace(whiteSpaceRegex, ''),
+                    this.GeotaggingString_ZipCodes.replace(whiteSpaceRegex, '')
                 ]);
             }
 
@@ -277,17 +296,13 @@ module powerbi {
         }
 
         private isLongitude(fieldRefName: string): boolean {
-            return GeoTaggingAnalyzerService.hasMatches(fieldRefName, [
-                this.GeotaggingString_Longitude,
-                this.GeotaggingString_Longitude_Short
-            ]);
+            return GeoTaggingAnalyzerService.hasMatches(fieldRefName, [this.GeotaggingString_Longitude])
+                || GeoTaggingAnalyzerService.hasMatches(fieldRefName, [this.GeotaggingString_Longitude_Short], true /* useStrict */);
         }
 
         private isLatitude(fieldRefName: string): boolean {
-            return GeoTaggingAnalyzerService.hasMatches(fieldRefName, [
-                this.GeotaggingString_Latitude,
-                this.GeotaggingString_Latitude_Short
-            ]);
+            return GeoTaggingAnalyzerService.hasMatches(fieldRefName, [this.GeotaggingString_Latitude])
+                || GeoTaggingAnalyzerService.hasMatches(fieldRefName, [this.GeotaggingString_Latitude_Short], true /* useStrict */);
         }
 
         private isTerritory(fieldRefName: string): boolean {
@@ -297,15 +312,29 @@ module powerbi {
             ]);
         }
 
-        private static hasMatches(fieldName: string, possibleMatches: string[]): boolean {
-            var value = fieldName.toLowerCase();
-
-            for (var i = 0, len = possibleMatches.length; i < len; i++) {
-                var possibleMatch = possibleMatches[i];
-                if (value.indexOf(possibleMatch) > -1)
-                    return true;
+        private static hasMatches(fieldName: string, possibleMatches: string[], useStrict?: boolean): boolean {
+            let nonWordRegex = /\W/;
+            let value = fieldName.toLowerCase();
+            for (let i = 0, len = possibleMatches.length; i < len; i++) {
+                let possibleMatch = possibleMatches[i].toLowerCase();
+                if (!useStrict) {
+                    if (value.indexOf(possibleMatch) > -1)
+                        return true;
+                }
+                else {
+                    let indexofpossibleMatch = value.indexOf(possibleMatch);
+                    if (indexofpossibleMatch > -1) {
+                        let wordEndFlag, wordBeginFlag: boolean;
+                        wordEndFlag = wordBeginFlag = true;
+                        if (indexofpossibleMatch - 1 > 0)
+                            wordBeginFlag = nonWordRegex.test(value[indexofpossibleMatch - 1]);
+                        if (indexofpossibleMatch + possibleMatch.length < value.length)
+                            wordEndFlag = nonWordRegex.test(value[indexofpossibleMatch + possibleMatch.length]);
+                        if (wordBeginFlag && wordEndFlag)
+                            return true;
+                    }
+                }
             }
-
             return false;
         }
 
@@ -395,7 +424,7 @@ module powerbi {
         }
 
         private isEnglishPostalCode(fieldRefName: string): boolean {
-            var result =
+            let result =
                 (GeoTaggingAnalyzerService.hasMatches(fieldRefName, [
                     EnglishBackup.GeotaggingString_Post,
                     EnglishBackup.GeotaggingString_Zip])
@@ -409,7 +438,7 @@ module powerbi {
 
             //Check again for strings without whitespace
             if (!result) {
-                var whiteSpaceRegexPattern = new RegExp('\s');
+                let whiteSpaceRegexPattern = new RegExp('\s');
                 result = GeoTaggingAnalyzerService.hasMatches(fieldRefName, [
                     EnglishBackup.GeotaggingString_PostalCode.replace(whiteSpaceRegexPattern, ''),
                     EnglishBackup.GeotaggingString_PostalCodes.replace(whiteSpaceRegexPattern, ''),
@@ -422,25 +451,21 @@ module powerbi {
         }
 
         private isEnglishLongitude(fieldRefName: string): boolean {
-            return GeoTaggingAnalyzerService.hasMatches(fieldRefName, [
-                EnglishBackup.GeotaggingString_Longitude,
-                EnglishBackup.GeotaggingString_Longitude_Short
-            ]);
+            return GeoTaggingAnalyzerService.hasMatches(fieldRefName, [EnglishBackup.GeotaggingString_Longitude])
+                || GeoTaggingAnalyzerService.hasMatches(fieldRefName, [EnglishBackup.GeotaggingString_Longitude_Short], true /* useStrict */);
         }
 
         private isEnglishLatitude(fieldRefName: string): boolean {
-            return GeoTaggingAnalyzerService.hasMatches(fieldRefName, [
-                EnglishBackup.GeotaggingString_Latitude,
-                EnglishBackup.GeotaggingString_Latitude_Short
-            ]);
+            return GeoTaggingAnalyzerService.hasMatches(fieldRefName, [EnglishBackup.GeotaggingString_Latitude])
+                || GeoTaggingAnalyzerService.hasMatches(fieldRefName, [EnglishBackup.GeotaggingString_Latitude_Short], true /* useStrict */);
         }
 
-        //private isEnglishTerritory(fieldRefName: string): boolean {
-        //    return GeoTaggingAnalyzerService.hasMatches(fieldRefName, [
-        //        EnglishBackup.GeotaggingString_Territory,
-        //        EnglishBackup.GeotaggingString_Territories
-        //    ]);
-        //}
+        protected isEnglishTerritory(fieldRefName: string): boolean {
+            return GeoTaggingAnalyzerService.hasMatches(fieldRefName, [
+                EnglishBackup.GeotaggingString_Territory,
+                EnglishBackup.GeotaggingString_Territories
+            ]);
+        }
 
         private getEnglishFieldType(fieldName: string): string {
             if (fieldName == null)

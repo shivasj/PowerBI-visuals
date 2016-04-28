@@ -24,8 +24,6 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
-
 module powerbi.data {
     export module DataViewSelfCrossJoin {
         /**
@@ -38,7 +36,7 @@ module powerbi.data {
 
             if (!dataView.categorical)
                 return;
-            var dataViewCategorical = dataView.categorical;
+            let dataViewCategorical = dataView.categorical;
             if (!dataViewCategorical.categories || dataViewCategorical.categories.length !== 1)
                 return;
             if (dataViewCategorical.values && dataViewCategorical.values.source)
@@ -52,78 +50,88 @@ module powerbi.data {
             debug.assertValue(dataViewCategorical, 'dataViewCategorical');
             debug.assertValue(dataViewCategorical.categories, 'dataViewCategorical.categories');
 
-            dataViewMetadata = Prototype.inherit(dataViewMetadata);
-            dataViewMetadata.columns = [];
-
-            var valuesArray: DataViewValueColumn[] = dataViewCategorical.values
-                ? dataViewCategorical.values.grouped()[0].values
-                : [];
-
-            var category = dataViewCategorical.categories[0],
+            let category = dataViewCategorical.categories[0],
                 categoryValues = category.values,
                 categoryLength = categoryValues.length;
 
             if (categoryLength === 0)
                 return;
 
-            var categoryIdentities = category.identity,
-                crossJoinedValuesArray: DataViewValueColumn[] = [],
-                nullValuesArray: any[] = createNullValues(categoryLength);
+            let valuesArray: DataViewValueColumn[] = dataViewCategorical.values
+                ? dataViewCategorical.values.grouped()[0].values
+                : [];
+            let transformedDataView = createCategoricalDataViewBuilder()
+                .withCategories(dataViewCategorical.categories)
+                .withGroupedValues(createGroupedValues(category, categoryValues, categoryLength, valuesArray))
+                .build();
 
-            debug.assertValue(categoryIdentities, 'categoryIdentities');
-
-            dataViewMetadata.columns.push(category.source);
-
-            for (var i = 0; i < categoryLength; i++) {
-                var identity = categoryIdentities[i],
-                    categoryValue = categoryValues[i];
-
-                for (var j = 0, jlen = valuesArray.length; j < jlen; j++) {
-                    var originalValueColumn = valuesArray[j],
-                        originalHighlightValues = originalValueColumn.highlights;
-
-                    var crossJoinedValueColumnSource = Prototype.inherit(originalValueColumn.source);
-                    crossJoinedValueColumnSource.groupName = categoryValue;
-                    dataViewMetadata.columns.push(crossJoinedValueColumnSource);
-
-                    var crossJoinedValueColumn: DataViewValueColumn = {
-                        source: crossJoinedValueColumnSource,
-                        identity: identity,
-                        values: inheritArrayWithValue(nullValuesArray, originalValueColumn.values, i),
-                    };
-
-                    if (originalHighlightValues)
-                        crossJoinedValueColumn.highlights = inheritArrayWithValue(nullValuesArray, originalHighlightValues, i);
-
-                    crossJoinedValuesArray.push(crossJoinedValueColumn);
-                }
-            }
-
-            var crossJoinedValues = DataViewTransform.createValueColumns(crossJoinedValuesArray, category.identityFields, category.source);
+            dataViewMetadata = Prototype.inherit(dataViewMetadata);
+            dataViewMetadata.columns = transformedDataView.metadata.columns;
 
             return {
                 metadata: dataViewMetadata,
-                categorical: {
-                    categories: dataViewCategorical.categories,
-                    values: crossJoinedValues,
-                },
+                categorical: transformedDataView.categorical,
             };
         }
 
-        function createNullValues(length: number): any[] {
-            debug.assertValue(length, 'length');
+        function createGroupedValues(
+            category: DataViewCategoryColumn,
+            categoryValues: any[],
+            categoryLength: number,
+            valuesArray: DataViewValueColumn[]): DataViewBuilderGroupedValuesOptions {
+            debug.assertValue(category, 'category');
+            debug.assertValue(categoryValues, 'categoryValues');
+            debug.assertValue(categoryLength, 'categoryLength');
+            debug.assertValue(valuesArray, 'valuesArray');
 
-            var array = new Array(length);
-            for (var i = 0; i < length; i++)
-                array[i] = null;
-            return array;
+            let nullValuesArray: any[] = createNullValues(categoryLength),
+                valuesArrayLen = valuesArray.length,
+                seriesData: DataViewBuilderSeriesData[][] = [];
+
+            for (let i = 0; i < categoryLength; i++) {
+                let seriesDataItem: DataViewBuilderSeriesData[] = [];
+
+                for (let j = 0; j < valuesArrayLen; j++) {
+                    let originalValueColumn = valuesArray[j],
+                        originalHighlightValues = originalValueColumn.highlights;
+
+                    let seriesDataItemCategory: DataViewBuilderSeriesData = {
+                        values: inheritArrayWithValue(nullValuesArray, originalValueColumn.values, i),
+                    };
+                    if (originalHighlightValues)
+                        seriesDataItemCategory.highlights = inheritArrayWithValue(nullValuesArray, originalHighlightValues, i);
+
+                    seriesDataItem.push(seriesDataItemCategory);
+                }
+
+                seriesData.push(seriesDataItem);
+            }
+
+            return {
+                groupColumn: {
+                    source: category.source,
+                    identityFrom: { fields: <SQExpr[]>category.identityFields, identities: category.identity },
+                    values: category.values,
+                },
+                valueColumns: _.map(valuesArray, v => <DataViewBuilderColumnOptions>{ source: v.source }),
+                data: seriesData,
+            };
         }
+    }
 
-        function inheritArrayWithValue(nullValues: any[], original: any[], index: number): any[] {
-            var inherited = Prototype.inherit(nullValues);
-            inherited[index] = original[index];
+    function createNullValues(length: number): any[] {
+        debug.assertValue(length, 'length');
 
-            return inherited;
-        }
+        let array = new Array(length);
+        for (let i = 0; i < length; i++)
+            array[i] = null;
+        return array;
+    }
+
+    function inheritArrayWithValue(nullValues: any[], original: any[], index: number): any[] {
+        let inherited = Prototype.inherit(nullValues);
+        inherited[index] = original[index];
+
+        return inherited;
     }
 }

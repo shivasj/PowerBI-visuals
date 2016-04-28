@@ -24,19 +24,7 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
-
 module powerbi {
-    import ArrayExtensions = jsCommon.ArrayExtensions;
-
-    /** Encapsulates the identity of a data scope in a DataView. */
-    export interface DataViewScopeIdentity {
-        /** Predicate expression that identifies the scope. */
-        expr: data.SQExpr;
-
-        /** Key string that identifies the DataViewScopeIdentity to a string, which can be used for equality comparison. */
-        key: string;
-    }
 
     export module DataViewScopeIdentity {
         /** Compares the two DataViewScopeIdentity values for equality. */
@@ -54,26 +42,40 @@ module powerbi {
             debug.assertValue(x, 'x');
             debug.assertValue(y, 'y');
 
-            return data.SQExpr.equals(x.expr, y.expr, ignoreCase);
+            return data.SQExpr.equals(<data.SQExpr>x.expr, <data.SQExpr>y.expr, ignoreCase);
         }
 
         export function filterFromIdentity(identities: DataViewScopeIdentity[], isNot?: boolean): data.SemanticFilter {
-            if (ArrayExtensions.isUndefinedOrEmpty(identities))
+            if (_.isEmpty(identities))
                 return;
-
-            var expr: data.SQExpr;
-            for (var i = 0, len = identities.length; i < len; i++) {
-                var identity = identities[i];
-
-                expr = expr
-                    ? powerbi.data.SQExprBuilder.or(expr, identity.expr)
-                    : identity.expr;
+            
+            let exprs: data.SQExpr[] = [];
+            for (let identity of identities) {
+                exprs.push(<data.SQExpr>identity.expr);
             }
 
-            if (expr && isNot)
-                expr = powerbi.data.SQExprBuilder.not(expr);
+            return filterFromExprs(exprs, isNot);
+        }
 
-            return powerbi.data.SemanticFilter.fromSQExpr(expr);
+        export function filterFromExprs(orExprs: data.SQExpr[], isNot?: boolean): data.SemanticFilter {
+            if (_.isEmpty(orExprs))
+                return;
+
+            let resultExpr: data.SQExpr;
+            for (let orExpr of orExprs) {
+                let inExpr = data.ScopeIdentityExtractor.getInExpr(orExpr);
+                if (resultExpr)
+                    resultExpr = data.SQExprBuilder.or(resultExpr, inExpr);
+                else
+                    resultExpr = inExpr || orExpr;
+            }
+            
+            if (resultExpr) {
+                if (isNot)
+                    resultExpr = powerbi.data.SQExprBuilder.not(resultExpr);
+            }
+
+            return powerbi.data.SemanticFilter.fromSQExpr(resultExpr);
         }
     }
 

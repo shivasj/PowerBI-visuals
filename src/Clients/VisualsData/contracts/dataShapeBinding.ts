@@ -24,15 +24,13 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
-
 module powerbi.data {
     /**
      * Represents the versions of the data shape binding structure.
      * NOTE Keep this file in sync with the Sql\InfoNav\src\Data\Contracts\DsqGeneration\DataShapeBindingVersions.cs
-     *      file in the TFS Dev branch.
+     * file in the TFS Dev branch.
      */
-    export enum DataShapeBindingVersions {
+    export const enum DataShapeBindingVersions {
         /** The initial version of data shape binding */
         Version0 = 0,
         /** Explicit subtotal support for axis groupings. */
@@ -61,10 +59,13 @@ module powerbi.data {
         Version?: number;
         Primary: DataShapeBindingAxis;
         Secondary?: DataShapeBindingAxis;
+        Aggregates?: DataShapeBindingAggregate[];
+        Projections?: number[];
         Limits?: DataShapeBindingLimit[];
         Highlights?: FilterDefinition[];
         DataReduction?: DataShapeBindingDataReduction;
         IncludeEmptyGroups?: boolean;
+        SuppressedJoinPredicates?: number[];
     }
 
     export interface DataShapeBindingDataReduction {
@@ -109,7 +110,20 @@ module powerbi.data {
 
     export interface DataShapeBindingAxisGrouping {
         Projections: number[];
+        GroupBy?: number[];
         SuppressedProjections?: number[];
         Subtotal?: SubtotalType;
-    }    
+        ShowItemsWithNoData?: number[];
+    }
+
+    export interface DataShapeBindingAggregate {
+        Select: number;
+        Kind: DataShapeBindingAggregateKind;
+    }
+
+    export const enum DataShapeBindingAggregateKind {
+        None = 0,
+        Min = 1,
+        Max = 1 << 1,
+    }
 } 

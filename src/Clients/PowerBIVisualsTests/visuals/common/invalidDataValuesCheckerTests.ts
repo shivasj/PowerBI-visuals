@@ -24,8 +24,6 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../../_references.ts"/>
-
 module powerbitests {
     import ValueType = powerbi.ValueType;
     import PrimitiveType = powerbi.PrimitiveType;
@@ -33,11 +31,11 @@ module powerbitests {
     import IVisualWarning = powerbi.IVisualWarning;
 
     describe("InvalidDataValuesCheckerTests", () => {
-        var dataViewBuilder: DataViewBuilder;
+        let dataViewBuilder: DataViewBuilder;
 
-        var categoryValues = ["a", "b", "c", "d", "e"];
+        const categoryValues = ["a", "b", "c", "d", "e"];
 
-        var dataViewMetadata: powerbi.DataViewMetadata = {
+        let dataViewMetadata: powerbi.DataViewMetadata = {
             columns: [
                 {
                     displayName: "stringColumn",
@@ -66,9 +64,9 @@ module powerbitests {
 
         it("empty values does not display a warning all supported.", () => {
             dataViewBuilder.values = [];
-            var dataView = dataViewBuilder.build();
+            let dataView = dataViewBuilder.build();
 
-            var warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
+            let warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
                 [dataView],
                 true,
                 true,
@@ -79,9 +77,9 @@ module powerbitests {
 
         it("empty values does not display a warning none supported.", () => {
             dataViewBuilder.values = [];
-            var dataView = dataViewBuilder.build();
+            let dataView = dataViewBuilder.build();
 
-            var warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
+            let warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
                 [dataView],
                 false,
                 false,
@@ -92,9 +90,9 @@ module powerbitests {
 
         it("single value does not display a warning all supported.", () => {
             dataViewBuilder.values = [300];
-            var dataView = dataViewBuilder.build();
+            let dataView = dataViewBuilder.build();
 
-            var warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
+            let warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
                 [dataView],
                 true,
                 true,
@@ -105,9 +103,9 @@ module powerbitests {
 
         it("single value does not display a warning none supported.", () => {
             dataViewBuilder.values = [300];
-            var dataView = dataViewBuilder.build();
+            let dataView = dataViewBuilder.build();
 
-            var warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
+            let warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
                 [dataView],
                 false,
                 false,
@@ -118,9 +116,9 @@ module powerbitests {
 
         it("NaN value does not display a warning when supported.", () => {
             dataViewBuilder.values = [NaN];
-            var dataView = dataViewBuilder.build();
+            let dataView = dataViewBuilder.build();
 
-            var warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
+            let warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
                 [dataView],
                 true,
                 true,
@@ -131,9 +129,9 @@ module powerbitests {
 
         it("NaN value does not display a warning when others not supported.", () => {
             dataViewBuilder.values = [NaN];
-            var dataView = dataViewBuilder.build();
+            let dataView = dataViewBuilder.build();
 
-            var warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
+            let warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
                 [dataView],
                 true,
                 false,
@@ -144,9 +142,9 @@ module powerbitests {
 
         it("NaN value displays a warning when not supported.", () => {
             dataViewBuilder.values = [NaN];
-            var dataView = dataViewBuilder.build();
+            let dataView = dataViewBuilder.build();
 
-            var warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
+            let warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
                 [dataView],
                 false,
                 false,
@@ -158,9 +156,9 @@ module powerbitests {
 
         it("NaN value displays a warning when not supported but others are supported.", () => {
             dataViewBuilder.values = [[NaN]];
-            var dataView = dataViewBuilder.build();
+            let dataView = dataViewBuilder.build();
 
-            var warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
+            let warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
                 [dataView],
                 false,
                 true,
@@ -172,9 +170,9 @@ module powerbitests {
 
         it("Negative infinity value does not display a warning when supported.", () => {
             dataViewBuilder.values = [Number.NEGATIVE_INFINITY];
-            var dataView = dataViewBuilder.build();
+            let dataView = dataViewBuilder.build();
 
-            var warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
+            let warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
                 [dataView],
                 true,
                 true,
@@ -185,9 +183,9 @@ module powerbitests {
 
         it("Negative infinity value does not display a warning when others not supported.", () => {
             dataViewBuilder.values = [Number.NEGATIVE_INFINITY];
-            var dataView = dataViewBuilder.build();
+            let dataView = dataViewBuilder.build();
 
-            var warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
+            let warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
                 [dataView],
                 false,
                 true,
@@ -198,24 +196,24 @@ module powerbitests {
 
         it("Negative infinity value displays a warning when not supported.", () => {
             dataViewBuilder.values = [Number.NEGATIVE_INFINITY];
-            var dataView = dataViewBuilder.build();
+            let dataView = dataViewBuilder.build();
 
-            var warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
+            let warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
                 [dataView],
                 false,
                 false,
                 false);
 
             expect(warnings.length).toBe(1);
-            var i: number = 0;
+            let i: number = 0;
             expect(warnings[i++].code).toBe("InfinityValuesNotSupported");
         });
 
         it("Negative infinity value displays a warning when not supported but others are supported.", () => {
             dataViewBuilder.values = [Number.NEGATIVE_INFINITY];
-            var dataView = dataViewBuilder.build();
+            let dataView = dataViewBuilder.build();
 
-            var warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
+            let warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
                 [dataView],
                 true,
                 false,
@@ -227,9 +225,9 @@ module powerbitests {
 
         it("Positive infinity value does not display a warning when supported.", () => {
             dataViewBuilder.values = [Number.NEGATIVE_INFINITY];
-            var dataView = dataViewBuilder.build();
+            let dataView = dataViewBuilder.build();
 
-            var warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
+            let warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
                 [dataView],
                 true,
                 true,
@@ -240,9 +238,9 @@ module powerbitests {
 
         it("Positive infinity value does not display a warning when others not supported.", () => {
             dataViewBuilder.values = [Number.POSITIVE_INFINITY];
-            var dataView = dataViewBuilder.build();
+            let dataView = dataViewBuilder.build();
 
-            var warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
+            let warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
                 [dataView],
                 false,
                 false,
@@ -253,9 +251,9 @@ module powerbitests {
 
         it("Postive infinity value displays a warning when not supported.", () => {
             dataViewBuilder.values = [Number.POSITIVE_INFINITY];
-            var dataView = dataViewBuilder.build();
+            let dataView = dataViewBuilder.build();
 
-            var warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
+            let warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
                 [dataView],
                 false,
                 false,
@@ -267,9 +265,9 @@ module powerbitests {
 
         it("Positive infinity value displays a warning when not supported but others are supported.", () => {
             dataViewBuilder.values = [Number.POSITIVE_INFINITY];
-            var dataView = dataViewBuilder.build();
+            let dataView = dataViewBuilder.build();
 
-            var warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
+            let warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
                 [dataView],
                 true,
                 true,
@@ -281,9 +279,9 @@ module powerbitests {
 
         it("Out of range value displays a warning when others are supported.", () => {
             dataViewBuilder.values = [1e301];
-            var dataView = dataViewBuilder.build();
+            let dataView = dataViewBuilder.build();
 
-            var warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
+            let warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
                 [dataView],
                 true,
                 true,
@@ -295,9 +293,9 @@ module powerbitests {
 
         it("Negative out of range value displays a warning when others are supported.", () => {
             dataViewBuilder.values = [-27e300];
-            var dataView = dataViewBuilder.build();
+            let dataView = dataViewBuilder.build();
 
-            var warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
+            let warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
                 [dataView],
                 true,
                 true,
@@ -309,9 +307,9 @@ module powerbitests {
 
         it("Out of range value displays a warning when others are not supported.", () => {
             dataViewBuilder.values = [1e301];
-            var dataView = dataViewBuilder.build();
+            let dataView = dataViewBuilder.build();
 
-            var warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
+            let warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
                 [dataView],
                 false,
                 false,
@@ -323,9 +321,9 @@ module powerbitests {
 
         it("Negative out of range value displays a warning when others are not supported.", () => {
             dataViewBuilder.values = [1e301];
-            var dataView = dataViewBuilder.build();
+            let dataView = dataViewBuilder.build();
 
-            var warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
+            let warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
                 [dataView],
                 false,
                 false,
@@ -337,32 +335,32 @@ module powerbitests {
 
         it("NaN and infinity sends warning for both when all not supported", () => {
             dataViewBuilder.values = [NaN, Number.POSITIVE_INFINITY];
-            var dataView = dataViewBuilder.build();
+            let dataView = dataViewBuilder.build();
 
-            var warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
+            let warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
                 [dataView],
                 false,
                 false,
                 false);
 
             expect(warnings.length).toBe(2);
-            var i: number = 0;
+            let i: number = 0;
             expect(warnings[i++].code).toBe("NaNNotSupported");
             expect(warnings[i++].code).toBe("InfinityValuesNotSupported");
         });
 
         it("NaN and infinity and out of range sends warning for all when all not supported", () => {
             dataViewBuilder.values = [NaN, Number.POSITIVE_INFINITY, 1e301];
-            var dataView = dataViewBuilder.build();
+            let dataView = dataViewBuilder.build();
 
-            var warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
+            let warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
                 [dataView],
                 false,
                 false,
                 false);
 
             expect(warnings.length).toBe(3);
-            var i: number = 0;
+            let i: number = 0;
             expect(warnings[i++].code).toBe("NaNNotSupported");
             expect(warnings[i++].code).toBe("InfinityValuesNotSupported");
             expect(warnings[i++].code).toBe("ValuesOutOfRange");
@@ -370,16 +368,16 @@ module powerbitests {
 
         it("NaN and infinity and out of range sends warning for all when all not supported has no duplications", () => {
             dataViewBuilder.values = [NaN, Number.POSITIVE_INFINITY, 1e301];
-            var dataView = dataViewBuilder.build();
+            let dataView = dataViewBuilder.build();
 
-            var warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
+            let warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
                 [dataView],
                 false,
                 false,
                 false);
 
             expect(warnings.length).toBe(3);
-            var index: number = 0;
+            let index: number = 0;
             expect(warnings[index++].code).toBe("NaNNotSupported");
             expect(warnings[index++].code).toBe("InfinityValuesNotSupported");
             expect(warnings[index++].code).toBe("ValuesOutOfRange");
@@ -387,32 +385,32 @@ module powerbitests {
 
         it("NaN and infinity and out of range sends warning for all when Infinity supported has no infinity warning", () => {
             dataViewBuilder.values = [NaN, Number.POSITIVE_INFINITY, NaN, 1e301];
-            var dataView = dataViewBuilder.build();
+            let dataView = dataViewBuilder.build();
 
-            var warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
+            let warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
                 [dataView],
                 false,
                 true,
                 true);
 
             expect(warnings.length).toBe(2);
-            var index: number = 0;
+            let index: number = 0;
             expect(warnings[index++].code).toBe("NaNNotSupported");
             expect(warnings[index++].code).toBe("ValuesOutOfRange");
         });
 
         it("NaN and infinity and out of range sends warning for all with good values at the beginning", () => {
             dataViewBuilder.values = [100, 200, 300, 400, NaN, Number.POSITIVE_INFINITY, NaN, 1e301];
-            var dataView = dataViewBuilder.build();
+            let dataView = dataViewBuilder.build();
 
-            var warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
+            let warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
                 [dataView],
                 false,
                 false,
                 false);
 
             expect(warnings.length).toBe(3);
-            var index: number = 0;
+            let index: number = 0;
             expect(warnings[index++].code).toBe("NaNNotSupported");
             expect(warnings[index++].code).toBe("InfinityValuesNotSupported");
             expect(warnings[index++].code).toBe("ValuesOutOfRange");
@@ -420,16 +418,16 @@ module powerbitests {
 
         it("NaN and infinity and out of range sends warning for all with good values throughout", () => {
             dataViewBuilder.values = [100, 200, NaN, 300, Number.POSITIVE_INFINITY, NaN, 400, 1e301, 500];
-            var dataView = dataViewBuilder.build();
+            let dataView = dataViewBuilder.build();
 
-            var warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
+            let warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
                 [dataView],
                 false,
                 false,
                 false);
 
             expect(warnings.length).toBe(3);
-            var index: number = 0;
+            let index: number = 0;
             expect(warnings[index++].code).toBe("NaNNotSupported");
             expect(warnings[index++].code).toBe("InfinityValuesNotSupported");
             expect(warnings[index++].code).toBe("ValuesOutOfRange");
@@ -437,12 +435,12 @@ module powerbitests {
 
         it("Multiple dataViews both good does not show a warning", () => {
             dataViewBuilder.values = [100, 200, 500];
-            var dataView = dataViewBuilder.build();
+            let dataView = dataViewBuilder.build();
 
             dataViewBuilder.values = [200, 300, 400];
-            var dataView2 = dataViewBuilder.build();
+            let dataView2 = dataViewBuilder.build();
 
-            var warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
+            let warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
                 [dataView, dataView2],
                 false,
                 false,
@@ -453,37 +451,37 @@ module powerbitests {
 
         it("Multiple dataviews first has invalid shows warnings", () => {
             dataViewBuilder.values = [100, 200, NaN, undefined];
-            var dataView = dataViewBuilder.build();
+            let dataView = dataViewBuilder.build();
 
             dataViewBuilder.values = [100, 200, 300];
-            var dataView2 = dataViewBuilder.build();
+            let dataView2 = dataViewBuilder.build();
 
-            var warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
+            let warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
                 [dataView, dataView2],
                 false,
                 false,
                 false);
 
             expect(warnings.length).toBe(1);
-            var index: number = 0;
+            let index: number = 0;
             expect(warnings[index++].code).toBe("NaNNotSupported");
         });
 
         it("Multiple datasets last has invalid values shows warnings", () => {
             dataViewBuilder.values = [100, 200, 300, 400];
-            var dataView = dataViewBuilder.build();
+            let dataView = dataViewBuilder.build();
 
             dataViewBuilder.values = [100, 200, NaN, 300, Number.POSITIVE_INFINITY, NaN, 400, 1e301, 500];
-            var dataView2 = dataViewBuilder.build();
+            let dataView2 = dataViewBuilder.build();
 
-            var warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
+            let warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
                 [dataView, dataView2],
                 false,
                 false,
                 false);
 
             expect(warnings.length).toBe(3);
-            var index: number = 0;
+            let index: number = 0;
             expect(warnings[index++].code).toBe("NaNNotSupported");
             expect(warnings[index++].code).toBe("InfinityValuesNotSupported");
             expect(warnings[index++].code).toBe("ValuesOutOfRange");
@@ -491,19 +489,19 @@ module powerbitests {
 
         it("Multiple dataViews both have invalid values shows correct warning", () => {
             dataViewBuilder.values = [100, 200, Number.NaN, 300, Number.POSITIVE_INFINITY, NaN, 400, 1e301, 500];
-            var dataView = dataViewBuilder.build();
+            let dataView = dataViewBuilder.build();
 
             dataViewBuilder.values = [Number.NEGATIVE_INFINITY, Number.NaN, 300, 1e301];
-            var dataView2 = dataViewBuilder.build();
+            let dataView2 = dataViewBuilder.build();
 
-            var warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
+            let warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
                 [dataView, dataView2],
                 false,
                 false,
                 false);
 
             expect(warnings.length).toBe(3);
-            var index: number = 0;
+            let index: number = 0;
             expect(warnings[index++].code).toBe("NaNNotSupported");
             expect(warnings[index++].code).toBe("InfinityValuesNotSupported");
             expect(warnings[index++].code).toBe("ValuesOutOfRange");
@@ -511,19 +509,19 @@ module powerbitests {
 
         it("Multiple dataViews both have invalid values not overlapping shows correct warning", () => {
             dataViewBuilder.values = [100, 200, 300, Number.POSITIVE_INFINITY, 400, 1e301, 500];
-            var dataView = dataViewBuilder.build();
+            let dataView = dataViewBuilder.build();
 
             dataViewBuilder.values = [Number.NEGATIVE_INFINITY, Number.NaN, 300];
-            var dataView2 = dataViewBuilder.build();
+            let dataView2 = dataViewBuilder.build();
 
-            var warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
+            let warnings: IVisualWarning[] = powerbi.visuals.getInvalidValueWarnings(
                 [dataView, dataView2],
                 false,
                 false,
                 false);
 
             expect(warnings.length).toBe(3);
-            var index: number = 0;
+            let index: number = 0;
             expect(warnings[index++].code).toBe("NaNNotSupported");
             expect(warnings[index++].code).toBe("InfinityValuesNotSupported");
             expect(warnings[index++].code).toBe("ValuesOutOfRange");

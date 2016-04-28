@@ -24,20 +24,38 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
-
 module powerbi.visuals {
     export interface FunnelBehaviorOptions {
-        datapoints: SelectableDataPoint[];
         bars: D3.Selection;
-        labels: D3.Selection;
+        interactors: D3.Selection;
         clearCatcher: D3.Selection;
         hasHighlights: boolean;
     }
 
-    export class FunnelWebBehavior {
-        public select(hasSelection: boolean, selection: D3.Selection, hasHighlights: boolean) {
-            selection.style("fill-opacity", (d: FunnelSlice) => ColumnUtil.getFillOpacity(d.selected, d.highlight, !d.highlight && hasSelection, !d.selected && hasHighlights));
+    export class FunnelWebBehavior implements IInteractiveBehavior {
+        private bars: D3.Selection;
+        private interactors: D3.Selection;
+        private hasHighlights: boolean;
+
+        public bindEvents(options: FunnelBehaviorOptions, selectionHandler: ISelectionHandler): void {
+
+            let bars = this.bars = options.bars;
+            let interactors = this.interactors = options.interactors;
+            let clearCatcher = options.clearCatcher;
+
+            this.hasHighlights = options.hasHighlights;
+
+            InteractivityUtils.registerStandardInteractivityHandlers(bars, selectionHandler);
+            InteractivityUtils.registerStandardInteractivityHandlers(interactors, selectionHandler);
+
+            clearCatcher.on('click', () => {
+                selectionHandler.handleClearSelection();
+            });
+        }
+
+        public renderSelection(hasSelection: boolean): void {
+            let hasHighlights = this.hasHighlights;
+            this.bars.style("fill-opacity", (d: FunnelSlice) => ColumnUtil.getFillOpacity(d.selected, d.highlight, !d.highlight && hasSelection, !d.selected && hasHighlights));
         }
     }
-} 
+}

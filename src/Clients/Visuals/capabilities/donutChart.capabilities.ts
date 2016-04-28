@@ -24,92 +24,75 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
-
 module powerbi.visuals {
-    export var donutChartCapabilities: VisualCapabilities = {
+    export const donutChartCapabilities: VisualCapabilities = {
         dataRoles: [
             {
                 name: 'Category',
                 kind: VisualDataRoleKind.Grouping,
                 displayName: data.createDisplayNameGetter('Role_DisplayName_Legend'),
+                description: data.createDisplayNameGetter('Role_DisplayName_LegendDescription')
             }, {
                 name: 'Series',
                 kind: VisualDataRoleKind.Grouping,
                 displayName: data.createDisplayNameGetter('Role_DisplayName_Details'),
+                description: data.createDisplayNameGetter('Role_DisplayName_DetailsDonutChartDescription'),
+
             }, {
                 name: 'Y',
                 kind: VisualDataRoleKind.Measure,
                 displayName: data.createDisplayNameGetter('Role_DisplayName_Values'),
+                description: data.createDisplayNameGetter('Role_DisplayName_ValuesDescription'),
+                requiredTypes: [{ numeric: true }, { integer: true }],
             }
         ],
-        objects: {
+        objects:{ 
             general: {
                 displayName: data.createDisplayNameGetter('Visual_General'),
                 properties: {
-                    formatString: {
-                        type: { formatting: { formatString: true } },
-                    },
+                    formatString: StandardObjectProperties.formatString,
                 },
             },
             legend: {
                 displayName: data.createDisplayNameGetter('Visual_Legend'),
+                description: data.createDisplayNameGetter('Visual_LegendDescription'),
                 properties: {
-                    show: {
-                        displayName: data.createDisplayNameGetter('Visual_Show'),
-                        type: { bool: true }
-                    },
-                    position: {
-                        displayName: data.createDisplayNameGetter('Visual_LegendPosition'),
-                        type: { formatting: { legendPosition: true } }
-                    },
-                    showTitle: {
-                        displayName: data.createDisplayNameGetter('Visual_LegendShowTitle'),
-                        type: { bool: true }
-                    },
-                    titleText: {
-                        displayName: data.createDisplayNameGetter('Visual_LegendTitleText'),
-                        type: { text: true }
-                    }
+                    show: StandardObjectProperties.show,
+                    position: StandardObjectProperties.legendPosition,
+                    showTitle: StandardObjectProperties.showLegendTitle,
+                    titleText: $.extend({}, StandardObjectProperties.legendTitle, {
+                        suppressFormatPainterCopy: true
+                    }),
+                    labelColor: StandardObjectProperties.labelColor,
+                    fontSize: StandardObjectProperties.fontSize,
                 }
             },
             dataPoint: {
                 displayName: data.createDisplayNameGetter('Visual_DataPoint'),
+                description: data.createDisplayNameGetter('Visual_DataPointDescription'),
                 properties: {
-                    fill: {
-                        displayName: data.createDisplayNameGetter('Visual_Fill'),
-                        type: { fill: { solid: { color: true } } }
-                    }
+                    defaultColor: StandardObjectProperties.defaultColor,
+                    fill: StandardObjectProperties.fill,
                 }
             },
             labels: {
-                displayName: data.createDisplayNameGetter('Visual_DataPointsLabels'),
+                displayName: data.createDisplayNameGetter('Visual_DetailLabels'),
                 properties: {
-                    show: {
-                        type: { bool: true }
-                    },
-                    color: {
-                        displayName: data.createDisplayNameGetter('Visual_LabelsFill'),
-                        type: { fill: { solid: { color: true } } }
-                    },
-                    labelDisplayUnits: {
-                        displayName: data.createDisplayNameGetter('Visual_DisplayUnits'),
-                        type: { formatting: { labelDisplayUnits: true } }
-                    },
-                    labelPrecision: {
-                        displayName: data.createDisplayNameGetter('Visual_Precision'),
-                        type: { numeric: true }
+                    show: StandardObjectProperties.show,
+                    color: StandardObjectProperties.dataColor,
+                    labelDisplayUnits: StandardObjectProperties.dataLabelDisplayUnits,
+                    labelPrecision: $.extend({}, StandardObjectProperties.labelPrecision, {
+                        suppressFormatPainterCopy: true,
+                    }),
+                    fontSize: $.extend({}, StandardObjectProperties.fontSize, {
+                        suppressFormatPainterCopy: true,
+                    }),
+                    labelStyle: {
+                        displayName: data.createDisplayNameGetter('Visual_LabelStyle'),
+                        type: { enumeration: labelStyle.type }
                     },
                 },
             },
-            categoryLabels: {
-                displayName: data.createDisplayNameGetter('Visual_CategoryLabels'),
-                properties: {
-                    show: {
-                        type: { bool: true }
-                    },
-                },
-            }
         },
         dataViewMappings: [{
             conditions: [
@@ -135,13 +118,17 @@ module powerbi.visuals {
             default: {},
         },
         supportsHighlight: true,
+        drilldown: {
+            roles: ['Category']
+        },
     };
 
-    export var donutChartProps = {
+    export const donutChartProps = {
         general: {
             formatString: <DataViewObjectPropertyIdentifier>{ objectName: 'general', propertyName: 'formatString' },
         },
         dataPoint: {
+            defaultColor: <DataViewObjectPropertyIdentifier>{ objectName: 'dataPoint', propertyName: 'defaultColor' },
             fill: <DataViewObjectPropertyIdentifier>{ objectName: 'dataPoint', propertyName: 'fill' },
         },
         legend: {
@@ -149,6 +136,7 @@ module powerbi.visuals {
             position: <DataViewObjectPropertyIdentifier>{ objectName: 'legend', propertyName: 'position' },
             showTitle: <DataViewObjectPropertyIdentifier>{ objectName: 'legend', propertyName: 'showTitle' },
             titleText: <DataViewObjectPropertyIdentifier>{ objectName: 'legend', propertyName: 'titleText' },
-        },
+            labelColor: <DataViewObjectPropertyIdentifier>{ objectName: 'legend', propertyName: 'labelColor' },
+        }, 
     };
 }

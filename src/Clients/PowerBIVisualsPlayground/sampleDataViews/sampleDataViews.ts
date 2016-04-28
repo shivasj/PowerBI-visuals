@@ -24,8 +24,6 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
-
 module powerbi.visuals.sampleDataViews {
 
     export interface ISampleDataViews {
@@ -52,7 +50,7 @@ module powerbi.visuals.sampleDataViews {
         }
 
         public getRandomValue(min: number, max: number): number {
-            var value = Math.random() * (max - min) + min;
+            let value = Math.random() * (max - min) + min;
             return Math.ceil(value * 100) / 100;
         }
 

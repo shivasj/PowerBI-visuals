@@ -24,10 +24,10 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
-
 module jsCommon {
-     /** Responsible for throttling input function. */
+    /**
+     * Responsible for throttling input function.
+     */
     export class ThrottleUtility {
         private fn: () => void;
         private timerFactory: ITimerPromiseFactory;
@@ -50,7 +50,9 @@ module jsCommon {
             }
         }
 
-        // public for testing purpose
+        /**
+         * Note: Public for testing purpose.
+         */
         public timerComplete(fn: () => void) {
             // run fn
             fn();

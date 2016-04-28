@@ -24,21 +24,48 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
-
 module powerbi.visuals {
-    
-    /** Extension of the Matrix node for Matrix visual*/
+
+    import TablixFormattingPropertiesMatrix = powerbi.visuals.controls.TablixFormattingPropertiesMatrix;
+    import TablixUtils = controls.internal.TablixUtils;
+    import TablixObjects = controls.internal.TablixObjects;
+    import UrlUtils = jsCommon.UrlUtils;
+
+    /**
+     * Extension of the Matrix node for Matrix visual.
+     */
+
     export interface MatrixVisualNode extends DataViewMatrixNode {
-        /** Index of the node in its parent's children collection
-        NOTE: for size optimization, we could also look this item up in the parent's children collection, but we may need to pay the perf penalty */
+        /**
+         * Index of the node in its parent's children collection.
+         * 
+         * Note: For size optimization, we could also look this item up in the parent's 
+         * children collection, but we may need to pay the perf penalty.
+         */
         index?: number;
 
-        /** Global index of the node as a leaf node. If the node is not a leaf, the value is undefined */
+        /**
+         * Global index of the node as a leaf node.
+         * If the node is not a leaf, the value is undefined.
+         */
         leafIndex?: number;
 
-        /** Parent of the node. Undefined for outermost nodes (children of the one root node) */
+        /**
+         * Parent of the node.
+         * Undefined for outermost nodes (children of the one root node).
+         */
         parent?: MatrixVisualNode;
+
+        /**
+         * Children of the same parent
+         */
+        siblings?: MatrixVisualNode[];
+
+        /**
+         * queryName of the node.
+         * If the node is not a leaf, the value is undefined.
+         */
+        queryName?: string;
     }
 
     export interface MatrixCornerItem {
@@ -47,29 +74,29 @@ module powerbi.visuals {
         isRowHeaderLeaf: boolean;
     }
 
-    export interface MatrixVisualBodyItem {
-        content: any;
-        isSubtotal: boolean;
-    }
+    export class MatrixVisualBodyItem extends TablixUtils.TablixVisualCell {
+        public get isMeasure(): boolean {
+            return true;
+        };
 
-    /** Interface for refreshing Matrix Data View */
+        public get isValidUrl(): boolean {
+            return false;
+        };
+
+        public get isValidImage(): boolean {
+            return false;
+        };
+    }
+    
+    /**
+     * Interface for refreshing Matrix Data View.
+     */
     export interface MatrixDataAdapter {
-        update(dataViewMatrix?: DataViewMatrix): void;
-        updateRows(): void;
-    }
-
-    export interface MatrixDataViewObjects extends DataViewObjects {
-        general: MatrixDataViewObject;
-    }
-
-    export interface MatrixDataViewObject extends DataViewObject {
-        rowSubtotals: boolean;
-        columnSubtotals: boolean;
+        update(dataViewMatrix?: DataViewMatrix, updateColumns?: boolean): void;
     }
 
     export interface IMatrixHierarchyNavigator extends controls.ITablixHierarchyNavigator, MatrixDataAdapter {
         getDataViewMatrix(): DataViewMatrix;
-        getDepth(hierarchy: MatrixVisualNode[]): number;
         getLeafCount(hierarchy: MatrixVisualNode[]): number;
         getLeafAt(hierarchy: MatrixVisualNode[], index: number): any;
         getLeafIndex(item: MatrixVisualNode): number;
@@ -88,29 +115,24 @@ module powerbi.visuals {
         headerItemEquals(item1: MatrixVisualNode, item2: MatrixVisualNode): boolean;
     }
 
-    var RoleNames = {
-        rows: 'Rows',
-        columns: 'Columns',
-        values: 'Values',
-    };
-
     interface MatrixHierarchy extends DataViewHierarchy {
         leafNodes?: MatrixVisualNode[];
     }
-
-    /** Factory method used by unit tests */
-    export function createMatrixHierarchyNavigator(matrix: DataViewMatrix, formatter: ICustomValueFormatter): IMatrixHierarchyNavigator {
+    
+    /**
+     * Factory method used by unit tests.
+     */
+    export function createMatrixHierarchyNavigator(matrix: DataViewMatrix, formatter: ICustomValueColumnFormatter): IMatrixHierarchyNavigator {
         return new MatrixHierarchyNavigator(matrix, formatter);
     }
 
     class MatrixHierarchyNavigator implements IMatrixHierarchyNavigator {
-
         private matrix: DataViewMatrix;
         private rowHierarchy: MatrixHierarchy;
         private columnHierarchy: MatrixHierarchy;
-        private formatter: ICustomValueFormatter;
+        private formatter: ICustomValueColumnFormatter;
 
-        constructor(matrix: DataViewMatrix, formatter: ICustomValueFormatter) {
+        constructor(matrix: DataViewMatrix, formatter: ICustomValueColumnFormatter) {
             this.matrix = matrix;
             this.rowHierarchy = MatrixHierarchyNavigator.wrapMatrixHierarchy(matrix.rows);
             this.columnHierarchy = MatrixHierarchyNavigator.wrapMatrixHierarchy(matrix.columns);
@@ -118,50 +140,61 @@ module powerbi.visuals {
 
             this.update();
         }
-
-        /** Returns the data view matrix. */
+        
+        /**
+         * Returns the data view matrix.
+         */
         public getDataViewMatrix(): DataViewMatrix {
             return this.matrix;
         }
-
-        /** Returns the depth of a hierarchy. */
-        public getDepth(hierarchy: MatrixVisualNode[]): number {
-            var matrixHierarchy = this.getMatrixHierarchy(hierarchy);
-
-            if (matrixHierarchy)
-                return Math.max(matrixHierarchy.levels.length, 1);
-
-            debug.assertFail('Hierarchy cannot be found');
-            return 0;
+        /**
+        * Returns the depth of the column hierarchy.
+         */
+        public getColumnHierarchyDepth(): number {
+            return Math.max(this.columnHierarchy.levels.length, 1);
         }
 
-        /** Returns the leaf count of a hierarchy. */
+        /**
+        * Returns the depth of the Row hierarchy.
+        */
+        public getRowHierarchyDepth(): number {
+            return Math.max(this.rowHierarchy.levels.length, 1);
+        }
+        
+        /**
+         * Returns the leaf count of a hierarchy.
+         */
         public getLeafCount(hierarchy: MatrixVisualNode[]): number {
-            var matrixHierarchy = this.getMatrixHierarchy(hierarchy);
+            let matrixHierarchy = this.getMatrixHierarchy(hierarchy);
             if (matrixHierarchy)
                 return matrixHierarchy.leafNodes.length;
 
-            debug.assertFail('Hierarchy cannot be found');
             return 0;
         }
-
-        /** Returns the leaf member of a hierarchy at a specified index. */
+        
+        /**
+         * Returns the leaf member of a hierarchy at a specified index.
+         */
         public getLeafAt(hierarchy: MatrixVisualNode[], index: number): MatrixVisualNode {
-            var matrixHierarchy = this.getMatrixHierarchy(hierarchy);
+            let matrixHierarchy = this.getMatrixHierarchy(hierarchy);
             if (matrixHierarchy)
                 return matrixHierarchy.leafNodes[index];
 
             return null;
         }
-
-        /** Returns the leaf index of the visual node. */
+        
+        /**
+         * Returns the leaf index of the visual node.
+         */
         public getLeafIndex(item: MatrixVisualNode): number {
             debug.assertValue(item, 'item');
 
             return item.leafIndex;
         }
-
-        /** Returns the specified hierarchy member parent. */
+        
+        /**
+         * Returns the specified hierarchy member parent.
+         */
         public getParent(item: MatrixVisualNode): MatrixVisualNode {
             debug.assertValue(item, 'item');
 
@@ -171,15 +204,19 @@ module powerbi.visuals {
 
             return item.parent;
         }
-
-        /** Returns the index of the hierarchy member relative to its parent. */
+        
+        /**
+         * Returns the index of the hierarchy member relative to its parent.
+         */
         public getIndex(item: MatrixVisualNode): number {
             debug.assertValue(item, 'item');
 
             return item.index;
         }
-
-        /** Checks whether a hierarchy member is a leaf. */
+        
+        /**
+         * Checks whether a hierarchy member is a leaf.
+         */
         public isLeaf(item: MatrixVisualNode): boolean {
             debug.assertValue(item, 'item');
 
@@ -194,80 +231,149 @@ module powerbi.visuals {
             return false;
         }
 
-        /** Checks whether a hierarchy member is the last item within its parent. */
+        public isFirstItem(item: MatrixVisualNode, items: MatrixVisualNode[]): boolean {
+            return item === _.first(items);
+        }
+
+        public areAllParentsFirst(item: MatrixVisualNode, items: MatrixVisualNode[]): boolean {
+            if (!item)
+                return false;
+
+            let parent = this.getParent(item);
+            if (!parent) {
+                return this.isFirstItem(item, item.siblings);
+            }
+            else {
+                return this.isFirstItem(item, item.siblings) && this.areAllParentsFirst(parent, parent.siblings);
+            }
+        }
+
+        /**
+         * Checks whether a hierarchy member is the last item within its parent. 
+         */
         public isLastItem(item: MatrixVisualNode, items: MatrixVisualNode[]): boolean {
             debug.assertValue(item, 'item');
 
-            return items[items.length - 1] === item;
+            return item === _.last(items);
         }
 
-        /** Gets the children members of a hierarchy member. */
+        public areAllParentsLast(item: MatrixVisualNode, items: MatrixVisualNode[]): boolean {
+            if (!item)
+                return false;
+
+            let parent = this.getParent(item);
+            if (!parent) {
+                return this.isLastItem(item, item.siblings);
+            }
+            else {
+                return this.isLastItem(item, item.siblings) && this.areAllParentsLast(parent, parent.siblings);
+            }
+        }
+        
+        /**
+         * Gets the children members of a hierarchy member.
+         */
         public getChildren(item: MatrixVisualNode): MatrixVisualNode[] {
             debug.assertValue(item, 'item');
 
             return item.children;
         }
+        
+        /**
+         * Gets the difference between current level and highest child's level. Can be > 1 if there are multiple values
+         * @param {MatrixVisualNode} item
+         * @returns
+         */
+        public getChildrenLevelDifference(item: MatrixVisualNode): number {
+            let diff = Infinity;
+            let children = this.getChildren(item);
+            for (let i = 0, ilen = children.length; i < ilen; i++) {
+                diff = Math.min(diff, children[i].level - item.level);
+            }
 
-        /** Gets the members count in a specified collection. */
+            return diff;
+        }
+        
+        /**
+         * Gets the members count in a specified collection.
+         */
         public getCount(items: MatrixVisualNode[]): number {
             debug.assertValue(items, 'items');
 
             return items.length;
         }
-
-        /** Gets the member at the specified index. */
+        
+        /**
+         * Gets the member at the specified index.
+         */
         public getAt(items: MatrixVisualNode[], index: number): MatrixVisualNode {
             debug.assertValue(items, 'items');
 
             return items[index];
         }
-
-        /** Gets the hierarchy member level. */
+        
+        /**
+         * Gets the hierarchy member level.
+         */
         public getLevel(item: MatrixVisualNode): number {
             debug.assertValue(item, 'item');
 
             return item.level;
         }
-
-        /** Returns the intersection between a row and a column item. */
+        
+        /**
+         * Returns the intersection between a row and a column item.
+         */
         public getIntersection(rowItem: MatrixVisualNode, columnItem: MatrixVisualNode): MatrixVisualBodyItem {
             debug.assertValue(rowItem, 'rowItem');
             debug.assertValue(columnItem, 'columnItem');
+            let isSubtotalItem = rowItem.isSubtotal === true || columnItem.isSubtotal === true;
 
-            var isSubtotalItem = rowItem.isSubtotal === true || columnItem.isSubtotal === true;
+            let node: DataViewMatrixNodeValue;
+            let valueSource: DataViewMetadataColumn;
+            let rowIndex: number = rowItem.leafIndex;
+            let colIndex: number = columnItem.leafIndex;
+            let bodyCell: MatrixVisualBodyItem;
 
-            if (!rowItem.values)
-                return {
-                    content: '',
-                    isSubtotal: isSubtotalItem,
-                };
+            if (!rowItem.values) {
+                node = undefined;
+            }
+            else {
+                node = <DataViewMatrixNodeValue>(rowItem.values[columnItem.leafIndex]);
+            }
 
-            var intersection = <DataViewMatrixNodeValue>(rowItem.values[columnItem.leafIndex]);
-            if (!intersection)
-                return {
-                    content: '',
-                    isSubtotal: isSubtotalItem,
-                };
+            if (node) {
+                valueSource = this.matrix.valueSources[node.valueSourceIndex || 0];
+                bodyCell = new MatrixVisualBodyItem(node.value, isSubtotalItem, valueSource, this.formatter);
+            }
+            else {
+                bodyCell = new MatrixVisualBodyItem(undefined, isSubtotalItem, undefined, this.formatter);
+            }
 
-            var formatString = valueFormatter.getFormatString(this.matrix.valueSources[intersection.valueSourceIndex ? intersection.valueSourceIndex : 0], Matrix.formatStringProp);
-            var formattedValue = this.formatter(intersection.value, formatString);
+            bodyCell.position.row.index = rowIndex;
+            bodyCell.position.row.indexInSiblings = rowItem.siblings.indexOf(rowItem);
+            bodyCell.position.row.isFirst = rowIndex === 0;
+            bodyCell.position.row.isLast = rowIndex === this.rowHierarchy.leafNodes.length - 1;
+            bodyCell.position.column.index = colIndex;
+            bodyCell.position.column.indexInSiblings = columnItem.siblings.indexOf(columnItem);
+            bodyCell.position.column.isFirst = colIndex === 0;
+            bodyCell.position.column.isLast = colIndex === this.columnHierarchy.leafNodes.length - 1;
 
-            return {
-                content: formattedValue,
-                isSubtotal: isSubtotalItem,
-            };
+            return bodyCell;
         }
-
-        /** Returns the corner cell between a row and a column level. */
+        
+        /**
+         * Returns the corner cell between a row and a column level.
+         */
         public getCorner(rowLevel: number, columnLevel: number): MatrixCornerItem {
             debug.assert(rowLevel >= 0, 'rowLevel');
             debug.assert(columnLevel >= 0, 'columnLevel');
 
-            var columnLevels = this.columnHierarchy.levels;
-            var rowLevels = this.rowHierarchy.levels;
+            let columnLevels = this.columnHierarchy.levels;
+            let rowLevels = this.rowHierarchy.levels;
 
             if (columnLevel === columnLevels.length - 1 || columnLevels.length === 0) {
-                var levelSource = rowLevels[rowLevel];
+                let levelSource = rowLevels[rowLevel];
                 if (levelSource)
                     return {
                         metadata: levelSource.sources[0],
@@ -277,7 +383,7 @@ module powerbi.visuals {
             }
 
             if (rowLevel === rowLevels.length - 1) {
-                var levelSource = columnLevels[columnLevel];
+                let levelSource = columnLevels[columnLevel];
                 if (levelSource)
                     return {
                         metadata: levelSource.sources[0],
@@ -294,37 +400,47 @@ module powerbi.visuals {
         }
 
         public headerItemEquals(item1: MatrixVisualNode, item2: MatrixVisualNode): boolean {
-            return (item1 === item2);
+            if (item1 && item2)
+                return (item1 === item2);
+            else
+                return false;
         }
 
         public bodyCellItemEquals(item1: MatrixVisualBodyItem, item2: MatrixVisualBodyItem): boolean {
-            return (item1 === item2);
+            return (item1.position.isMatch(item2.position));
         }
 
         public cornerCellItemEquals(item1: any, item2: any): boolean {
-            return (item1 === item2);
+            return item1 === item2;
         }
 
-        /** Implementation for MatrixDataAdapter interface */
-        public update(dataViewMatrix?: DataViewMatrix): void {
+        public getMatrixColumnHierarchy(): MatrixHierarchy {
+            return this.columnHierarchy;
+        }
+
+        public getMatrixRowHierarchy(): MatrixHierarchy {
+            return this.rowHierarchy;
+        }
+        
+        /**
+         * Implementation for MatrixDataAdapter interface.
+         */
+        public update(dataViewMatrix?: DataViewMatrix, updateColumns: boolean = true): void {
             if (dataViewMatrix) {
                 this.matrix = dataViewMatrix;
                 this.rowHierarchy = MatrixHierarchyNavigator.wrapMatrixHierarchy(dataViewMatrix.rows);
-                this.columnHierarchy = MatrixHierarchyNavigator.wrapMatrixHierarchy(dataViewMatrix.columns);
+                if (updateColumns)
+                    this.columnHierarchy = MatrixHierarchyNavigator.wrapMatrixHierarchy(dataViewMatrix.columns);
             }
             this.updateHierarchy(this.rowHierarchy);
-            this.updateHierarchy(this.columnHierarchy);
-
-            MatrixHierarchyNavigator.updateStaticColumnHeaders(this.columnHierarchy);
-        }
-
-        /** Implementation for MatrixDataAdapter interface */
-        public updateRows(): void {
-            this.updateHierarchy(this.rowHierarchy);
+            if (updateColumns) {
+                this.updateHierarchy(this.columnHierarchy);
+                MatrixHierarchyNavigator.updateStaticColumnHeaders(this.columnHierarchy);
+            }
         }
 
         private static wrapMatrixHierarchy(hierarchy: DataViewHierarchy): MatrixHierarchy {
-            var matrixHierarchy = Prototype.inherit<MatrixHierarchy>(hierarchy);
+            let matrixHierarchy = Prototype.inherit<MatrixHierarchy>(hierarchy);
             matrixHierarchy.leafNodes = [];
 
             return matrixHierarchy;
@@ -339,9 +455,11 @@ module powerbi.visuals {
         }
 
         private updateRecursive(hierarchy: MatrixHierarchy, nodes: MatrixVisualNode[], parent: MatrixVisualNode, cache: MatrixVisualNode[]): void {
-            var level: DataViewHierarchyLevel;
-            for (var i = 0, ilen = nodes.length; i < ilen; i++) {
-                var node = nodes[i];
+            let level: DataViewHierarchyLevel;
+            for (let i = 0, ilen = nodes.length; i < ilen; i++) {
+                let node = nodes[i];
+                node.siblings = nodes;
+
                 if (parent)
                     node.parent = parent;
 
@@ -349,10 +467,11 @@ module powerbi.visuals {
                     level = hierarchy.levels[node.level];
 
                 if (level) {
-                    var source = level.sources[node.levelSourceIndex ? node.levelSourceIndex : 0];
-                    var formatString = valueFormatter.getFormatString(source, Matrix.formatStringProp);
+                    let source = level.sources[node.levelSourceIndex ? node.levelSourceIndex : 0];
+                    let formatString = valueFormatter.getFormatString(source, TablixObjects.PropColumnFormatString.getPropertyID());
                     if (formatString)
-                        node.name = this.formatter(node.value, formatString);
+                        node.name = this.formatter(node.value, source, TablixObjects.PropColumnFormatString.getPropertyID());
+                    node.queryName = source.queryName;
                 }
 
                 node.index = i;
@@ -367,17 +486,17 @@ module powerbi.visuals {
         }
 
         private static updateStaticColumnHeaders(columnHierarchy: MatrixHierarchy): void {
-            var columnLeafNodes = columnHierarchy.leafNodes;
+            let columnLeafNodes = columnHierarchy.leafNodes;
             if (columnLeafNodes && columnLeafNodes.length > 0) {
-                var columnLeafSources = columnHierarchy.levels[columnLeafNodes[0].level].sources;
+                let columnLeafSources = columnHierarchy.levels[columnLeafNodes[0].level].sources;
 
-                for (var i = 0, ilen = columnLeafNodes.length; i < ilen; i++) {
-                    var columnLeafNode = columnLeafNodes[i];
+                for (let i = 0, ilen = columnLeafNodes.length; i < ilen; i++) {
+                    let columnLeafNode = columnLeafNodes[i];
 
                     // Static leaf may need to get label from it's definition
                     if (!columnLeafNode.identity && columnLeafNode.value === undefined) {
                         // We make distincion between null and undefined. Null can be considered as legit value, undefined means we need to fall back to metadata
-                        var source = columnLeafSources[columnLeafNode.levelSourceIndex ? columnLeafNode.levelSourceIndex : 0];
+                        let source = columnLeafSources[columnLeafNode.levelSourceIndex ? columnLeafNode.levelSourceIndex : 0];
                         if (source)
                             columnLeafNode.name = source.displayName;
                     }
@@ -386,11 +505,11 @@ module powerbi.visuals {
         }
 
         private getMatrixHierarchy(rootNodes: MatrixVisualNode[]): MatrixHierarchy {
-            var rowHierarchyRootNodes = this.rowHierarchy.root.children;
+            let rowHierarchyRootNodes = this.rowHierarchy.root.children;
             if (rowHierarchyRootNodes && rootNodes === rowHierarchyRootNodes)
                 return this.rowHierarchy;
 
-            var columnHierarchyRootNodes = this.columnHierarchy.root.children;
+            let columnHierarchyRootNodes = this.columnHierarchy.root.children;
             if (columnHierarchyRootNodes && rootNodes === columnHierarchyRootNodes)
                 return this.columnHierarchy;
 
@@ -401,23 +520,18 @@ module powerbi.visuals {
     export interface MatrixBinderOptions {
         onBindRowHeader?(item: MatrixVisualNode): void;
         totalLabel?: string;
-        onColumnHeaderClick?(queryName: string): void;
+        onColumnHeaderClick?(queryName: string, sortDirection: SortDirection): void;
+        showSortIcons?: boolean;
     }
 
     export class MatrixBinder implements controls.ITablixBinder {
-
-        private static headerClassName = "bi-tablix-header";
-        private static numericCellClassName = "bi-table-cell-numeric";
-        private static columnHeaderLeafClassName = "bi-tablix-column-header-leaf";
-        private static rowHeaderLeafClassName = "bi-tablix-row-header-leaf";
-        private static rowHeaderStaticLeafClassName = "bi-tablix-row-header-static-leaf";
-        private static rowHeaderTopLevelStaticLeafClassName = "bi-tablix-row-header-toplevel-static-leaf";
-        private static bodyCellClassName = "bi-matrix-body-cell";
-        private static totalClassName = "total";
-        private static nonBreakingSpace = '&nbsp;';
-
+        private formattingProperties: TablixFormattingPropertiesMatrix;
         private hierarchyNavigator: IMatrixHierarchyNavigator;
         private options: MatrixBinderOptions;
+
+        private textHeightHeader: number;
+        private textHeightValue: number;
+        private textHeightTotal: number;
 
         constructor(hierarchyNavigator: IMatrixHierarchyNavigator, options: MatrixBinderOptions) {
 
@@ -427,110 +541,263 @@ module powerbi.visuals {
             this.options = options;
         }
 
+        public onDataViewChanged(formattingProperties: TablixFormattingPropertiesMatrix): void {
+            this.formattingProperties = formattingProperties;
+            this.updateTextHeights();
+        }
+
+        private updateTextHeights(): void {
+            let textProps: TextProperties = {
+                fontFamily: '',
+                fontSize: TablixObjects.getTextSizeInPx(this.formattingProperties.general.textSize),
+                text: 'a',
+            };
+
+            textProps.fontFamily = TablixUtils.FontFamilyHeader;
+            this.textHeightHeader = Math.ceil(TextMeasurementService.measureSvgTextHeight(textProps));
+
+            textProps.fontFamily = TablixUtils.FontFamilyCell;
+            this.textHeightValue = Math.ceil(TextMeasurementService.measureSvgTextHeight(textProps));
+
+            textProps.fontFamily = TablixUtils.FontFamilyTotal;
+            this.textHeightTotal = Math.ceil(TextMeasurementService.measureSvgTextHeight(textProps));
+        }
+
         public onStartRenderingSession(): void {
         }
 
         public onEndRenderingSession(): void {
         }
-
-        // Row Header
+        
+        /**
+         * Row Header.
+         */
         public bindRowHeader(item: MatrixVisualNode, cell: controls.ITablixCell): void {
-            var styleClasses: string;
+            TablixUtils.resetCellCssClass(cell);
 
-            var isLeaf = this.hierarchyNavigator && this.hierarchyNavigator.isLeaf(item);
+            let cellStyle = new TablixUtils.CellStyle();
+
+            let isLeaf = this.hierarchyNavigator && this.hierarchyNavigator.isLeaf(item);
             if (isLeaf) {
-                if (!item.identity) {
-                    if (item.level === 0)
-                        styleClasses = MatrixBinder.rowHeaderTopLevelStaticLeafClassName;
-                    else
-                        styleClasses = MatrixBinder.rowHeaderStaticLeafClassName;
-                }
-                else {
-                    styleClasses = MatrixBinder.rowHeaderLeafClassName;
-                }
+                TablixUtils.addCellCssClass(cell, TablixUtils.CssClassMatrixRowHeaderLeaf);
+                cellStyle.borders.right = new TablixUtils.EdgeSettings(TablixObjects.PropGridOutlineWeight.defaultValue, TablixObjects.PropGridOutlineColor.defaultValue);
             }
-            else
-                styleClasses = MatrixBinder.headerClassName;
 
-            if (item.isSubtotal)
-                styleClasses += ' ' + MatrixBinder.totalClassName;
+            if (item.isSubtotal) {
+                cellStyle.paddings.left = TablixUtils.CellPaddingLeftMatrixTotal;
+            }
 
-            cell.extension.setContainerStyle(styleClasses);
-
-            this.bindHeader(item, cell, this.getRowHeaderMetadata(item));
+            this.bindHeader(item, cell, this.getRowHeaderMetadata(item), cellStyle);
 
             if (this.options.onBindRowHeader)
                 this.options.onBindRowHeader(item);
+
+            this.setRowHeaderStyle(cell, cellStyle);
+
+            cell.applyStyle(cellStyle);
+        }
+
+        private setRowHeaderStyle(cell: controls.ITablixCell, style: TablixUtils.CellStyle): void {
+            let propsGrid = this.formattingProperties.grid;
+            let props = this.formattingProperties.rowHeaders;
+            let propsValues = this.formattingProperties.values;
+            let propsCols = this.formattingProperties.columnHeaders;
+
+            style.borders.top = new TablixUtils.EdgeSettings();
+            if (cell.position.row.isFirst) {
+                style.borders.top.applyParams(outline.showTop(props.outline), propsGrid.outlineWeight, propsGrid.outlineColor);
+
+                // If we dont have top border, but Values have, we need to apply extra padding
+                if (!outline.showTop(props.outline) && outline.showTop(propsValues.outline))
+                    style.paddings.top += propsGrid.outlineWeight;
+            } // else: do nothing
+
+            style.borders.bottom = new TablixUtils.EdgeSettings();
+            if (cell.position.row.isLast) {
+                style.borders.bottom.applyParams(outline.showBottom(props.outline), propsGrid.outlineWeight, propsGrid.outlineColor);
+
+                // If we dont have bottom border, but Values have, we need to apply extra padding
+                if (!outline.showBottom(props.outline) && outline.showBottom(propsValues.outline))
+                    style.paddings.bottom += propsGrid.outlineWeight;
+            }
+            else {
+                style.borders.bottom.applyParams(propsGrid.gridHorizontal, propsGrid.gridHorizontalWeight, propsGrid.gridHorizontalColor);
+            }
+
+            style.borders.left = new TablixUtils.EdgeSettings();
+            if (cell.position.column.isFirst) {
+                style.borders.left.applyParams(outline.showLeft(props.outline), propsGrid.outlineWeight, propsGrid.outlineColor);
+
+                // If we dont have left border, but Column Headers have, we need to apply extra padding
+                if (!outline.showLeft(props.outline) && outline.showLeft(propsCols.outline))
+                    style.paddings.left += propsGrid.outlineWeight;
+            } // else: do nothing
+
+            style.borders.right = new TablixUtils.EdgeSettings();
+            if (cell.position.column.isLast) {
+                style.borders.right.applyParams(outline.showRight(props.outline), propsGrid.outlineWeight, propsGrid.outlineColor);
+            }
+            else {
+                style.borders.right.applyParams(propsGrid.gridVertical, propsGrid.gridVerticalWeight, propsGrid.gridVerticalColor);
+            }
+
+            style.fontColor = props.fontColor;
+            style.backColor = props.backColor;
+            style.paddings.top = style.paddings.bottom = propsGrid.rowPadding;
         }
 
         public unbindRowHeader(item: any, cell: controls.ITablixCell): void {
-            cell.extension.clearContainerStyle();
-            controls.HTMLElementUtils.clearChildren(cell.extension.contentHost);
+            TablixUtils.clearCellStyle(cell);
+            TablixUtils.clearCellTextAndTooltip(cell);
         }
-
-        // Column Header
+        
+        /**
+         * Column Header.
+         */
         public bindColumnHeader(item: MatrixVisualNode, cell: controls.ITablixCell): void {
-            var styleClasses: string;
-            var overwriteTotalLabel = false;
+            TablixUtils.resetCellCssClass(cell);
 
-            var isLeaf = this.hierarchyNavigator && this.hierarchyNavigator.isLeaf(item);
+            // Set default style
+            let cellStyle = new TablixUtils.CellStyle();
+
+            let overwriteTotalLabel = false;
+
+            let isLeaf = this.hierarchyNavigator && this.hierarchyNavigator.isLeaf(item);
             if (isLeaf) {
-                styleClasses = MatrixBinder.columnHeaderLeafClassName;
+                cellStyle.borders.bottom = new TablixUtils.EdgeSettings(TablixObjects.PropGridOutlineWeight.defaultValue, TablixObjects.PropGridOutlineColor.defaultValue);
 
-                var sortableHeaderColumnMetadata = this.getSortableHeaderColumnMetadata(item);
-                if (sortableHeaderColumnMetadata) {
+                TablixUtils.addCellCssClass(cell, TablixUtils.CssClassTablixColumnHeaderLeaf);
+                TablixUtils.addCellCssClass(cell, TablixUtils.CssClassTablixValueNumeric);
+
+                let sortableHeaderColumnMetadata = this.getSortableHeaderColumnMetadata(item);
+                if (sortableHeaderColumnMetadata && this.options.showSortIcons) {
                     this.registerColumnHeaderClickHandler(sortableHeaderColumnMetadata, cell);
+                    TablixUtils.createColumnHeaderWithSortIcon(sortableHeaderColumnMetadata, cell);
                 }
 
                 // Overwrite only if the there are subtotal siblings (like in the multimeasure case), which means ALL siblings are subtotals.
                 if (item.isSubtotal && item.parent && item.parent.children.length > 1 && (<MatrixVisualNode>item.parent.children[0]).isSubtotal)
                     overwriteTotalLabel = true;
             }
+
+            cell.extension.disableDragResize();
+            this.bindHeader(item, cell, this.getColumnHeaderMetadata(item), cellStyle, overwriteTotalLabel);
+
+            this.setColumnHeaderStyle(cell, cellStyle);
+
+            cell.applyStyle(cellStyle);
+        }
+
+        private setColumnHeaderStyle(cell: controls.ITablixCell, style: TablixUtils.CellStyle): void {
+            let propsGrid = this.formattingProperties.grid;
+            let props = this.formattingProperties.columnHeaders;
+            let propsValues = this.formattingProperties.values;
+
+            style.fontColor = props.fontColor;
+            style.backColor = props.backColor;
+            style.paddings.top = style.paddings.bottom = propsGrid.rowPadding;
+
+            style.borders.top = new TablixUtils.EdgeSettings();
+            if (cell.position.row.isFirst) {
+                style.borders.top.applyParams(outline.showTop(props.outline), propsGrid.outlineWeight, propsGrid.outlineColor);
+            } // else: do nothing
+
+            style.borders.bottom = new TablixUtils.EdgeSettings();
+            if (cell.position.row.isLast) {
+                style.borders.bottom.applyParams(outline.showBottom(props.outline), propsGrid.outlineWeight, propsGrid.outlineColor);
+            }
             else {
-                styleClasses = MatrixBinder.headerClassName;
+                style.borders.bottom.applyParams(propsGrid.gridHorizontal, propsGrid.gridHorizontalWeight, propsGrid.gridHorizontalColor);
             }
 
-            if (item.isSubtotal)
-                styleClasses += ' ' + MatrixBinder.totalClassName;
+            style.borders.left = new TablixUtils.EdgeSettings();
+            if (cell.position.column.isFirst) {
+                // If we dont have left border, but Values have, we need to apply extra padding
+                if (!outline.showLeft(props.outline) && outline.showLeft(propsValues.outline))
+                    style.paddings.left += propsGrid.outlineWeight;
+            }
 
-            styleClasses += ' ' + MatrixBinder.numericCellClassName;
+            style.borders.right = new TablixUtils.EdgeSettings();
+            if (cell.position.column.isLast) {
+                style.borders.right.applyParams(outline.showRight(props.outline), propsGrid.outlineWeight, propsGrid.outlineColor);
 
-            cell.extension.setContainerStyle(styleClasses);
-            cell.extension.disableDragResize();
-
-            this.bindHeader(item, cell, this.getColumnHeaderMetadata(item), overwriteTotalLabel);
+                // If we dont have right border, but Values have, we need to apply extra padding
+                if (!outline.showRight(props.outline) && outline.showRight(propsValues.outline))
+                    style.paddings.right += propsGrid.outlineWeight;
+            }
+            else {
+                style.borders.right.applyParams(propsGrid.gridVertical, propsGrid.gridVerticalWeight, propsGrid.gridVerticalColor);
+            }
         }
 
         public unbindColumnHeader(item: MatrixVisualNode, cell: controls.ITablixCell): void {
-            cell.extension.clearContainerStyle();
-            cell.extension.contentHost.textContent = '';
+            TablixUtils.clearCellStyle(cell);
+            TablixUtils.clearCellTextAndTooltip(cell);
 
-            var sortableHeaderColumnMetadata = this.getSortableHeaderColumnMetadata(item);
+            let sortableHeaderColumnMetadata = this.getSortableHeaderColumnMetadata(item);
             if (sortableHeaderColumnMetadata) {
                 this.unregisterColumnHeaderClickHandler(cell);
             }
+
+            if (this.options.showSortIcons)
+                TablixUtils.removeSortIcons(cell);
         }
 
-        // Body Cell
-        public bindBodyCell(item: MatrixVisualBodyItem, cell: controls.ITablixCell): void {
-            var styleClasses = MatrixBinder.bodyCellClassName;
+        private bindHeader(item: MatrixVisualNode, cell: controls.ITablixCell, metadata: DataViewMetadataColumn, style: TablixUtils.CellStyle, overwriteSubtotalLabel?: boolean): void {
+            TablixUtils.addCellCssClass(cell, TablixUtils.CssClassTablixHeader);
 
-            if (item.isSubtotal)
-                styleClasses += ' ' + MatrixBinder.totalClassName;
+            style.fontFamily = TablixUtils.FontFamilyHeader;
+            style.fontColor = TablixUtils.FontColorHeaders;
 
-            cell.extension.setContainerStyle(styleClasses);
-            cell.extension.contentHost.textContent = item.content;
+            let imgHeight = this.formattingProperties.grid.imageHeight;
+
+            if (converterHelper.isImageUrlColumn(metadata))
+                cell.contentHeight = imgHeight;
+            else if (item.isSubtotal)
+                cell.contentHeight = this.textHeightTotal;
+            else
+                cell.contentHeight = this.textHeightValue;
+
+            if (item.isSubtotal) {
+                TablixUtils.addCellCssClass(cell, TablixUtils.CssClassTablixValueTotal);
+                style.fontFamily = TablixUtils.FontFamilyTotal;
+
+                if (!overwriteSubtotalLabel) {
+                    TablixUtils.setCellTextAndTooltip(cell, this.options.totalLabel);
+                    return;
+                }
+            }
+
+            let value = MatrixBinder.getNodeLabel(item);
+            if (!value) {
+                // just to maintain the height of the row in case all realized cells are nulls
+                cell.extension.contentHost.innerHTML = TablixUtils.StringNonBreakingSpace;
+            }
+            else if (converterHelper.isWebUrlColumn(metadata) && UrlUtils.isValidUrl(value)) {
+                TablixUtils.appendATagToBodyCell(item.value, cell);
+            }
+            else if (converterHelper.isImageUrlColumn(metadata)) {
+                style.hasImage = true;
+
+                if (UrlUtils.isValidImageUrl(value)) {
+                    TablixUtils.appendImgTagToBodyCell(item.value, cell, imgHeight);
+                }
+                else {
+                    TablixUtils.setCellTextAndTooltip(cell, value);
+                }
+            }
+            else {
+                TablixUtils.setCellTextAndTooltip(cell, value);
+            }
         }
 
-        public unbindBodyCell(item: MatrixVisualBodyItem, cell: controls.ITablixCell): void {
-            cell.extension.clearContainerStyle();
-            cell.extension.contentHost.textContent = '';
-        }
-
-        private registerColumnHeaderClickHandler(columnMetadata: DataViewMetadataColumn, cell: controls.ITablixCell) {
+        private registerColumnHeaderClickHandler(columnMetadata: DataViewMetadataColumn, cell: controls.ITablixCell): void {
             if (this.options.onColumnHeaderClick) {
-                var handler = (e: MouseEvent) => {
-                    this.options.onColumnHeaderClick(columnMetadata.queryName ? columnMetadata.queryName : columnMetadata.displayName);
+                let handler = (e: MouseEvent) => {
+                    if (TablixUtils.isValidSortClick(e)) {
+                        let sortDirection: SortDirection = TablixUtils.reverseSort(columnMetadata.sort);
+                        this.options.onColumnHeaderClick(columnMetadata.queryName ? columnMetadata.queryName : columnMetadata.displayName, sortDirection);
+                    }
                 };
                 cell.extension.registerClickHandler(handler);
             }
@@ -542,38 +809,197 @@ module powerbi.visuals {
             }
         }
 
-        // Corner Cell
+        /**
+         * Body Cell.
+         */
+        public bindBodyCell(item: MatrixVisualBodyItem, cell: controls.ITablixCell): void {
+            TablixUtils.resetCellCssClass(cell);
+
+            let cellStyle = new TablixUtils.CellStyle();
+
+            cell.contentHeight = this.textHeightValue;
+
+            if (item.domContent) {
+                $(cell.extension.contentHost).append(item.domContent);
+            }
+            else
+            {
+                TablixUtils.addCellCssClass(cell, TablixUtils.CssClassTablixValueNumeric);
+                if (item.isTotal) {
+                    TablixUtils.addCellCssClass(cell, TablixUtils.CssClassTablixValueTotal);
+                    cellStyle.fontFamily = TablixUtils.FontFamilyTotal;
+                    cell.contentHeight = this.textHeightTotal;
+                }
+
+                if (item.textContent) {
+                    TablixUtils.setCellTextAndTooltip(cell, item.textContent);
+                }
+            }
+
+            this.setBodyCellStyle(cell, item, cellStyle);
+            cell.applyStyle(cellStyle);
+        }
+
+        private setBodyCellStyle(cell: controls.ITablixCell, item: MatrixVisualBodyItem, style: TablixUtils.CellStyle): void {
+            let propsGrid = this.formattingProperties.grid;
+            let props = this.formattingProperties.values;
+            let propsTotal = this.formattingProperties.subtotals;
+            let propsRows = this.formattingProperties.rowHeaders;
+            let propsColumns = this.formattingProperties.columnHeaders;
+
+            style.paddings.top = style.paddings.bottom = propsGrid.rowPadding;
+
+            style.borders.top = new TablixUtils.EdgeSettings();
+            if (cell.position.row.isFirst) { // First Row
+                style.borders.top.applyParams(outline.showTop(props.outline), propsGrid.outlineWeight, propsGrid.outlineColor);
+
+                // If we dont have top border, but Row Headers have, we need to apply extra padding
+                if (!outline.showTop(props.outline) && outline.showTop(propsRows.outline))
+                    style.paddings.top += propsGrid.outlineWeight;
+
+            } // else: do nothing
+
+            style.borders.bottom = new TablixUtils.EdgeSettings();
+            if (cell.position.row.isLast) { // Last Row
+                style.borders.bottom.applyParams(outline.showBottom(props.outline), propsGrid.outlineWeight, propsGrid.outlineColor);
+
+                // If we dont have bottom border, but Row Headers have, we need to apply extra padding
+                if (!outline.showBottom(props.outline) && outline.showBottom(propsRows.outline))
+                    style.paddings.bottom += propsGrid.outlineWeight;
+            }
+            else {
+                style.borders.bottom.applyParams(propsGrid.gridHorizontal, propsGrid.gridHorizontalWeight, propsGrid.gridHorizontalColor);
+            }
+
+            style.borders.left = new TablixUtils.EdgeSettings();
+            if (cell.position.column.isFirst) { // First Column 
+                style.borders.left.applyParams(outline.showLeft(props.outline), propsGrid.outlineWeight, propsGrid.outlineColor);
+            } // else: do nothing
+
+            style.borders.right = new TablixUtils.EdgeSettings();
+            if (cell.position.column.isLast) { // Last Column
+                style.borders.right.applyParams(outline.showRight(props.outline), propsGrid.outlineWeight, propsGrid.outlineColor);
+
+                // If we dont have right border, but Column Headers have, we need to apply extra padding
+                if (!outline.showRight(props.outline) && outline.showRight(propsColumns.outline))
+                    style.paddings.right += propsGrid.outlineWeight;
+            }
+            else {
+                style.borders.right.applyParams(propsGrid.gridVertical, propsGrid.gridVerticalWeight, propsGrid.gridVerticalColor);
+            }
+
+            let rowBandingIndex: number;
+            if (this.formattingProperties.general.rowSubtotals && propsTotal.backColor) // Totals breaking banding sequence
+                rowBandingIndex = item.position.row.indexInSiblings;
+            else
+                rowBandingIndex = item.position.row.index;
+
+            if (item.isTotal && propsTotal.fontColor) {
+                style.fontColor = propsTotal.fontColor;
+            }
+            else {
+                style.fontColor = rowBandingIndex % 2 === 0 ? props.fontColorPrimary : props.fontColorSecondary;
+            }
+
+            if (item.isTotal && propsTotal.backColor) {
+                style.backColor = propsTotal.backColor;
+            }
+            else {
+                style.backColor = rowBandingIndex % 2 === 0 ? props.backColorPrimary : props.backColorSecondary;
+            }
+        }
+
+        public unbindBodyCell(item: MatrixVisualBodyItem, cell: controls.ITablixCell): void {
+            TablixUtils.clearCellStyle(cell);
+            TablixUtils.clearCellTextAndTooltip(cell);
+        }
+        
+        /**
+         * Corner Cell.
+         */
         public bindCornerCell(item: MatrixCornerItem, cell: controls.ITablixCell): void {
-            var styleClasses: string;
+            TablixUtils.resetCellCssClass(cell);
+
+            let cellStyle = new TablixUtils.CellStyle();
+
+            cellStyle.fontFamily = TablixUtils.FontFamilyHeader;
+            cellStyle.fontColor = TablixUtils.FontColorHeaders;
+
+            cell.contentHeight = this.textHeightHeader;
 
             if (item.isColumnHeaderLeaf) {
-                styleClasses = MatrixBinder.columnHeaderLeafClassName;
-                var cornerHeaderMetadata = this.getSortableCornerColumnMetadata(item);
+                TablixUtils.addCellCssClass(cell, TablixUtils.CssClassTablixColumnHeaderLeaf);
+
+                cellStyle.borders.bottom = new TablixUtils.EdgeSettings(TablixObjects.PropGridOutlineWeight.defaultValue, TablixObjects.PropGridOutlineColor.defaultValue);
+
+                let cornerHeaderMetadata = this.getSortableCornerColumnMetadata(item);
                 if (cornerHeaderMetadata)
                     this.registerColumnHeaderClickHandler(cornerHeaderMetadata, cell);
+
+                if (this.options.showSortIcons)
+                    TablixUtils.createColumnHeaderWithSortIcon(cornerHeaderMetadata, cell);
+                else
+                    TablixUtils.setCellTextAndTooltip(cell, cornerHeaderMetadata.displayName);
+            }
+            else {
+                let itemText = item.metadata ? item.metadata.displayName : '';
+                TablixUtils.setCellTextAndTooltip(cell, itemText);
             }
 
             if (item.isRowHeaderLeaf) {
-                if (styleClasses)
-                    styleClasses += ' ';
-                else
-                    styleClasses = '';
-
-                styleClasses += MatrixBinder.rowHeaderLeafClassName;
+                TablixUtils.addCellCssClass(cell, TablixUtils.CssClassMatrixRowHeaderLeaf);
             }
 
-            if (styleClasses)
-                cell.extension.setContainerStyle(styleClasses);
-            else
-                cell.extension.setContainerStyle(MatrixBinder.headerClassName);
+            TablixUtils.addCellCssClass(cell, TablixUtils.CssClassTablixHeader);
 
+            this.setCornerCellsStyle(cell, cellStyle);
+
+            cell.applyStyle(cellStyle);
             cell.extension.disableDragResize();
-            cell.extension.contentHost.textContent = item.metadata ? item.metadata.displayName : '';
+        }
+
+        private setCornerCellsStyle(cell: controls.ITablixCell, style: TablixUtils.CellStyle): void {
+            let propsGrid = this.formattingProperties.grid;
+            let propsCol = this.formattingProperties.columnHeaders;
+            let propsRow = this.formattingProperties.rowHeaders;
+
+            style.fontColor = propsCol.fontColor || propsRow.fontColor;
+            style.backColor = propsCol.backColor || propsRow.backColor;
+
+            style.paddings.top = style.paddings.bottom = propsGrid.rowPadding;
+
+            style.borders.top = new TablixUtils.EdgeSettings();
+            if (cell.position.row.isFirst) {
+                style.borders.top.applyParams(outline.showTop(propsCol.outline), propsGrid.outlineWeight, propsGrid.outlineColor);
+            } // else: do nothing
+
+            style.borders.bottom = new TablixUtils.EdgeSettings();
+            if (cell.position.row.isLast) {
+                style.borders.bottom.applyParams(outline.showBottom(propsCol.outline), propsGrid.outlineWeight, propsGrid.outlineColor);
+            }
+            else {
+                style.borders.bottom.applyParams(propsGrid.gridHorizontal, propsGrid.gridHorizontalWeight, propsGrid.gridHorizontalColor);
+            }
+
+            style.borders.left = new TablixUtils.EdgeSettings();
+            if (cell.position.column.isFirst) {
+                style.borders.left.applyParams(outline.showLeft(propsCol.outline), propsGrid.outlineWeight, propsGrid.outlineColor);
+
+                // If we dont have left border, but Row Headers have, we need to apply extra padding
+                if (!outline.showLeft(propsCol.outline) && outline.showLeft(propsRow.outline))
+                    style.paddings.left += propsGrid.outlineWeight;
+            } // else: do nothing
+
+            style.borders.right = new TablixUtils.EdgeSettings();
+            style.borders.right.applyParams(propsGrid.gridVertical, propsGrid.gridVerticalWeight, propsGrid.gridVerticalColor);
         }
 
         public unbindCornerCell(item: MatrixCornerItem, cell: controls.ITablixCell): void {
-            cell.extension.clearContainerStyle();
-            cell.extension.contentHost.textContent = '';
+            TablixUtils.clearCellStyle(cell);
+            TablixUtils.clearCellTextAndTooltip(cell);
+
+            if (this.options.showSortIcons)
+                TablixUtils.removeSortIcons(cell);
 
             if (item.isColumnHeaderLeaf) {
                 this.unregisterColumnHeaderClickHandler(cell);
@@ -591,19 +1017,21 @@ module powerbi.visuals {
 
         public unbindEmptySpaceFooterCell(cell: controls.ITablixCell): void {
         }
-
-        // Measurement Helper
+        
+        /**
+         * Measurement Helper.
+         */
         public getHeaderLabel(item: MatrixVisualNode): string {
             return MatrixBinder.getNodeLabel(item);
         }
 
         public getCellContent(item: MatrixVisualBodyItem): string {
-            return item.content;
+            return item.textContent || '';
         }
 
         public hasRowGroups(): boolean {
             // Figure out whether we have a static row header, i.e., not row groups
-            var dataView = this.hierarchyNavigator.getDataViewMatrix();
+            let dataView = this.hierarchyNavigator.getDataViewMatrix();
 
             if (!dataView || !dataView.rows || !dataView.rows.levels || dataView.rows.levels.length === 0)
                 return false;
@@ -622,41 +1050,22 @@ module powerbi.visuals {
 
             return '';
         }
-
-        private bindHeader(item: MatrixVisualNode, cell: controls.ITablixCell, metadata: DataViewMetadataColumn, overwriteSubtotalLabel?: boolean): void {
-            if (item.isSubtotal && !overwriteSubtotalLabel) {
-                cell.extension.contentHost.textContent = this.options.totalLabel;
-                return;
-            }
-
-            var value = MatrixBinder.getNodeLabel(item);
-            if (!value) {
-                // just to maintain the height of the row in case all realized cells are nulls
-                cell.extension.contentHost.innerHTML = MatrixBinder.nonBreakingSpace;
-                return;
-            }
-
-            if (metadata && UrlHelper.isValidUrl(metadata, value)) {
-                controls.internal.TablixUtils.appendATagToBodyCell(item.value, cell);
-            }
-            else
-                cell.extension.contentHost.textContent = value;
-        }
-
-        /** Returns the column metadata of the column that needs to be sorted for the specified matrix corner node.
-            Returns null if the specified corner node does not represent a sortable header. */
+       
+        /**
+         * Returns the column metadata of the column that needs to be sorted for the specified matrix corner node.
+         * 
+         * @return Column metadata or null if the specified corner node does not represent a sortable header.
+         */
         private getSortableCornerColumnMetadata(item: MatrixCornerItem): DataViewMetadataColumn {
-            if (!item.isColumnHeaderLeaf)
-                return null;
-
-            return item.metadata;
+            if (item.isColumnHeaderLeaf)
+                return item.metadata;
         }
 
         private getRowHeaderMetadata(item: MatrixVisualNode): DataViewMetadataColumn {
             if (!this.hierarchyNavigator || !item)
                 return;
 
-            var dataView = this.hierarchyNavigator.getDataViewMatrix();
+            let dataView = this.hierarchyNavigator.getDataViewMatrix();
 
             if (!dataView || !dataView.rows)
                 return;
@@ -668,7 +1077,7 @@ module powerbi.visuals {
             if (!this.hierarchyNavigator || !item)
                 return;
 
-            var dataView = this.hierarchyNavigator.getDataViewMatrix();
+            let dataView = this.hierarchyNavigator.getDataViewMatrix();
             if (!dataView || !dataView.columns)
                 return;
 
@@ -679,35 +1088,49 @@ module powerbi.visuals {
             if (!hierarchy || !hierarchy.levels || hierarchy.levels.length < level)
                 return;
 
-            var levelInfo = hierarchy.levels[level];
+            let levelInfo = hierarchy.levels[level];
             if (!levelInfo || !levelInfo.sources || levelInfo.sources.length === 0)
                 return;
 
             // This assumes the source will always be the first item in the array of sources.
             return levelInfo.sources[0];
         }
-
-        /** Returns the column metadata of the column that needs to be sorted for the specified header node.
-            Returns null if the specified header node does not represent a sortable header. */
+        
+        /**
+         * Returns the column metadata of the column that needs to be sorted for the specified header node.
+         * 
+         * @return Column metadata or null if the specified header node does not represent a sortable header.
+         */
         private getSortableHeaderColumnMetadata(item: MatrixVisualNode): DataViewMetadataColumn {
-
-            var dataView = this.hierarchyNavigator.getDataViewMatrix();
+            let dataView = this.hierarchyNavigator.getDataViewMatrix();
 
             // If there are no row groups, sorting is not supported (as it does not make sense).
             if (!dataView.rows || !dataView.rows.levels || dataView.rows.levels.length === 0)
                 return null;
 
-            // Note that the measures establish a level as well, so need to subtract 1
-            var columnGroupCount = dataView.columns ? dataView.columns.levels.length - 1 : 0;
+            let isMultiMeasure: boolean = dataView.valueSources && dataView.valueSources.length > 1;
 
-            var valueIndex: number = -1;
+            let columnGroupCount = dataView.columns ? dataView.columns.levels.length : 0;
+
+            // If we have multiple values, they establish an extra level, so need to subtract 1
+            if (isMultiMeasure) {
+                columnGroupCount--;
+            }
+            // Check if it has only 1 measure with no column groups
+            else if (columnGroupCount === 1 &&
+                dataView.columns.levels[0] &&
+                dataView.columns.levels[0].sources && dataView.columns.levels[0].sources[0] &&
+                dataView.columns.levels[0].sources[0].roles && dataView.columns.levels[0].sources[0].roles["Values"]) {
+                columnGroupCount = 0;
+            }
+
+            let valueIndex: number = -1;
             if (columnGroupCount === 0) {
                 // Matrices without column groups, support sorting on all columns (which are then measure columns).
                 valueIndex = item.levelSourceIndex;
             }
             else if (item.isSubtotal) {
                 // Matrices with column groups support sorting only on the column grand total.
-                var isMultiMeasure: boolean = dataView.valueSources && dataView.valueSources.length > 1;
 
                 if (isMultiMeasure) {
                     // In the multi-measure case we need to check if the parent's level is 0 in order
@@ -736,100 +1159,58 @@ module powerbi.visuals {
         }
     }
 
-    export class Matrix implements IVisual {
-        public static formatStringProp: DataViewObjectPropertyIdentifier = { objectName: 'general', propertyName: 'formatString' };
-        private static preferredLoadMoreThreshold: number = 0.8;
+    export interface MatrixConstructorOptions {
+        isTouchEnabled?: boolean;
+    }
 
-        // DEVNOTE: public only for testing
+    export class Matrix implements IVisual {
+        private static preferredLoadMoreThreshold: number = 0.8;
+        
+        /**
+         * Note: Public only for testing.
+         */
         public static TotalLabel = 'TableTotalLabel';
 
         private element: JQuery;
         private currentViewport: IViewport;
         private style: IVisualStyle;
         private dataView: DataView;
-        private formatter: ICustomValueFormatter;
+        private formatter: ICustomValueColumnFormatter;
         private isInteractive: boolean;
+        private isTouchEnabled: boolean;
         private hostServices: IVisualHostServices;
         private hierarchyNavigator: IMatrixHierarchyNavigator;
         private waitingForData: boolean;
         private tablixControl: controls.TablixControl;
         private lastAllowHeaderResize: boolean;
         private waitingForSort: boolean;
+        private columnWidthManager: controls.TablixColumnWidthManager;
 
-        public static capabilities: VisualCapabilities = {
-            dataRoles: [
-                {
-                    name: RoleNames.rows,
-                    kind: VisualDataRoleKind.Grouping
-                }, {
-                    name: RoleNames.columns,
-                    kind: VisualDataRoleKind.Grouping
-                }, {
-                    name: RoleNames.values,
-                    kind: VisualDataRoleKind.Measure
-                }
-            ],
-            objects: {
-                general: {
-                    displayName: data.createDisplayNameGetter('Visual_General'),
-                    properties: {
-                        formatString: {
-                            type: { formatting: { formatString: true } },
-                        },
-                        rowSubtotals: {
-                            type: { bool: true },
-                            displayName: data.createDisplayNameGetter('Visual_RowTotals')
-                        },
-                        columnSubtotals: {
-                            type: { bool: true },
-                            displayName: data.createDisplayNameGetter('Visual_ColumnTotals')
-                        }
-                    },
-                }
-            },
-            dataViewMappings: [{
-                conditions: [
-                    { 'Rows': { max: 0 }, 'Columns': { max: 0 }, 'Values': { min: 1 } },
-                    { 'Rows': { min: 1 }, 'Columns': { min: 0 }, 'Values': { min: 0 } },
-                    { 'Rows': { min: 0 }, 'Columns': { min: 1 }, 'Values': { min: 0 } }
-                ],
-                matrix: {
-                    rows: {
-                        for: { in: 'Rows' },
-                        /* Explicitly override the server data reduction to make it appropriate for matrix. */
-                        dataReductionAlgorithm: { window: { count: 100 } }
-                    },
-                    columns: {
-                        for: { in: 'Columns' },
-                        /* Explicitly override the server data reduction to make it appropriate for matrix. */
-                        dataReductionAlgorithm: { top: { count: 100 } }
-                    },
-                    values: {
-                        for: { in: 'Values' }
-                    }
-                }
-            }],
-            filterMappings: {
-                measureFilter: {
-                    targetRoles: [RoleNames.rows]
-                }
-            },
-            sorting: {
-                custom: {},
-            },
-            suppressDefaultTitle: true,
-        };
+        /**
+        * Flag indicating that we are persisting objects, so that next onDataChanged can be safely ignored.
+        */
+        public persistingObjects: boolean;
+
+        constructor(options?: MatrixConstructorOptions) {
+            if (options) {
+                this.isTouchEnabled = options.isTouchEnabled;
+            }
+        }
 
         public static customizeQuery(options: CustomizeQueryOptions): void {
-            var dataViewMapping = options.dataViewMappings[0];
+            let dataViewMapping = options.dataViewMappings[0];
             if (!dataViewMapping || !dataViewMapping.matrix || !dataViewMapping.metadata)
                 return;
 
-            var dataViewMatrix: data.CompiledDataViewMatrixMapping = <data.CompiledDataViewMatrixMapping>dataViewMapping.matrix;
+            let dataViewMatrix: data.CompiledDataViewMatrixMapping = <data.CompiledDataViewMatrixMapping>dataViewMapping.matrix;
 
-            var objects: MatrixDataViewObjects = <MatrixDataViewObjects>dataViewMapping.metadata.objects;
-            dataViewMatrix.rows.for.in.subtotalType = Matrix.shouldShowRowSubtotals(objects) ? data.CompiledSubtotalType.After : data.CompiledSubtotalType.None;
-            dataViewMatrix.columns.for.in.subtotalType = Matrix.shouldShowColumnSubtotals(objects) ? data.CompiledSubtotalType.After : data.CompiledSubtotalType.None;
+            // If Columns Hierarchy is not empty, set Window DataReduction Count to 100
+            if (!_.isEmpty(dataViewMatrix.columns.for.in.items)) {
+                dataViewMatrix.rows.dataReductionAlgorithm.window.count = 100;
+            }
+            let objects: DataViewObjects = dataViewMapping.metadata.objects;
+            (<data.CompiledDataViewRoleForMappingWithReduction>dataViewMatrix.rows).for.in.subtotalType = TablixObjects.shouldShowRowSubtotals(objects) ? data.CompiledSubtotalType.After : data.CompiledSubtotalType.None;
+            dataViewMatrix.columns.for.in.subtotalType = TablixObjects.shouldShowColumnSubtotals(objects) ? data.CompiledSubtotalType.After : data.CompiledSubtotalType.None;
         }
 
         public static getSortableRoles(): string[] {
@@ -840,36 +1221,87 @@ module powerbi.visuals {
             this.element = options.element;
             this.style = options.style;
             this.updateViewport(options.viewport);
-            this.formatter = valueFormatter.formatRaw;
+            this.formatter = valueFormatter.formatValueColumn;
             this.isInteractive = options.interactivity && options.interactivity.selection != null;
             this.hostServices = options.host;
+            this.persistingObjects = false;
 
             this.waitingForData = false;
             this.lastAllowHeaderResize = true;
             this.waitingForSort = false;
         }
 
+        public static converter(dataView: DataView): TablixFormattingPropertiesMatrix {
+            debug.assertValue(dataView, 'dataView');
+
+            return TablixObjects.getMatrixObjects(dataView);
+        }
+
         public onResizing(finalViewport: IViewport): void {
             this.updateViewport(finalViewport);
+        }
+
+        /*
+        Public for testing
+        */
+        public getColumnWidthManager(): controls.TablixColumnWidthManager {
+            return this.columnWidthManager;
         }
 
         public onDataChanged(options: VisualDataChangedOptions): void {
             debug.assertValue(options, 'options');
 
-            var previousDataView = this.dataView;
-            if (options.dataViews && options.dataViews.length > 0) {
-                this.dataView = options.dataViews[0];
+            let dataViews = options.dataViews;
+
+            if (dataViews && dataViews.length > 0) {
+                let previousDataView = this.dataView;
+                this.dataView = dataViews[0];
+
+                // We don't check for persisting flag
+                // Any change to the Column Widths need to go through to update all column group instances
+                // ToDo: Consider not resetting scrollbar everytime
+
+                let formattingProperties = Matrix.converter(this.dataView);
+                let textSize = formattingProperties.general.textSize;
 
                 if (options.operationKind === VisualDataChangeOperationKind.Append) {
-                    this.hierarchyNavigator.updateRows();
-                    this.refreshControl(false);
+                    let rootChanged = previousDataView.matrix.rows.root !== this.dataView.matrix.rows.root;
+
+                    this.hierarchyNavigator.update(this.dataView.matrix, rootChanged);
+                    // If Root for Rows or Columns has changed by the DataViewTransform (e.g. when having reorders in values)
+                    if (rootChanged)
+                        this.tablixControl.updateModels(/*resetScrollOffsets*/false, this.dataView.matrix.rows.root.children, this.dataView.matrix.columns.root.children);
+
+                    this.refreshControl(/*clear*/false);
                 } else {
-                    this.updateInternal(this.dataView, previousDataView);
+                    this.createOrUpdateHierarchyNavigator();
+                    this.createColumnWidthManager();
+                    this.createTablixControl(textSize);
+                    let binder = <MatrixBinder>this.tablixControl.getBinder();
+                    binder.onDataViewChanged(formattingProperties);
+
+                    this.updateInternal(textSize, previousDataView);
                 }
             }
 
             this.waitingForData = false;
             this.waitingForSort = false;
+        }
+
+        private createColumnWidthManager(): void {
+            let columnHierarchy: MatrixHierarchy = (<MatrixHierarchyNavigator>this.hierarchyNavigator).getMatrixColumnHierarchy();
+            if (!this.columnWidthManager) {
+                this.columnWidthManager = new controls.TablixColumnWidthManager(this.dataView, true /* isMatrix */, (objectInstances: VisualObjectInstancesToPersist) => this.persistColumnWidths(objectInstances), columnHierarchy.leafNodes);
+            }
+            // Dont update if dataView is coming from persisting
+            else if (!this.persistingObjects) {
+                this.columnWidthManager.updateDataView(this.dataView, columnHierarchy.leafNodes);
+            }
+        }
+
+        private persistColumnWidths(objectInstances: VisualObjectInstancesToPersist): void {
+            this.persistingObjects = true;
+            this.hostServices.persistProperties(objectInstances);
         }
 
         private updateViewport(newViewport: IViewport) {
@@ -879,12 +1311,12 @@ module powerbi.visuals {
                 this.tablixControl.viewport = this.currentViewport;
                 this.verifyHeaderResize();
 
-                this.refreshControl(false);
+                this.refreshControl(/*clear*/false);
             }
         }
 
         private refreshControl(clear: boolean) {
-            if (this.element.visible() || this.getLayoutKind() === controls.TablixLayoutKind.DashboardTile) {
+            if (visibilityHelper.partiallyVisible(this.element) || this.getLayoutKind() === controls.TablixLayoutKind.DashboardTile) {
                 this.tablixControl.refresh(clear);
             }
         }
@@ -893,55 +1325,86 @@ module powerbi.visuals {
             return this.isInteractive ? controls.TablixLayoutKind.Canvas : controls.TablixLayoutKind.DashboardTile;
         }
 
-        private createControl(matrixNavigator: IMatrixHierarchyNavigator): controls.TablixControl {
-            var layoutKind = this.getLayoutKind();
+        private createOrUpdateHierarchyNavigator(): void {
+            if (!this.tablixControl) {
+                let matrixNavigator = createMatrixHierarchyNavigator(this.dataView.matrix, this.formatter);
+                this.hierarchyNavigator = matrixNavigator;
+            }
+            else {
+                this.hierarchyNavigator.update(this.dataView.matrix);
+            }
+        }
 
-            var matrixBinderOptions: MatrixBinderOptions = {
+        private createTablixControl(textSize: number): void {
+            if (!this.tablixControl) {
+                // Create the control
+                this.tablixControl = this.createControl(this.hierarchyNavigator, textSize);
+            }
+        }
+
+        private createControl(matrixNavigator: IMatrixHierarchyNavigator, textSize: number): controls.TablixControl {
+            let layoutKind = this.getLayoutKind();
+
+            let matrixBinderOptions: MatrixBinderOptions = {
                 onBindRowHeader: (item: MatrixVisualNode) => { this.onBindRowHeader(item); },
                 totalLabel: this.hostServices.getLocalizedString(Matrix.TotalLabel),
-                onColumnHeaderClick: (queryName: string) => this.onColumnHeaderClick(queryName),
+                onColumnHeaderClick: (queryName: string, sortDirection: SortDirection) => this.onColumnHeaderClick(queryName, sortDirection),
+                showSortIcons: layoutKind === controls.TablixLayoutKind.Canvas,
             };
-            var matrixBinder = new MatrixBinder(this.hierarchyNavigator, matrixBinderOptions);
+            let matrixBinder = new MatrixBinder(this.hierarchyNavigator, matrixBinderOptions);
 
-            var layoutManager: controls.internal.TablixLayoutManager = layoutKind === controls.TablixLayoutKind.DashboardTile
+            let layoutManager: controls.internal.TablixLayoutManager = layoutKind === controls.TablixLayoutKind.DashboardTile
                 ? controls.internal.DashboardTablixLayoutManager.createLayoutManager(matrixBinder)
-                : controls.internal.CanvasTablixLayoutManager.createLayoutManager(matrixBinder);
+                : controls.internal.CanvasTablixLayoutManager.createLayoutManager(matrixBinder, this.columnWidthManager);
 
-            var tablixContainer = document.createElement('div');
-            tablixContainer.className = "tablixContainer";
+            let tablixContainer = document.createElement('div');
             this.element.append(tablixContainer);
 
-            var tablixOptions: controls.TablixOptions = {
+            let tablixOptions: controls.TablixOptions = {
                 interactive: this.isInteractive,
-                enableTouchSupport: false,
+                enableTouchSupport: this.isTouchEnabled,
+                layoutKind: layoutKind,
+                fontSize: TablixObjects.getTextSizeInPx(textSize),
             };
 
             return new controls.TablixControl(matrixNavigator, layoutManager, matrixBinder, tablixContainer, tablixOptions);
         }
 
-        private updateInternal(dataView: DataView, previousDataView: DataView) {
-            if (!this.tablixControl) {
-                var matrixNavigator = createMatrixHierarchyNavigator(dataView.matrix, this.formatter);
-                this.hierarchyNavigator = matrixNavigator;
-
-                // Create the control
-                this.tablixControl = this.createControl(matrixNavigator);
-            }
-            else {
-                this.hierarchyNavigator.update(dataView.matrix);
+        private updateInternal(textSize: number, previousDataView: DataView) {
+            if (this.getLayoutKind() === controls.TablixLayoutKind.DashboardTile) {
+                this.tablixControl.layoutManager.adjustContentSize(converterHelper.hasImageUrlColumn(this.dataView));
             }
 
+            this.tablixControl.fontSize = TablixObjects.getTextSizeInPx(textSize);
             this.verifyHeaderResize();
 
+            /* To avoid resetting scrollbar every time we persist Objects. If:
+            * AutoSizeColumns options was flipped
+            * A Column was resized manually
+            * A Column was auto-sized
+            */
+
             // Update models before the viewport to make sure column widths are computed correctly
-            this.tablixControl.updateModels(/*resetScrollOffsets*/true, dataView.matrix.rows.root.children, dataView.matrix.columns.root.children);
+            // if a persisting operation is going, don't reset the scrollbar (column resize)
+            this.tablixControl.updateModels(/*resetScrollOffsets*/!this.persistingObjects, this.dataView.matrix.rows.root.children, this.dataView.matrix.columns.root.children);
             this.tablixControl.viewport = this.currentViewport;
-            var shouldClearControl = this.shouldClearControl(previousDataView, dataView);
+            let shouldClearControl = this.shouldClearControl(previousDataView, this.dataView);
 
             // We need the layout for the DIV to be done so that the control can measure items correctly.
             setTimeout(() => {
                 // Render
                 this.refreshControl(shouldClearControl);
+
+                // At this point, all columns are rendered with proper width, reset the flag if it was raised
+                if (this.persistingObjects) {
+                    this.persistingObjects = false;
+                    return;
+                }
+
+                // if AutoSize option was set to OFF, persist all columns width
+                if (this.columnWidthManager.shouldPersistAllColumnWidths()) {
+                    this.columnWidthManager.persistAllColumnWidths(this.tablixControl.layoutManager.columnWidthsToPersist);
+                }
             }, 0);
         }
 
@@ -949,6 +1412,7 @@ module powerbi.visuals {
             if (!this.waitingForSort || !previousDataView || !newDataView)
                 return true;
 
+            // ToDo: Get better criteria
             return !DataViewAnalysis.isMetadataEquivalent(previousDataView.metadata, newDataView.metadata);
         }
 
@@ -959,72 +1423,47 @@ module powerbi.visuals {
             }
         }
 
-        private onColumnHeaderClick(queryName: string) {
-            var sortDescriptors: SortableFieldDescriptor[] = [{
-                queryName: queryName,
-            }];
-            var args: CustomSortEventArgs = {
-                sortDescriptors: sortDescriptors
-            };
+        private onColumnHeaderClick(queryName: string, sortDirection: SortDirection): void {
             this.waitingForSort = true;
-            this.hostServices.onCustomSort(args);
+            this.hostServices.onCustomSort(TablixUtils.getCustomSortEventArgs(queryName, sortDirection));
         }
-
-        /* Public for testability */
+        
+        /**
+         * Note: Public for testability.
+         */
         public needsMoreData(item: MatrixVisualNode): boolean {
             if (this.waitingForData || !this.hierarchyNavigator.isLeaf(item) || !this.dataView.metadata || !this.dataView.metadata.segment)
                 return false;
 
-            var leafCount = this.tablixControl.rowDimension.getItemsCount();
-            var loadMoreThreshold = leafCount * Matrix.preferredLoadMoreThreshold;
+            let leafCount = this.tablixControl.rowDimension.getItemsCount();
+            let loadMoreThreshold = leafCount * Matrix.preferredLoadMoreThreshold;
 
             return this.hierarchyNavigator.getLeafIndex(item) >= loadMoreThreshold;
         }
 
-        private static shouldShowRowSubtotals(objects: MatrixDataViewObjects): boolean {
-            if (objects && objects.general)
-                return objects.general.rowSubtotals !== false;
+        public enumerateObjectInstances(options: EnumerateVisualObjectInstancesOptions): VisualObjectInstanceEnumeration {
+            let enumeration = new ObjectEnumerationBuilder();
 
-            // By default, totals are enabled
-            return true;
-        }
-
-        private static shouldShowColumnSubtotals(objects: MatrixDataViewObjects): boolean {
-            if (objects && objects.general)
-                return objects.general.columnSubtotals !== false;
-
-            // By default, totals are enabled
-            return true;
-        }
-
-        private getMatrixDataViewObjects(): MatrixDataViewObjects {
-            if (this.dataView && this.dataView.metadata && this.dataView.metadata.objects)
-                return <MatrixDataViewObjects>this.dataView.metadata.objects;
-        }
-
-        public enumerateObjectInstances(options: EnumerateVisualObjectInstancesOptions): VisualObjectInstance[] {
-            var instances: VisualObjectInstance[] = [];
-            if (options.objectName === 'general') {
-                var objects = this.getMatrixDataViewObjects();
-
-                instances.push({
-                    selector: null,
-                    properties: {
-                        rowSubtotals: Matrix.shouldShowRowSubtotals(objects),
-                        columnSubtotals: Matrix.shouldShowColumnSubtotals(objects)
-                    },
-                    objectName: options.objectName
-                });
+            // Visuals are initialized with an empty data view before queries are run, therefore we need to make sure that
+            // we are resilient here when we do not have data view.
+            if (this.dataView) {
+                TablixObjects.enumerateObjectInstances(options, enumeration, this.dataView, false, controls.TablixType.Matrix);
             }
-            return instances;
+
+            return enumeration.complete();
         }
 
         private shouldAllowHeaderResize(): boolean {
             return this.hostServices.getViewMode() === ViewMode.Edit;
         }
 
+        public onViewModeChanged(viewMode: ViewMode): void {
+            /* Refreshes the column headers to enable/disable Column resizing */
+            this.updateViewport(this.currentViewport);
+        }
+
         private verifyHeaderResize() {
-            var currentAllowHeaderResize = this.shouldAllowHeaderResize();
+            let currentAllowHeaderResize = this.shouldAllowHeaderResize();
             if (currentAllowHeaderResize !== this.lastAllowHeaderResize) {
                 this.lastAllowHeaderResize = currentAllowHeaderResize;
                 this.tablixControl.layoutManager.setAllowHeaderResize(currentAllowHeaderResize);

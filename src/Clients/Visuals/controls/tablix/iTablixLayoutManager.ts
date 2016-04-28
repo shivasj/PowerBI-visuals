@@ -24,11 +24,9 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../../_references.ts"/>
-
 module powerbi.visuals.controls {
 
-    export enum TablixCellType {
+    export const enum TablixCellType {
         CornerCell,
         RowHeader,
         ColumnHeader,
@@ -41,7 +39,16 @@ module powerbi.visuals.controls {
         colSpan: number;
         rowSpan: number;
         textAlign: string;
-        extension: any;
+        extension: internal.TablixCellPresenter;
+        position: internal.TablixUtils.CellPosition;
+        contentHeight: number;
+        contentWidth: number;
+        containerHeight: number;
+        containerWidth: number;
+
+        unfixRowHeight();
+
+        applyStyle(style: internal.TablixUtils.CellStyle): void;
     }
         
     export interface IDimensionLayoutManager {

@@ -24,15 +24,13 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
-
 module powerbi.data {
     import ArrayExtensions = jsCommon.ArrayExtensions;
 
     /** Rewrites an expression tree, including all descendant nodes. */
-    export class SQExprRewriter implements ISQExprVisitor<SQExpr> {
+    export class SQExprRewriter implements ISQExprVisitor<SQExpr>, IFillRuleDefinitionVisitor<LinearGradient2Definition, LinearGradient3Definition> {
         public visitColumnRef(expr: SQColumnRefExpr): SQExpr {
-            var origArg = expr.source,
+            let origArg = expr.source,
                 rewrittenArg = origArg.accept(this);
 
             if (origArg === rewrittenArg)
@@ -42,7 +40,7 @@ module powerbi.data {
         }
 
         public visitMeasureRef(expr: SQMeasureRefExpr): SQExpr {
-            var origArg = expr.source,
+            let origArg = expr.source,
                 rewrittenArg = origArg.accept(this);
 
             if (origArg === rewrittenArg)
@@ -52,7 +50,7 @@ module powerbi.data {
         }
 
         public visitAggr(expr: SQAggregationExpr): SQExpr {
-            var origArg = expr.arg,
+            let origArg = expr.arg,
                 rewrittenArg = origArg.accept(this);
 
             if (origArg === rewrittenArg)
@@ -61,12 +59,42 @@ module powerbi.data {
             return new SQAggregationExpr(rewrittenArg, expr.func);
         }
 
+        public visitHierarchy(expr: SQHierarchyExpr): SQExpr {
+            let origArg = expr.arg,
+                rewrittenArg = origArg.accept(this);
+
+            if (origArg === rewrittenArg)
+                return expr;
+
+            return new SQHierarchyExpr(rewrittenArg, expr.hierarchy);
+        }
+
+        public visitHierarchyLevel(expr: SQHierarchyLevelExpr): SQExpr {
+            let origArg = expr.arg,
+                rewrittenArg = origArg.accept(this);
+
+            if (origArg === rewrittenArg)
+                return expr;
+
+            return new SQHierarchyLevelExpr(rewrittenArg, expr.level);
+        }
+
+        public visitPropertyVariationSource(expr: SQPropertyVariationSourceExpr): SQExpr {
+            let origArg = expr.arg,
+                rewrittenArg = origArg.accept(this);
+
+            if (origArg === rewrittenArg)
+                return expr;
+
+            return new SQPropertyVariationSourceExpr(rewrittenArg, expr.name, expr.property);
+        }
+
         public visitEntity(expr: SQEntityExpr): SQExpr {
             return expr;
         }
 
         public visitAnd(orig: SQAndExpr): SQExpr {
-            var origLeft = orig.left,
+            let origLeft = orig.left,
                 rewrittenLeft = origLeft.accept(this),
                 origRight = orig.right,
                 rewrittenRight = origRight.accept(this);
@@ -78,7 +106,7 @@ module powerbi.data {
         }
 
         public visitBetween(orig: SQBetweenExpr): SQExpr {
-            var origArg = orig.arg,
+            let origArg = orig.arg,
                 rewrittenArg = origArg.accept(this),
                 origLower = orig.lower,
                 rewrittenLower = origLower.accept(this),
@@ -92,13 +120,13 @@ module powerbi.data {
         }
 
         public visitIn(orig: SQInExpr): SQExpr {
-            var origArgs = orig.args,
+            let origArgs = orig.args,
                 rewrittenArgs = this.rewriteAll(origArgs),
                 origValues: SQExpr[][] = orig.values,
                 rewrittenValues: SQExpr[][];
 
-            for (var i = 0, len = origValues.length; i < len; i++) {
-                var origValueTuple = origValues[i],
+            for (let i = 0, len = origValues.length; i < len; i++) {
+                let origValueTuple = origValues[i],
                     rewrittenValueTuple = this.rewriteAll(origValueTuple);
 
                 if (origValueTuple !== rewrittenValueTuple && !rewrittenValues)
@@ -114,12 +142,12 @@ module powerbi.data {
             return new SQInExpr(rewrittenArgs, rewrittenValues || origValues);
         }
 
-        private rewriteAll(origExprs: SQExpr[]): SQExpr[]{
+        private rewriteAll(origExprs: SQExpr[]): SQExpr[] {
             debug.assertValue(origExprs, 'origExprs');
 
-            var rewrittenResult: SQExpr[];
-            for (var i = 0, len = origExprs.length; i < len; i++) {
-                var origExpr = origExprs[i],
+            let rewrittenResult: SQExpr[];
+            for (let i = 0, len = origExprs.length; i < len; i++) {
+                let origExpr = origExprs[i],
                     rewrittenExpr = origExpr.accept(this);
 
                 if (origExpr !== rewrittenExpr && !rewrittenResult)
@@ -133,7 +161,7 @@ module powerbi.data {
         }
 
         public visitOr(orig: SQOrExpr): SQExpr {
-            var origLeft = orig.left,
+            let origLeft = orig.left,
                 rewrittenLeft = origLeft.accept(this),
                 origRight = orig.right,
                 rewrittenRight = origRight.accept(this);
@@ -145,7 +173,7 @@ module powerbi.data {
         }
 
         public visitCompare(orig: SQCompareExpr): SQExpr {
-            var origLeft = orig.left,
+            let origLeft = orig.left,
                 rewrittenLeft = origLeft.accept(this),
                 origRight = orig.right,
                 rewrittenRight = origRight.accept(this);
@@ -153,11 +181,11 @@ module powerbi.data {
             if (origLeft === rewrittenLeft && origRight === rewrittenRight)
                 return orig;
 
-            return new SQCompareExpr(orig.kind, rewrittenLeft, rewrittenRight);
+            return new SQCompareExpr(orig.comparison, rewrittenLeft, rewrittenRight);
         }
 
         public visitContains(orig: SQContainsExpr): SQExpr {
-            var origLeft = orig.left,
+            let origLeft = orig.left,
                 rewrittenLeft = origLeft.accept(this),
                 origRight = orig.right,
                 rewrittenRight = origRight.accept(this);
@@ -169,7 +197,7 @@ module powerbi.data {
         }
 
         public visitExists(orig: SQExistsExpr): SQExpr {
-            var origArg = orig.arg,
+            let origArg = orig.arg,
                 rewrittenArg = origArg.accept(this);
 
             if (origArg === rewrittenArg)
@@ -179,7 +207,7 @@ module powerbi.data {
         }
 
         public visitNot(orig: SQNotExpr): SQExpr {
-            var origArg = orig.arg,
+            let origArg = orig.arg,
                 rewrittenArg = origArg.accept(this);
 
             if (origArg === rewrittenArg)
@@ -189,7 +217,7 @@ module powerbi.data {
         }
 
         public visitStartsWith(orig: SQStartsWithExpr): SQExpr {
-            var origLeft = orig.left,
+            let origLeft = orig.left,
                 rewrittenLeft = origLeft.accept(this),
                 origRight = orig.right,
                 rewrittenRight = origRight.accept(this);
@@ -205,7 +233,7 @@ module powerbi.data {
         }
 
         public visitDateSpan(orig: SQDateSpanExpr): SQExpr {
-            var origArg = orig.arg,
+            let origArg = orig.arg,
                 rewrittenArg = origArg.accept(this);
 
             if (origArg === rewrittenArg)
@@ -215,7 +243,7 @@ module powerbi.data {
         }
 
         public visitDateAdd(orig: SQDateAddExpr): SQExpr {
-            var origArg = orig.arg,
+            let origArg = orig.arg,
                 rewrittenArg = origArg.accept(this);
 
             if (origArg === rewrittenArg)
@@ -225,6 +253,139 @@ module powerbi.data {
         }
 
         public visitNow(orig: SQNowExpr): SQExpr {
+            return orig;
+        }
+
+        public visitDefaultValue(orig: SQDefaultValueExpr): SQExpr {
+            return orig;
+        }
+
+        public visitAnyValue(orig: SQAnyValueExpr): SQExpr {
+            return orig;
+        }
+
+        public visitArithmetic(orig: SQArithmeticExpr): SQExpr {
+            let origLeft = orig.left,
+                rewrittenLeft = origLeft.accept(this),
+                origRight = orig.right,
+                rewrittenRight = origRight.accept(this);
+
+            if (origLeft === rewrittenLeft && origRight === rewrittenRight)
+                return orig;
+
+            return new SQArithmeticExpr(rewrittenLeft, rewrittenRight, orig.operator);
+        }
+
+        public visitScopedEval(orig: SQScopedEvalExpr): SQExpr {
+            let origExpression = orig.expression,
+                rewrittenExpression = origExpression.accept(this),
+                origScope = orig.scope,
+                rewrittenScope = this.rewriteAll(origScope);
+
+            if (origExpression === rewrittenExpression && origScope === rewrittenScope)
+                return orig;
+
+            return new SQScopedEvalExpr(rewrittenExpression, rewrittenScope);
+        }
+
+        public visitFillRule(orig: SQFillRuleExpr): SQExpr {
+            let origInput = orig.input,
+                rewrittenInput = origInput.accept(this);
+
+            let origRule = orig.rule;
+
+            let origGradient2 = origRule.linearGradient2,
+                rewrittenGradient2 = origGradient2;
+            if (origGradient2) {
+                rewrittenGradient2 = this.visitLinearGradient2(origGradient2);
+            }
+
+            let origGradient3 = origRule.linearGradient3,
+                rewrittenGradient3 = origGradient3;
+            if (origGradient3) {
+                rewrittenGradient3 = this.visitLinearGradient3(origGradient3);
+            }
+
+            if (origInput !== rewrittenInput ||
+                origGradient2 !== rewrittenGradient2 ||
+                origGradient3 !== rewrittenGradient3) {
+                let rewrittenRule: FillRuleDefinition = {};
+                if (rewrittenGradient2)
+                    rewrittenRule.linearGradient2 = rewrittenGradient2;
+                if (rewrittenGradient3)
+                    rewrittenRule.linearGradient3 = rewrittenGradient3;
+
+                return new SQFillRuleExpr(rewrittenInput, rewrittenRule);
+            }
+
+            return orig;
+        }
+
+        public visitLinearGradient2(origGradient2: LinearGradient2Definition): LinearGradient2Definition {
+            debug.assertValue(origGradient2, 'origGradient2');
+
+            let origMin = origGradient2.min,
+                rewrittenMin = this.visitFillRuleStop(origMin),
+                origMax = origGradient2.max,
+                rewrittenMax = this.visitFillRuleStop(origMax);
+
+            if (origMin !== rewrittenMin || origMax !== rewrittenMax) {
+                return {
+                    min: rewrittenMin,
+                    max: rewrittenMax,
+                };
+            }
+
+            return origGradient2;
+        }
+
+        public visitLinearGradient3(origGradient3: LinearGradient3Definition): LinearGradient3Definition {
+            debug.assertValue(origGradient3, 'origGradient3');
+
+            let origMin = origGradient3.min,
+                rewrittenMin = this.visitFillRuleStop(origMin),
+                origMid = origGradient3.mid,
+                rewrittenMid = this.visitFillRuleStop(origMid),
+                origMax = origGradient3.max,
+                rewrittenMax = this.visitFillRuleStop(origMax);
+
+            if (origMin !== rewrittenMin || origMid !== rewrittenMid || origMax !== rewrittenMax) {
+                return {
+                    min: rewrittenMin,
+                    mid: rewrittenMid,
+                    max: rewrittenMax,
+                };
+            }
+
+            return origGradient3;
+        }
+
+        private visitFillRuleStop(stop: RuleColorStopDefinition): RuleColorStopDefinition {
+            debug.assertValue(stop, 'stop');
+
+            let origColor = stop.color,
+                rewrittenColor = stop.color.accept(this);
+
+            let origValue = stop.value,
+                rewrittenValue = origValue;
+            if (origValue)
+                rewrittenValue = origValue.accept(this);
+
+            if (origColor !== rewrittenColor || origValue !== rewrittenValue) {
+                let rewrittenStop: RuleColorStopDefinition = {
+                    color: rewrittenColor
+                };
+
+                if (rewrittenValue)
+                    rewrittenStop.value = rewrittenValue;
+
+                return rewrittenStop;
+            }
+
+            return stop;
+        }
+
+        public visitResourcePackageItem(orig: SQResourcePackageItemExpr): SQExpr {
             return orig;
         }
     }

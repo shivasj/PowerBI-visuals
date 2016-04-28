@@ -24,8 +24,6 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="_references.ts"/>
-
 interface ScriptErrorInfo {
     message: string;
     sourceUrl: string;
@@ -39,7 +37,13 @@ interface ErrorInfoKeyValuePair {
     errorInfoValue: string;
 }
 
+const enum ErrorType {
+    VisualNotSupported = 1,
+}
+
 interface ErrorDetails {
     message: string;
     additionalErrorInfo: ErrorInfoKeyValuePair[];
+    helpLink?: string;
+    errorType?: ErrorType;
 }

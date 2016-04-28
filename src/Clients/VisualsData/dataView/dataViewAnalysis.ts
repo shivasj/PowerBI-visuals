@@ -24,16 +24,42 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
-
 module powerbi {
     export module DataViewAnalysis {
         import ArrayExtensions = jsCommon.ArrayExtensions;
-        import QueryProjectionByProperty = powerbi.data.QueryProjectionsByRole;
+        import QueryProjectionsByRole = powerbi.data.QueryProjectionsByRole;
+        import DataViewObjectDescriptors = powerbi.data.DataViewObjectDescriptors;
+        import DataViewObjectDefinitions = powerbi.data.DataViewObjectDefinitions;
 
         export interface ValidateAndReshapeResult {
             dataView?: DataView;
             isValid: boolean;
+        }
+
+        export interface RoleKindByQueryRef {
+            [queryRef: string]: VisualDataRoleKind;
+        }
+
+        export interface DataViewMappingResult {
+            supportedMappings: DataViewMapping[];
+
+            /** A set of mapping errors if there are no supported mappings */
+            mappingErrors: DataViewMappingMatchError[];
+        }
+
+        export enum DataViewMappingMatchErrorCode {
+            conditionRangeTooLarge,
+            conditionRangeTooSmall,
+            conditionKindExpectedMeasure,
+            conditionKindExpectedGrouping,
+            conditionKindExpectedGroupingOrMeasure,
+        }
+
+        export interface DataViewMappingMatchError {
+            code: DataViewMappingMatchErrorCode;
+            roleName: string;
+            mappingIndex?: number;
+            conditionIndex?: number;
         }
 
         /** Reshapes the data view to match the provided schema if possible. If not, returns null */
@@ -42,23 +68,31 @@ module powerbi {
                 return { dataView: dataView, isValid: true };
 
             if (dataView) {
-                var dataViewMapping = dataViewMappings[0];
+                for (let dataViewMapping of dataViewMappings) {
+                    // Keep the original when possible.
+                    if (supports(dataView, dataViewMapping))
+                        return { dataView: dataView, isValid: true };
 
-                // Keep the original when possible.
-                if (supports(dataView, dataViewMapping))
-                    return { dataView: dataView, isValid: true };
+                    if (dataViewMapping.categorical && dataView.categorical)
+                        return reshapeCategorical(dataView, dataViewMapping);
 
-                if (dataViewMapping.categorical)
-                    return reshapeCategorical(dataView, dataViewMapping);
+                    if (dataViewMapping.tree && dataView.tree)
+                        return reshapeTree(dataView, dataViewMapping.tree);
 
-                if (dataViewMapping.tree)
-                    return reshapeTree(dataView, dataViewMapping.tree);
+                    if (dataViewMapping.single && dataView.single)
+                        return reshapeSingle(dataView, dataViewMapping.single);
 
-                if (dataViewMapping.single)
-                    return reshapeSingle(dataView, dataViewMapping.single);
-
-                if (dataViewMapping.table)
-                    return reshapeTable(dataView, dataViewMapping.table);
+                    if (dataViewMapping.table && dataView.table)
+                        return reshapeTable(dataView, dataViewMapping.table);
+                }
+            }
+            else if (ScriptResultUtil.findScriptResult(dataViewMappings)) {
+                // Currently, PBI Service treats R Script Visuals as static images.
+                // This causes validation to fail, since in PBI service no DataView is generated, but there are DataViewMappings,
+                // to support the PBI Desktop scenario.
+                // This code will be removed once PBI Service fully supports R Script Visuals.
+                // VSTS: 6217994 - [R Viz] Remove temporary DataViewAnalysis validation workaround of static R Script Visual mappings
+                return { dataView: dataView, isValid: true };
             }
 
             return { isValid: false };
@@ -66,28 +100,29 @@ module powerbi {
 
         function reshapeCategorical(dataView: DataView, dataViewMapping: DataViewMapping): ValidateAndReshapeResult {
             debug.assertValue(dataViewMapping, 'dataViewMapping');
+
             //The functionality that used to compare categorical.values.length to schema.values doesn't apply any more, we don't want to use the same logic for re-shaping.
-            var categoryRoleMapping = dataViewMapping.categorical;
-            var categorical = dataView.categorical;
+            let categoryRoleMapping = dataViewMapping.categorical;
+            let categorical = dataView.categorical;
             if (!categorical)
                 return { isValid: false };
 
-            var rowCount;
+            let rowCount;
             if (categoryRoleMapping.rowCount) {
                 rowCount = categoryRoleMapping.rowCount.supported;
                 if (rowCount && rowCount.max) {
-                    var updated: DataViewCategorical;
-                    var categories = categorical.categories;
-                    var maxRowCount = rowCount.max;
-
+                    let updated: DataViewCategorical;
+                    let categories = categorical.categories;
+                    let maxRowCount = rowCount.max;
+                    let originalLength = undefined;
                     if (categories) {
-                        for (var i = 0, len = categories.length; i < len; i++) {
-                            var category = categories[i];
-                            var originalLength = category.values.length;
+                        for (let i = 0, len = categories.length; i < len; i++) {
+                            let category = categories[i];
+                            originalLength = category.values.length;
                             if (maxRowCount !== undefined && originalLength > maxRowCount) {
 
                                 // Row count too large: Trim it to fit.
-                                var updatedCategories = ArrayExtensions.range(category.values, 0, maxRowCount - 1);
+                                let updatedCategories = ArrayExtensions.range(category.values, 0, maxRowCount - 1);
 
                                 updated = updated || { categories: [] };
                                 updated.categories.push({
@@ -106,8 +141,8 @@ module powerbi {
                             updated = updated || {};
                             updated.values = data.DataViewTransform.createValueColumns();
 
-                            for (var i = 0, len = categorical.values.length; i < len; i++) {
-                                var column = categorical.values[i],
+                            for (let i = 0, len = categorical.values.length; i < len; i++) {
+                                let column = categorical.values[i],
                                     updatedColumn: DataViewValueColumn = {
                                         source: column.source,
                                         values: ArrayExtensions.range(column.values, 0, maxRowCount - 1)
@@ -155,8 +190,8 @@ module powerbi {
             debug.assertValue(treeRoleMapping, 'treeRoleMapping');
 
             // TODO: Need to implement the reshaping of Tree
-            var metadata = dataView.metadata;
-            if (conforms(countGroups(metadata.columns), treeRoleMapping.depth) /*&& conforms(countMeasures(metadata.columns), treeRoleMapping.aggregates)*/)
+            let metadata = dataView.metadata;
+            if (validateRange(countGroups(metadata.columns), treeRoleMapping.depth) == null /*&& conforms(countMeasures(metadata.columns), treeRoleMapping.aggregates)*/)
                 return { dataView: dataView, isValid: true };
 
             return { isValid: false };
@@ -173,9 +208,9 @@ module powerbi {
         }
 
         export function countGroups(columns: DataViewMetadataColumn[]): number {
-            var count = 0;
+            let count = 0;
 
-            for (var i = 0, len = columns.length; i < len; i++) {
+            for (let i = 0, len = columns.length; i < len; i++) {
                 if (!columns[i].isMeasure)
                     ++count;
             }
@@ -184,9 +219,9 @@ module powerbi {
         }
 
         export function countMeasures(columns: DataViewMetadataColumn[]): number {
-            var count = 0;
+            let count = 0;
 
-            for (var i = 0, len = columns.length; i < len; i++) {
+            for (let i = 0, len = columns.length; i < len; i++) {
                 if (columns[i].isMeasure)
                     ++count;
             }
@@ -197,6 +232,9 @@ module powerbi {
         /** Indicates whether the dataView conforms to the specified schema. */
         export function supports(dataView: DataView, roleMapping: DataViewMapping, usePreferredDataViewSchema?: boolean): boolean {
             if (!roleMapping || !dataView)
+                return false;
+
+            if (roleMapping.scriptResult && !supportsScriptResult(dataView.scriptResult, roleMapping.scriptResult))
                 return false;
 
             if (roleMapping.categorical && !supportsCategorical(dataView, roleMapping.categorical, usePreferredDataViewSchema))
@@ -217,7 +255,7 @@ module powerbi {
         function supportsCategorical(dataView: DataView, categoryRoleMapping: DataViewCategoricalMapping, usePreferredDataViewSchema?: boolean): boolean {
             debug.assertValue(categoryRoleMapping, 'categoryRoleMapping');
 
-            var dataViewCategorical = dataView.categorical;
+            let dataViewCategorical = dataView.categorical;
             if (!dataViewCategorical)
                 return false;
 
@@ -226,18 +264,18 @@ module powerbi {
             //    return false;
 
             if (categoryRoleMapping.rowCount) {
-                var rowCount = categoryRoleMapping.rowCount.supported;
+                let rowCount = categoryRoleMapping.rowCount.supported;
                 if (usePreferredDataViewSchema && categoryRoleMapping.rowCount.preferred)
                     rowCount = categoryRoleMapping.rowCount.preferred;
 
                 if (rowCount) {
-                    var len: number = 0;
+                    let len: number = 0;
                     if (dataViewCategorical.values && dataViewCategorical.values.length)
                         len = dataViewCategorical.values[0].values.length;
                     else if (dataViewCategorical.categories && dataViewCategorical.categories.length)
                         len = dataViewCategorical.categories[0].values.length;
 
-                    if (!conforms(len, rowCount))
+                    if (validateRange(len, rowCount) != null)
                         return false;
                 }
             }
@@ -257,8 +295,8 @@ module powerbi {
         function supportsTree(dataView: DataView, treeRoleMapping: DataViewTreeMapping): boolean {
             debug.assertValue(treeRoleMapping, 'treeRoleMapping');
 
-            var metadata = dataView.metadata;
-            return conforms(countGroups(metadata.columns), treeRoleMapping.depth);
+            let metadata = dataView.metadata;
+            return validateRange(countGroups(metadata.columns), treeRoleMapping.depth) == null;
         }
 
         function supportsTable(dataViewTable: DataViewTable, tableRoleMapping: DataViewTableMapping, usePreferredDataViewSchema?: boolean): boolean {
@@ -268,16 +306,16 @@ module powerbi {
                 return false;
 
             if (tableRoleMapping.rowCount) {
-                var rowCount = tableRoleMapping.rowCount.supported;
+                let rowCount = tableRoleMapping.rowCount.supported;
                 if (usePreferredDataViewSchema && tableRoleMapping.rowCount.preferred)
                     rowCount = tableRoleMapping.rowCount.preferred;
 
                 if (rowCount) {
-                    var len: number = 0;
+                    let len: number = 0;
                     if (dataViewTable.rows && dataViewTable.rows.length)
                         len = dataViewTable.rows.length;
 
-                    if (!conforms(len, rowCount))
+                    if (validateRange(len, rowCount) != null)
                         return false;
                 }
             }
@@ -285,73 +323,184 @@ module powerbi {
             return true;
         }
 
-        export function conforms(value: number, range: NumberRange): boolean {
-            debug.assertValue(value, 'value');
+        function supportsScriptResult(dataView: DataViewScriptResultData, scriptResultRoleMapping: DataViewScriptResultMapping): boolean {
+            debug.assertValue(scriptResultRoleMapping, 'scriptResultRoleMapping');
 
-            if (!range)
-                return value === 0;
-
-            if (range.min !== undefined && range.min > value)
+            if (!dataView)
                 return false;
 
-            if (range.max !== undefined && range.max < value)
+            if (!dataView.imageBase64)
                 return false;
 
             return true;
         }
 
-        /** Determines the appropriate DataViewMappings for the projections. */
-        export function chooseDataViewMappings(projections: QueryProjectionByProperty, mappings: DataViewMapping[]): DataViewMapping[] {
-            debug.assertValue(projections, 'projections');
-            debug.assertValue(mappings, 'mappings');
+        /** 
+         * Determines whether the value conforms to the range in the role condition, returning undefined
+         * if so or an appropriate error code if not.
+         */
+        export function validateRange(value: number, roleCondition: RoleCondition, ignoreMin?: boolean): DataViewMappingMatchErrorCode {
+            debug.assertValue(value, 'value');
 
-            var supportedMappings: DataViewMapping[] = [];
+            if (!roleCondition)
+                return;
 
-            for (var i = 0, len = mappings.length; i < len; i++) {
-                var mapping = mappings[i],
-                    mappingConditions = mapping.conditions;
+            if (!ignoreMin && roleCondition.min !== undefined && roleCondition.min > value)
+                return DataViewMappingMatchErrorCode.conditionRangeTooSmall;
 
-                if (mappingConditions && mappingConditions.length) {
-                    for (var j = 0, jlen = mappingConditions.length; j < jlen; j++) {
-                        var condition = mappingConditions[j];
-                        if (matchesCondition(projections, condition)) {
-                            supportedMappings.push(mapping);
-                            break;
+            if (roleCondition.max !== undefined && roleCondition.max < value)
+                return DataViewMappingMatchErrorCode.conditionRangeTooLarge;
+        }
+
+        /** 
+         * Determines whether the value conforms to the kind in the role condition, returning undefined
+         * if so or an appropriate error code if not.
+         */
+        function validateKind(roleCondition: RoleCondition, roleName: string, projections: QueryProjectionsByRole, roleKindByQueryRef: RoleKindByQueryRef): DataViewMappingMatchErrorCode {
+            if (!roleCondition || roleCondition.kind === undefined) {
+                return;
+            }
+            let expectedKind = roleCondition.kind;
+            let roleCollection = projections[roleName];
+            if (roleCollection) {
+                let roleProjections = roleCollection.all();
+                for (let roleProjection of roleProjections) {
+                    if (roleKindByQueryRef[roleProjection.queryRef] !== expectedKind) {
+                        switch (expectedKind) {
+                            case VisualDataRoleKind.Measure:
+                                return DataViewMappingMatchErrorCode.conditionKindExpectedMeasure;
+                            case VisualDataRoleKind.Grouping:
+                                return DataViewMappingMatchErrorCode.conditionKindExpectedGrouping;
+                            case VisualDataRoleKind.GroupingOrMeasure:
+                                return DataViewMappingMatchErrorCode.conditionKindExpectedGroupingOrMeasure;
                         }
                     }
                 }
-                else {
-                    supportedMappings.push(mapping);
+            }
+        }
+
+        /** Determines the appropriate DataViewMappings for the projections. */
+        export function chooseDataViewMappings(
+            projections: QueryProjectionsByRole,
+            mappings: DataViewMapping[],
+            roleKindByQueryRef: RoleKindByQueryRef,
+            objectDescriptors?: DataViewObjectDescriptors,
+            objectDefinitions?: DataViewObjectDefinitions): DataViewMappingResult {
+            debug.assertValue(projections, 'projections');
+            debug.assertAnyValue(mappings, 'mappings');
+
+            let supportedMappings: DataViewMapping[] = [];
+            let errors: DataViewMappingMatchError[] = [];
+
+            if (!_.isEmpty(mappings)) {
+                for (let mappingIndex = 0, mappingCount = mappings.length; mappingIndex < mappingCount; mappingIndex++) {
+                    let mapping = mappings[mappingIndex],
+                        mappingConditions = mapping.conditions,
+                        requiredProperties = mapping.requiredProperties;
+                    let allPropertiesValid: boolean = areAllPropertiesValid(requiredProperties, objectDescriptors, objectDefinitions);
+                    let conditionsMet: DataViewMappingCondition[] = [];
+
+                    if (!_.isEmpty(mappingConditions)) {
+                        for (let conditionIndex = 0, conditionCount = mappingConditions.length; conditionIndex < conditionCount; conditionIndex++) {
+                            let condition = mappingConditions[conditionIndex];
+                            let currentConditionErrors = checkForConditionErrors(projections, condition, roleKindByQueryRef);
+                            if (!_.isEmpty(currentConditionErrors)) {
+                                for (let error of currentConditionErrors) {
+                                    error.mappingIndex = mappingIndex;
+                                    error.conditionIndex = conditionIndex;
+                                    errors.push(error);
+                                }
+                            }
+                            else
+                                conditionsMet.push(condition);
+                        }
+                    }
+                    else {
+                        conditionsMet.push({});
+                    }
+
+                    if (!_.isEmpty(conditionsMet) && allPropertiesValid) {
+                        let supportedMapping = _.cloneDeep(mapping);
+
+                        let updatedConditions = _.filter(conditionsMet, (condition) => Object.keys(condition).length > 0);
+                        if (!_.isEmpty(updatedConditions))
+                            supportedMapping.conditions = updatedConditions;
+                        supportedMappings.push(supportedMapping);
+                    }
                 }
             }
 
-            return ArrayExtensions.emptyToNull(supportedMappings);
+            return {
+                supportedMappings: ArrayExtensions.emptyToNull(supportedMappings),
+                mappingErrors: ArrayExtensions.emptyToNull(errors),
+            };
         }
 
-        function matchesCondition(projections: QueryProjectionByProperty, condition: DataViewMappingCondition): boolean {
+        function checkForConditionErrors(projections: QueryProjectionsByRole, condition: DataViewMappingCondition, roleKindByQueryRef: RoleKindByQueryRef): DataViewMappingMatchError[] {
             debug.assertValue(projections, 'projections');
             debug.assertValue(condition, 'condition');
 
-            var conditionRoles = Object.keys(condition);
-            for (var i = 0, len = conditionRoles.length; i < len; i++) {
-                var roleName: string = conditionRoles[i],
-                    range = condition[roleName];
+            let conditionRoles = Object.keys(condition);
+            let errors: DataViewMappingMatchError[] = [];
 
-                var roleCount = getPropertyCount(roleName, projections);
-                if (!conforms(roleCount, range))
-                    return false;
+            for (let i = 0, len = conditionRoles.length; i < len; i++) {
+                let roleName: string = conditionRoles[i],
+                    isDrillable = projections[roleName] && !_.isEmpty(projections[roleName].activeProjectionRefs),
+                    roleCondition = condition[roleName];
+
+                let roleCount = getPropertyCount(roleName, projections, isDrillable);
+                let rangeError = validateRange(roleCount, roleCondition);
+                if (rangeError != null) {
+                    errors.push({
+                        code: rangeError,
+                        roleName: roleName,
+                    });
+                }
+                let kindError = validateKind(roleCondition, roleName, projections, roleKindByQueryRef);
+                if (kindError != null) {
+                    errors.push({
+                        code: kindError,
+                        roleName: roleName,
+                    });
+                }
             }
 
-            return true;
+            return errors;
         }
 
-        export function getPropertyCount(roleName: string, projections: QueryProjectionByProperty): number {
+        function areAllPropertiesValid(requiredProperties: DataViewObjectPropertyIdentifier[], objectDescriptors: DataViewObjectDescriptors, objectDefinitions?: DataViewObjectDefinitions): boolean {
+            if (_.isEmpty(requiredProperties))
+                return true;
+
+            if (!objectDescriptors || !objectDefinitions)
+                return false;
+
+            let staticEvalContext: data.IEvalContext = data.createStaticEvalContext();
+
+            return _.every(requiredProperties, (requiredProperty) => {
+                let objectDescriptorValue = null;
+                let objectDescriptorProperty = objectDescriptors[requiredProperty.objectName];
+                if (objectDescriptorProperty)
+                    objectDescriptorValue = objectDescriptorProperty.properties[requiredProperty.propertyName];
+                let objectDefinitionValue = DataViewObjectDefinitions.getValue(objectDefinitions, requiredProperty, null);
+
+                if (!objectDescriptorValue || !objectDefinitionValue)
+                    return false;
+
+                return data.DataViewObjectEvaluator.evaluateProperty(staticEvalContext, objectDescriptorValue, objectDefinitionValue);
+            });
+        }
+
+        export function getPropertyCount(roleName: string, projections: QueryProjectionsByRole, useActiveIfAvailable?: boolean): number {
             debug.assertValue(roleName, 'roleName');
             debug.assertValue(projections, 'projections');
 
-            var projectionsForRole = projections[roleName];
-            if (projectionsForRole)
+            let projectionsForRole = projections[roleName];
+            if (projectionsForRole) {
+                if (useActiveIfAvailable)
+                    return 1;
                 return projectionsForRole.all().length;
+            }
 
             return 0;
         }
@@ -361,20 +510,20 @@ module powerbi {
                 && dataView2
                 && dataView1.categorical
                 && dataView2.categorical) {
-                var dv1Categories = dataView1.categorical.categories;
-                var dv2Categories = dataView2.categorical.categories;
+                let dv1Categories = dataView1.categorical.categories;
+                let dv2Categories = dataView2.categorical.categories;
                 if (dv1Categories
                     && dv2Categories
                     && dv1Categories.length === dv2Categories.length) {
-                    for (var i = 0, len = dv1Categories.length; i < len; i++) {
-                        var dv1Identity = dv1Categories[i].identity;
-                        var dv2Identity = dv2Categories[i].identity;
+                    for (let i = 0, len = dv1Categories.length; i < len; i++) {
+                        let dv1Identity = dv1Categories[i].identity;
+                        let dv2Identity = dv2Categories[i].identity;
 
-                        var dv1Length = getLengthOptional(dv1Identity);
+                        let dv1Length = getLengthOptional(dv1Identity);
                         if (dv1Length !== getLengthOptional(dv2Identity))
                             return false;
 
-                        for (var j = 0; j < dv1Length; j++) {
+                        for (let j = 0; j < dv1Length; j++) {
                             if (!DataViewScopeIdentity.equals(dv1Identity[j], dv2Identity[j]))
                                 return false;
                         }
@@ -413,24 +562,27 @@ module powerbi {
             if (column1.type !== column2.type)
                 return false;
 
+            if (column1.sort !== column2.sort)
+                return false;
+
             return true;
         }
 
         /* Returns true if the metadata columns at the same positions in the array are equivalent. */
-        export function isMetadataEquivalent(metadata1: DataViewMetadata, metadata2: DataViewMetadata) {
+        export function isMetadataEquivalent(metadata1: DataViewMetadata, metadata2: DataViewMetadata): boolean {
             if (!metadata1 && !metadata2)
                 return true;
 
             if (!metadata1 || !metadata2)
                 return false;
 
-            var previousColumnsLength = metadata1.columns.length;
-            var newColumnsLength = metadata2.columns.length;
+            let previousColumnsLength = metadata1.columns.length;
+            let newColumnsLength = metadata2.columns.length;
 
             if (previousColumnsLength !== newColumnsLength)
                 return false;
 
-            for (var i: number = 0; i < newColumnsLength; i++) {
+            for (let i: number = 0; i < newColumnsLength; i++) {
                 if (!DataViewAnalysis.areMetadataColumnsEquivalent(metadata1.columns[i], metadata2.columns[i]))
                     return false;
             }

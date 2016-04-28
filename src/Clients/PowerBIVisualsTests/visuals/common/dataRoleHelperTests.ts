@@ -24,144 +24,192 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../../_references.ts"/>
-
 module powerbitests {
-    var DataRoleHelper = powerbi.visuals.DataRoleHelper;
+    import DataRoleHelper = powerbi.data.DataRoleHelper;
     import DataViewTransform = powerbi.data.DataViewTransform;
 
-    describe("dataRoleHelper tests",() => {
-        it('getMeasureIndexOfRole with roles validation',() => {
-            var dataViewMetadata: powerbi.DataViewMetadata = {
-                columns: [
-                    { displayName: 'col1' },
-                    { displayName: 'col2', isMeasure: true, roles: { "Size": true } },
-                    { displayName: 'col3', isMeasure: true, roles: { "X": true } },
-                    { displayName: 'col4', isMeasure: true, roles: { "Y": true } }
-                ]
-            };
-            var dataView: powerbi.DataView = {
-                metadata: dataViewMetadata,
-                categorical: {
-                    categories: [{
-                        source: dataViewMetadata.columns[0],
-                        values: ['Montana', 'California', 'Arizona']
-                    }],
-                    values: DataViewTransform.createValueColumns([{
-                        source: dataViewMetadata.columns[1],
-                        values: [-100, 200, 700],
-                        subtotal: 800
-                    }, {
-                            source: dataViewMetadata.columns[2],
-                            values: [1, 2, 3],
-                            subtotal: 6
-                        }, {
-                            source: dataViewMetadata.columns[3],
-                            values: [4, 5, 6],
-                            subtotal: 15
-                        }])
-                }
-            };
-            var grouped = dataView.categorical.values.grouped();
+    describe("dataRoleHelper tests", () => {
+        let dataViewBuilder: DataViewBuilder;
 
-            var result = DataRoleHelper.getMeasureIndexOfRole(grouped, "InvalidRoleName");
+        beforeEach(() => {
+            dataViewBuilder = new DataViewBuilder();
+
+            dataViewBuilder.categoriesValues = ["Montana", "California", "Arizona"];
+            dataViewBuilder.values = [
+                [-100, 200, 700],
+                [1, 2, 3],
+                [4, 5, 6]
+            ];
+        });
+
+        it("getMeasureIndexOfRole with roles validation", () => {
+            dataViewBuilder.columns = [
+                {displayName: "col1"},
+                {displayName: "col2", isMeasure: true, roles: {"Size": true}},
+                {displayName: "col3", isMeasure: true, roles: {"X": true}},
+                {displayName: "col4", isMeasure: true, roles: {"Y": true}}
+            ];
+
+            let dataView: powerbi.DataView = dataViewBuilder.build();
+
+            let grouped = dataView.categorical.values.grouped();
+
+            let result = DataRoleHelper.getMeasureIndexOfRole(grouped, "InvalidRoleName");
             expect(result).toBe(-1);
 
-            result = powerbi.visuals.DataRoleHelper.getMeasureIndexOfRole(grouped, "Size");
+            result = powerbi.data.DataRoleHelper.getMeasureIndexOfRole(grouped, "Size");
             expect(result).toBe(0);
 
-            result = powerbi.visuals.DataRoleHelper.getMeasureIndexOfRole(grouped, "X");
+            result = powerbi.data.DataRoleHelper.getMeasureIndexOfRole(grouped, "X");
             expect(result).toBe(1);
 
-            result = powerbi.visuals.DataRoleHelper.getMeasureIndexOfRole(grouped, "Y");
+            result = powerbi.data.DataRoleHelper.getMeasureIndexOfRole(grouped, "Y");
             expect(result).toBe(2);
         });
 
-        it('getMeasureIndexOfRole without roles validation',() => {
-            var dataViewMetadata: powerbi.DataViewMetadata = {
-                columns: [
-                    { displayName: 'col1' },
-                    { displayName: 'col2', isMeasure: true },
-                    { displayName: 'col3', isMeasure: true },
-                    { displayName: 'col4', isMeasure: true }
-                ]
-            };
-            var dataView: powerbi.DataView = {
-                metadata: dataViewMetadata,
-                categorical: {
-                    categories: [{
-                        source: dataViewMetadata.columns[0],
-                        values: ['Montana', 'California', 'Arizona']
-                    }],
-                    values: DataViewTransform.createValueColumns([{
-                        source: dataViewMetadata.columns[1],
-                        values: [-100, 200, 700],
-                        subtotal: 800
-                    }, {
-                            source: dataViewMetadata.columns[2],
-                            values: [1, 2, 3],
-                            subtotal: 6
-                        }, {
-                            source: dataViewMetadata.columns[3],
-                            values: [4, 5, 6],
-                            subtotal: 15
-                        }])
-                }
-            };
-            var grouped = dataView.categorical.values.grouped();
+        it("getMeasureIndexOfRole without roles validation", () => {
+            dataViewBuilder.columns = [
+                { displayName: "col1" },
+                { displayName: "col2", isMeasure: true },
+                { displayName: "col3", isMeasure: true },
+                { displayName: "col4", isMeasure: true }
+            ];
 
-            var result = DataRoleHelper.getMeasureIndexOfRole(grouped, "InvalidRoleName");
+            let dataView: powerbi.DataView = dataViewBuilder.build();
+
+            let grouped = dataView.categorical.values.grouped();
+
+            let result = DataRoleHelper.getMeasureIndexOfRole(grouped, "InvalidRoleName");
             expect(result).toBe(-1);
 
-            result = powerbi.visuals.DataRoleHelper.getMeasureIndexOfRole(grouped, "Size");
+            result = powerbi.data.DataRoleHelper.getMeasureIndexOfRole(grouped, "Size");
             expect(result).toBe(-1);
 
-            result = powerbi.visuals.DataRoleHelper.getMeasureIndexOfRole(grouped, "X");
+            result = powerbi.data.DataRoleHelper.getMeasureIndexOfRole(grouped, "X");
             expect(result).toBe(-1);
 
-            result = powerbi.visuals.DataRoleHelper.getMeasureIndexOfRole(grouped, "Y");
+            result = powerbi.data.DataRoleHelper.getMeasureIndexOfRole(grouped, "Y");
             expect(result).toBe(-1);
         });
 
-        it('getMeasureIndexOfRole without roles validation with default too few measures',() => {
-            var dataViewMetadata: powerbi.DataViewMetadata = {
-                columns: [
-                    { displayName: 'col1' },
-                    { displayName: 'col2', isMeasure: true },
-                ]
-            };
-            var dataView: powerbi.DataView = {
-                metadata: dataViewMetadata,
-                categorical: {
-                    categories: [{
-                        source: dataViewMetadata.columns[0],
-                        values: ['Montana', 'California', 'Arizona']
-                    }],
-                    values: DataViewTransform.createValueColumns([{
-                        source: dataViewMetadata.columns[1],
-                        values: [-100, 200, 700],
-                        subtotal: 800
-                    }])
-                }
-            };
-            var grouped = dataView.categorical.values.grouped();
+        it("getMeasureIndexOfRole without roles validation with default", () => {
+            dataViewBuilder.columns = [
+                {displayName: "col1"},
+                {displayName: "col2", isMeasure: true},
+                {displayName: "col3", isMeasure: true},
+                {displayName: "col4", isMeasure: true}
+            ];
 
-            var result = powerbi.visuals.DataRoleHelper.getMeasureIndexOfRole(grouped, "2nd measure");
+            let dataView: powerbi.DataView = dataViewBuilder.build();
+
+            let grouped = dataView.categorical.values.grouped();
+
+            let result = powerbi.data.DataRoleHelper.getMeasureIndexOfRole(grouped, "Size");
             expect(result).toBe(-1);
         });
 
-        it('hasRoleInDataView',() => {
-            var dataViewMetadata: powerbi.DataViewMetadata = {
+        it("getMeasureIndexOfRole without roles validation with default too few measures", () => {
+            dataViewBuilder.values = [[-1, 2, 3]];
+
+            dataViewBuilder.columns = [
+                {displayName: "col1"},
+                {displayName: "col2", isMeasure: true}
+            ];
+
+            let dataView: powerbi.DataView = dataViewBuilder.build();
+
+            let grouped = dataView.categorical.values.grouped();
+
+            let result = powerbi.data.DataRoleHelper.getMeasureIndexOfRole(grouped, "2nd measure");
+            expect(result).toBe(-1);
+        });
+
+        it("hasRoleInDataView", () => {
+            let dataViewMetadata: powerbi.DataViewMetadata = {
                 columns: [
-                    { displayName: 'col1', roles: { 'Series': true } },
-                    { displayName: 'col2', isMeasure: true, roles: { "Size": true } },
+                    { displayName: "col1", roles: { "Series": true } },
+                    { displayName: "col2", isMeasure: true, roles: { "Size": true } },
                 ]
             };
-            var dataView: powerbi.DataView = {
+            let dataView: powerbi.DataView = {
                 metadata: dataViewMetadata
             };
-            expect(DataRoleHelper.hasRoleInDataView(dataView, 'Series')).toBe(true);
-            expect(DataRoleHelper.hasRoleInDataView(dataView, 'Category')).toBe(false);
+            expect(DataRoleHelper.hasRoleInDataView(dataView, "Series")).toBe(true);
+            expect(DataRoleHelper.hasRoleInDataView(dataView, "Category")).toBe(false);
         });
     });
+
+    class DataViewBuilder {
+        private _categoriesValues: any[] = [];
+
+        public get categoriesValues(): any[] {
+            return this._categoriesValues;
+        }
+
+        public set categoriesValues(value: any[]) {
+            this._categoriesValues = value;
+        }
+
+        private _values: any[] = [];
+
+        public get values(): any[] {
+            return this._values;
+        }
+
+        public set values(value: any[]) {
+            this._values = value;
+        }
+
+        private _dataViewMetadata;
+
+        public get dataViewMetadata() {
+            return this._dataViewMetadata;
+        }
+
+        private _columns: any[] = [];
+
+        public get columns(): any[] {
+            return this._columns;
+        }
+
+        public set columns(value: any[]) {
+            this._columns = value;
+            this.updateCategoricalValues();
+            this.createDataViewMetadata();
+        }
+
+        private createDataViewMetadata() {
+            this._dataViewMetadata = {
+                columns: this.columns
+            };
+        }
+
+        private categoricalValues: any[] = [];
+
+        private updateCategoricalValues() {
+            let categoricalValues: any[] = [];
+
+            for (let i = 1; i < this.columns.length && (i - 1) < this.values.length; i++) {
+                let categoricalValue = this.values[i - 1];
+                categoricalValue.source = this.columns[i];
+
+                categoricalValues.push(categoricalValue);
+            }
+
+            this.categoricalValues = categoricalValues;
+        }
+
+        public build(): powerbi.DataView {
+            return {
+                metadata: this.dataViewMetadata,
+                categorical: {
+                    categories: [{
+                        source: this.dataViewMetadata.columns[0],
+                        values: this.categoriesValues
+                    }],
+                    values: DataViewTransform.createValueColumns(this.categoricalValues)
+                }
+            };
+        }
+    }
 }

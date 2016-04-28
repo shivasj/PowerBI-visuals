@@ -24,8 +24,6 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="_references.ts"/>
-
 module jsCommon {
 
     export module Formatting {
@@ -37,9 +35,10 @@ module jsCommon {
             s: string;
         }
 
-        var _regexCache: IRegexInt[];
+        let regexCache: IRegexInt[];
 
-        /** Translate .NET format into something supported by jQuery.Globalize
+        /** 
+         * Translate .NET format into something supported by jQuery.Globalize.
          */
         export function findDateFormat(value: Date, format: string, cultureName: string)
         {
@@ -90,7 +89,8 @@ module jsCommon {
               return { value: value, format: format };
         }
          
-        /** Translates unsupported .NET custom format expressions to the custom expressions supported by JQuery.Globalize
+        /** 
+         * Translates unsupported .NET custom format expressions to the custom expressions supported by JQuery.Globalize.
          */
         export function fixDateTimeFormat(format: string): string {
             // Fix for the "K" format (timezone): 
@@ -108,21 +108,21 @@ module jsCommon {
             //The Globalize doesn't support this formatting so we need to replace it with the 4 digit year "yyyy" format.
             format = format.replace(/(^y|^)yyy(^y|$)/g, "yyyy");    
 
-            if (!_regexCache) {
+            if (!regexCache) {
                 // Creating Regexes for cases "Using single format specifier" 
                 //- http://msdn.microsoft.com/en-us/library/8kb3ddd4.aspx#UsingSingleSpecifiers
                 // This is not supported from The Globalize.
                 // The case covers all single "%" lead specifier (like "%d" but not %dd) 
                 // The cases as single "%d" are filtered in if the bellow.
                 // (?!S) where S is the specifier make sure that we only one symbol for specifier.
-                _regexCache = ["d", "f", "F", "g", "h", "H", "K", "m", "M", "s", "t", "y", "z", ":", "/"].map((s) => {
+                regexCache = ["d", "f", "F", "g", "h", "H", "K", "m", "M", "s", "t", "y", "z", ":", "/"].map((s) => {
                     return { r: new RegExp("\%" + s + "(?!" + s + ")", "g"), s: s };
                 });
             }
 
             if (format.indexOf("%") !== -1 && format.length > 2) {
-                for (var i = 0; i < _regexCache.length; i++) {
-                    format = format.replace(_regexCache[i].r, _regexCache[i].s);
+                for (let i = 0; i < regexCache.length; i++) {
+                    format = format.replace(regexCache[i].r, regexCache[i].s);
                 }
             }
             return format;

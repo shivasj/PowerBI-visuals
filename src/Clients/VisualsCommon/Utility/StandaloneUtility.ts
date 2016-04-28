@@ -24,39 +24,67 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
-
 module jsCommon {
     // NOTE: this file includes standalone utilities that should have no dependencies on external libraries, including jQuery.
 
-    /** Interface to help define objects indexed by number to a particular type. */
+    /**
+     * Interface to help define objects indexed by number to a particular type.
+     */
     export interface INumberDictionary<T> {
         [key: number]: T;
     }
 
-    /** Interface to help define objects indexed by name to a particular type. */
+    /**
+     * Interface to help define objects indexed by name to a particular type.
+     */
     export interface IStringDictionary<T> {
         [key: string]: T;
     }
 
-    /** Extensions for Enumerations. */
+    /**
+     * Extensions for Enumerations.
+     */
     export module EnumExtensions {
-        /** Gets a value indicating whether the value has the bit flags set. */
+        /**
+         * Gets a value indicating whether the value has the bit flags set.
+         */
         export function hasFlag(value: number, flag: number): boolean {
             debug.assert(!!flag, 'flag must be specified and nonzero.');
 
             return (value & flag) === flag;
         }
-        
-        // According to the TypeScript Handbook, this is safe to do.
+
+        /**
+         * Sets a value of a flag without modifying any other flags.
+         */        
+        export function setFlag(value: number, flag: number): number {
+            debug.assert(!!flag, "flag must be specified and nonzero.");
+            return value |= flag;
+        }
+
+        /**
+         * Resets a value of a flag without modifying any other flags.
+         */                
+        export function resetFlag(value: number, flag: number): number {
+            debug.assert(!!flag, "flag must be specified and nonzero.");
+            return value &= ~flag;
+        }
+
+        /**
+         * According to the TypeScript Handbook, this is safe to do.
+         */
         export function toString(enumType: any, value: number): string {
             return enumType[value];
         }
     }
 
-    /** Extensions to String class */
+    /**
+     * Extensions to String class.
+     */
     export module StringExtensions {
-        /** Checks if a string ends with a sub-string */
+        /**
+         * Checks if a string ends with a sub-string.
+         */
         export function endsWith(str: string, suffix: string): boolean {
             debug.assertValue(str, 'str');
             debug.assertValue(suffix, 'suffix');
@@ -72,7 +100,9 @@ module jsCommon {
     }
 
     export module JsonComparer {
-        /** Performs JSON-style comparison of two objects. */
+        /**
+         * Performs JSON-style comparison of two objects.
+         */
         export function equals<T>(x: T, y: T): boolean {
             if (x === y)
                 return true;
@@ -80,4 +110,89 @@ module jsCommon {
             return JSON.stringify(x) === JSON.stringify(y);
         }
     }
-} 
+
+    /**
+     * Values are in terms of 'pt'
+     * Convert to pixels using PixelConverter.fromPoint
+     */
+    export module TextSizeDefaults {
+        /**
+         * Stored in terms of 'pt'
+         * Convert to pixels using PixelConverter.fromPoint
+         */
+        export const TextSizeMin: number = 8;
+
+        /**
+         * Stored in terms of 'pt'
+         * Convert to pixels using PixelConverter.fromPoint
+         */
+        export const TextSizeMax: number = 40;
+
+        const TextSizeRange: number = TextSizeMax - TextSizeMin;
+
+        /**
+         * Returns the percentage of this value relative to the TextSizeMax
+         * @param textSize - should be given in terms of 'pt'
+         */
+        export function getScale(textSize: number) {
+            return (textSize - TextSizeMin) / TextSizeRange;
+        }
+
+    }
+
+    export module PixelConverter {
+        const PxPtRatio: number = 4 / 3;
+        const PixelString: string = 'px';
+
+        /**
+         * Appends 'px' to the end of number value for use as pixel string in styles
+         */
+        export function toString(px: number): string {
+            return px + PixelString;
+        }
+
+        /**
+         * Converts point value (pt) to pixels
+         * Returns a string for font-size property
+         * e.g. fromPoint(8) => '24px'
+         */
+        export function fromPoint(pt: number): string {
+            return toString(fromPointToPixel(pt));
+        }
+
+       /**
+        * Converts point value (pt) to pixels
+        * Returns a number for font-size property
+        * e.g. fromPoint(8) => 24px
+        */
+        export function fromPointToPixel(pt: number): number {
+            return (PxPtRatio * pt);
+        }
+
+        /**
+         * Converts pixel value (px) to pt
+         * e.g. toPoint(24) => 8
+         */
+        export function toPoint(px: number): number {
+            return px / PxPtRatio;
+        }
+    }
+
+    export module RegExpExtensions {
+        /**
+         * Runs exec on regex starting from 0 index
+         * This is the expected behavior but RegExp actually remember
+         * the last index they stopped at (found match at) and will
+         * return unexpected results when run in sequence.
+         * @param regex - regular expression object
+         * @param value - string to search wiht regex
+         * @param start - index within value to start regex
+         */
+        export function run(regex: RegExp, value: string, start?: number): RegExpExecArray {
+            debug.assertValue(regex, 'regex');
+
+            regex.lastIndex = start || 0;
+            return regex.exec(value);
+        }
+    }
+}

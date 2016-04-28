@@ -24,8 +24,6 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="_references.ts"/>
-
 $.fn.multiline = function (text) {
     this.text(text);
     this.html(this.html().replace(/\n/g, '<br/>'));
@@ -55,7 +53,9 @@ $.fn.togglePanelControl = function () {
 };
 
 module jsCommon {
-    /** Represents a promise that may be rejected by its consumer. */    
+    /** 
+     * Represents a promise that may be rejected by its consumer.
+     */    
     export interface IRejectablePromise extends JQueryPromise<void> {
         reject(...args: any[]): void;
     }

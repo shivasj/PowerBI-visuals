@@ -24,17 +24,19 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
-
 module jsCommon {
-    // JavaScript files
-    var MSMapcontrol = 'https://ecn.dev.virtualearth.net/mapcontrol/mapcontrol.ashx?v=7.0&s=1&onscriptload=globalMapControlLoaded';
+    /**
+     * JavaScript files.
+     */    
+    const MSMapcontrol = 'https://ecn.dev.virtualearth.net/mapcontrol/mapcontrol.ashx?v=7.0&s=1&onscriptload=globalMapControlLoaded';
 
-    // Map loading logic
-    var MSMapcontrolLoaded = false;
-	var WaitForMSMapLoad: JQueryDeferred<void> = null;
+    /**
+     * Map loading logic.
+     */
+    let MSMapcontrolLoaded = false;
+    let WaitForMSMapLoad: JQueryDeferred<void> = null;
 
-    var PowerViewPackage: IDependency = {
+    const PowerViewPackage: IDependency = {
         javaScriptFiles: [
             powerbi.build + '/externals/pv/webclient.js'
         ],
@@ -46,18 +48,22 @@ module jsCommon {
         ]
     };
 
-    export function ensurePowerView(action: () => void = () => { }): void {
+    export function ensurePowerView(action: () => void = _.noop): void {
         requires(PowerViewPackage, action);
     }
 
-    var MapPackage: IDependency = {
+    const MapPackage: IDependency = {
 		javaScriptFilesWithCallback: [
             { javascriptFile: MSMapcontrol, onLoadCallback: waitForMapControlLoaded }
         ]
     };
 
-    export function ensureMap(action: () => void): void {
-        requires(MapPackage, action);
+    export function ensureMap(locale: string, action: () => void): void {
+        let mapPackageWithLocale = powerbi.Prototype.inherit(MapPackage);
+        if (!_.isEmpty(locale)) {
+            mapPackageWithLocale.javaScriptFilesWithCallback[0].javascriptFile = MSMapcontrol.concat('&mkt=' + locale);
+        }
+        requires(mapPackageWithLocale, action);
     }
 
 	export function mapControlLoaded(): void {
@@ -69,7 +75,7 @@ module jsCommon {
 	}
 
 	export function waitForMapControlLoaded(): JQueryPromise<void> {
-		var task: JQueryDeferred<void>;
+		let task: JQueryDeferred<void>;
 		if (!MSMapcontrolLoaded) {
 			task = WaitForMSMapLoad = $.Deferred<void>();
 		} else {
@@ -82,8 +88,8 @@ module jsCommon {
 }
 
 /* tslint:disable:no-unused-variable */
-var globalMapControlLoaded = function() {
+let globalMapControlLoaded = function() {
 	// Map requires a function in the global namespace to callback once loaded
 	jsCommon.mapControlLoaded();
 };
-
+/* tslint:enable:no-unused-variable */
